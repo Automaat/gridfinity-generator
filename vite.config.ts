@@ -9,6 +9,7 @@ export default defineConfig({
 	},
 	assetsInclude: ['**/*.wasm'],
 	test: {
+		passWithNoTests: true,
 		include: ['src/**/*.{test,spec}.{js,ts}'],
 		coverage: {
 			provider: 'v8',
