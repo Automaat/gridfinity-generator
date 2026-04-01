@@ -6,6 +6,7 @@ function mockSolid(): Record<string, unknown> {
 	const solid: Record<string, unknown> = {};
 	solid.fuse = vi.fn(() => mockSolid());
 	solid.cut = vi.fn(() => mockSolid());
+	solid.intersect = vi.fn(() => mockSolid());
 	solid.translate = vi.fn(() => mockSolid());
 	solid.extrude = vi.fn(() => mockSolid());
 	solid.loftWith = vi.fn(() => mockSolid());
