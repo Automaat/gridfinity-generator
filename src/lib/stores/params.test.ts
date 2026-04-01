@@ -15,6 +15,7 @@ describe('defaultParams', () => {
 			labelTab: false,
 			dividersX: 0,
 			dividersY: 0,
+			lightweightDividers: false,
 			scoopWalls: [],
 			scoopRadius: 0
 		});
@@ -49,6 +50,7 @@ describe('params store', () => {
 			labelTab: true,
 			dividersX: 5,
 			dividersY: 3,
+			lightweightDividers: true,
 			scoopWalls: ['back', 'front'],
 			scoopRadius: 5
 		};
@@ -116,6 +118,7 @@ describe('URL serialization', () => {
 			labelTab: true,
 			dividersX: 2,
 			dividersY: 1,
+			lightweightDividers: true,
 			scoopWalls: ['back', 'front'],
 			scoopRadius: 5
 		};

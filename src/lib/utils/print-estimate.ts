@@ -46,11 +46,12 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	}
 
 	// Dividers
+	const dividerFill = p.lightweightDividers ? 0.45 : 1.0;
 	if (p.dividersX > 0) {
-		volumeMm3 += p.dividersX * p.wallThickness * innerL * wallHeight;
+		volumeMm3 += p.dividersX * p.wallThickness * innerL * wallHeight * dividerFill;
 	}
 	if (p.dividersY > 0) {
-		volumeMm3 += p.dividersY * innerW * p.wallThickness * wallHeight;
+		volumeMm3 += p.dividersY * innerW * p.wallThickness * wallHeight * dividerFill;
 	}
 
 	const volumeCm3 = volumeMm3 / 1000;

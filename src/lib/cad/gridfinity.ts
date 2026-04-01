@@ -1,4 +1,4 @@
-import { draw, drawCircle, drawRoundedRectangle, type Solid, type Sketch } from 'replicad';
+import { draw, drawCircle, drawPolysides, drawRoundedRectangle, type Solid, type Sketch } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
 
 // Gridfinity spec (from kennetek/gridfinity-rebuilt-openscad)
@@ -195,6 +195,63 @@ function buildStackingLip(
 	}
 }
 
+// Lightweight divider hex pattern
+const HEX_RADIUS = 6;
+const HEX_WEB = 3;
+const HEX_MARGIN = 4;
+
+function cutHexPattern(
+	wall: Solid,
+	faceWidth: number,
+	faceHeight: number,
+	wallThickness: number,
+	plane: 'YZ' | 'XZ',
+	wallBottom: number
+): Solid {
+	const usableW = faceWidth - 2 * HEX_MARGIN;
+	const usableH = faceHeight - 2 * HEX_MARGIN;
+	if (usableW < 2 * HEX_RADIUS || usableH < 2 * HEX_RADIUS) return wall;
+
+	const colSpacing = Math.sqrt(3) * HEX_RADIUS + HEX_WEB;
+	const rowSpacing = 1.5 * HEX_RADIUS + HEX_WEB;
+
+	const cols = Math.floor(usableW / colSpacing);
+	const rows = Math.floor(usableH / rowSpacing);
+	if (cols < 1 || rows < 1) return wall;
+
+	const gridW = (cols - 1) * colSpacing;
+	const gridH = (rows - 1) * rowSpacing;
+
+	let holes: Solid | null = null;
+
+	for (let row = 0; row < rows; row++) {
+		const isOdd = row % 2 === 1;
+		const maxCols = isOdd ? cols - 1 : cols;
+		const rowOffset = isOdd ? colSpacing / 2 : 0;
+
+		for (let col = 0; col < maxCols; col++) {
+			const u = -gridW / 2 + col * colSpacing + rowOffset;
+			const v = -gridH / 2 + row * rowSpacing;
+			const zCenter = wallBottom + faceHeight / 2 + v;
+
+			const hex = (
+				drawPolysides(HEX_RADIUS, 6)
+					.rotate(30)
+					.sketchOnPlane(plane, -wallThickness / 2) as Sketch
+			).extrude(wallThickness) as Solid;
+
+			const positioned =
+				plane === 'YZ'
+					? (hex.translate(0, u, zCenter) as Solid)
+					: (hex.translate(u, 0, zCenter) as Solid);
+
+			holes = holes ? (holes.fuse(positioned) as Solid) : positioned;
+		}
+	}
+
+	return holes ? (wall.cut(holes) as Solid) : wall;
+}
+
 function buildDividers(
 	p: BinParams,
 	innerW: number,
@@ -209,12 +266,15 @@ function buildDividers(
 		const spacing = innerW / (p.dividersX + 1);
 		for (let i = 1; i <= p.dividersX; i++) {
 			const xPos = -innerW / 2 + i * spacing;
-			const wall = (
+			let wall = (
 				drawRoundedRectangle(p.wallThickness, innerL, 0).sketchOnPlane(
 					'XY',
 					wallBottom
 				) as Sketch
 			).extrude(wallHeight) as Solid;
+			if (p.lightweightDividers) {
+				wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'YZ', wallBottom);
+			}
 			const positioned = wall.translate(xPos, 0, 0) as Solid;
 			dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
 		}
@@ -225,12 +285,15 @@ function buildDividers(
 		const spacing = innerL / (p.dividersY + 1);
 		for (let i = 1; i <= p.dividersY; i++) {
 			const yPos = -innerL / 2 + i * spacing;
-			const wall = (
+			let wall = (
 				drawRoundedRectangle(innerW, p.wallThickness, 0).sketchOnPlane(
 					'XY',
 					wallBottom
 				) as Sketch
 			).extrude(wallHeight) as Solid;
+			if (p.lightweightDividers) {
+				wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'XZ', wallBottom);
+			}
 			const positioned = wall.translate(0, yPos, 0) as Solid;
 			dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
 		}

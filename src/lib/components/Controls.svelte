@@ -140,6 +140,13 @@
 			<span class="text-sm text-zinc-400">Dividers Y</span>
 			<input type="number" min="0" max="5" step="1" bind:value={$params.dividersY} class={inputClass} />
 		</label>
+
+		{#if $params.dividersX > 0 || $params.dividersY > 0}
+			<label class="flex items-center gap-2 text-sm text-zinc-400">
+				<input type="checkbox" bind:checked={$params.lightweightDividers} class="accent-blue-500" />
+				Lightweight dividers
+			</label>
+		{/if}
 	</div>
 
 	<hr class="border-zinc-700" />

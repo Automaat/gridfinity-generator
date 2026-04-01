@@ -11,6 +11,7 @@ export interface BinParams {
 	labelTab: boolean;
 	dividersX: number;
 	dividersY: number;
+	lightweightDividers: boolean;
 	scoopWalls: ('back' | 'front' | 'left' | 'right')[];
 	scoopRadius: number;
 }
@@ -26,6 +27,7 @@ export const defaultParams: BinParams = {
 	labelTab: false,
 	dividersX: 0,
 	dividersY: 0,
+	lightweightDividers: false,
 	scoopWalls: [],
 	scoopRadius: 0
 };
@@ -49,6 +51,7 @@ const URL_KEYS: Record<string, keyof BinParams> = {
 	lt: 'labelTab',
 	dx: 'dividersX',
 	dy: 'dividersY',
+	ld: 'lightweightDividers',
 	sw: 'scoopWalls',
 	sr: 'scoopRadius'
 };
@@ -103,7 +106,7 @@ export function deserializeParams(search: URLSearchParams): BinParams {
 		} else if (param === 'scoopRadius') {
 			const parsed = parseFloat(raw);
 			p.scoopRadius = clamp(Number.isNaN(parsed) ? 0 : parsed, 0, 20);
-		} else if (param === 'magnetHoles' || param === 'screwHoles' || param === 'labelTab') {
+		} else if (param === 'magnetHoles' || param === 'screwHoles' || param === 'labelTab' || param === 'lightweightDividers') {
 			(p as Record<string, unknown>)[param] = raw === '1';
 		} else if (param === 'wallThickness') {
 			const parsed = parseFloat(raw);
