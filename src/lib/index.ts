@@ -1,1 +1,2 @@
-// place files you want to import through the `$lib` alias in this folder.
+export { params, defaultParams, dimensions } from './stores/params';
+export type { BinParams } from './stores/params';

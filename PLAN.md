@@ -62,36 +62,36 @@ src/
 
 ## Build Phases
 
-### Phase 1 — Scaffold + Basic Bin ✦ MVP
+### Phase 1 — Scaffold + Basic Bin ✦ MVP ✅
 
-1. `npx sv create gridfinity-generator` (SvelteKit, TypeScript)
-2. Install deps: `replicad`, `threlte`, `three`, `tailwindcss`
-3. Set up replicad Web Worker with message passing
-4. Build basic box geometry: single 1×1 bin, no features
-5. Wire Threlte viewer — render mesh from worker output
-6. Add width/length/height sliders → trigger rebuild
-7. STEP export button (replicad `exportSTEP()`)
-8. STL export button (replicad `exportSTL()`)
+1. ✅ `npx sv create gridfinity-generator` (SvelteKit, TypeScript)
+2. ✅ Install deps: `replicad`, `threlte`, `three`, `tailwindcss`, `oxlint`
+3. ✅ Set up replicad Web Worker with message passing
+4. ✅ Build basic box geometry: single 1×1 bin, no features
+5. ✅ Wire Threlte viewer — render mesh from worker output
+6. ✅ Add width/length/height inputs → trigger rebuild (150ms debounce)
+7. ✅ STEP export button (replicad `blobSTEP()`)
+8. ✅ STL export button (replicad `blobSTL()`)
 
 **Goal:** adjustable box with live preview + file download
 
-### Phase 2 — Accurate Gridfinity Profile
+### Phase 2 — Accurate Gridfinity Profile ✅
 
-1. Port exact base profile from OpenSCAD spec (stepped platform)
+1. ✅ Port exact base profile from OpenSCAD spec (lofted stepped platform)
 2. Port stacking lip chamfer profile
-3. Add corner fillets (outer 3.75mm, inner 1.6mm)
-4. Multi-unit grid: repeat base pattern across W×L units
+3. ✅ Add corner fillets (outer 3.75mm, inner 2.8mm)
+4. ✅ Multi-unit grid: repeat base pattern across W×L units
 5. Bottom scoop (optional, standard Gridfinity feature)
 
 **Goal:** dimensionally accurate Gridfinity-compatible bins
 
-### Phase 3 — Compartments + Features
+### Phase 3 — Compartments + Features (in progress)
 
 1. Compartment dividers (boolean subtract internal walls)
-2. Magnet holes (cylinder subtract at grid intersections)
-3. Screw holes (cylinder through base)
+2. ✅ Magnet holes (6.5mm × 2.4mm cylinder subtract at grid corners)
+3. ✅ Screw holes (3mm × 6mm cylinder through base)
 4. Label tab (angled surface at front)
-5. Wall thickness control
+5. ✅ Wall thickness control
 
 **Goal:** fully configurable bins matching commercial generators
 
