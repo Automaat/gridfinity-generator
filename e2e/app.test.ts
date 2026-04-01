@@ -44,9 +44,7 @@ test.describe('controls panel', () => {
 		await page.goto('/');
 
 		const widthInput = page.locator('input[type="number"]').first();
-		await widthInput.clear();
-		await widthInput.type('4');
-		await widthInput.dispatchEvent('input');
+		await widthInput.fill('4');
 
 		await expect(page.getByText('Width (168mm)')).toBeVisible({ timeout: 3000 });
 	});
@@ -74,14 +72,14 @@ test.describe('controls panel', () => {
 	test('renders stacking lip dropdown with standard selected', async ({ page }) => {
 		await page.goto('/');
 
-		const select = page.locator('select');
+		const select = page.getByLabel('Stacking lip');
 		await expect(select).toHaveValue('standard');
 	});
 
 	test('can change stacking lip option', async ({ page }) => {
 		await page.goto('/');
 
-		const select = page.locator('select');
+		const select = page.getByLabel('Stacking lip');
 		await select.selectOption('reduced');
 		await expect(select).toHaveValue('reduced');
 
