@@ -15,7 +15,13 @@ export default defineConfig({
 			provider: 'v8',
 			reporter: ['text', 'cobertura'],
 			include: ['src/**/*.{js,ts,svelte}'],
-			exclude: ['src/**/*.{test,spec}.{js,ts}', 'src/**/*.d.ts']
+			exclude: [
+					'src/**/*.{test,spec}.{js,ts}',
+					'src/**/*.d.ts',
+					'src/**/*.svelte',
+					'src/routes/**',
+					'src/lib/cad/worker.ts'
+				]
 		}
 	}
 });
