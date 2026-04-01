@@ -44,7 +44,9 @@ test.describe('controls panel', () => {
 		await page.goto('/');
 
 		const widthInput = page.locator('input[type="number"]').first();
-		await widthInput.fill('4');
+		await widthInput.clear();
+		await widthInput.pressSequentially('4');
+		await widthInput.dispatchEvent('input');
 
 		await expect(page.getByText('Width (168mm)')).toBeVisible({ timeout: 3000 });
 	});
