@@ -41,6 +41,11 @@ vi.mock('replicad', () => ({
 	})),
 	drawRoundedRectangle: vi.fn(() => ({
 		sketchOnPlane: vi.fn(() => mockSketch())
+	})),
+	drawPolysides: vi.fn(() => ({
+		rotate: vi.fn(() => ({
+			sketchOnPlane: vi.fn(() => mockSketch())
+		}))
 	}))
 }));
 
@@ -59,6 +64,7 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 		labelTab: false,
 		dividersX: 0,
 		dividersY: 0,
+		lightweightDividers: false,
 		scoopWalls: [],
 		scoopRadius: 0,
 		...overrides
@@ -274,5 +280,29 @@ describe('buildBin', () => {
 	it('uses custom scoop radius', () => {
 		const result = buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 3 }));
 		expect(result).toBeDefined();
+	});
+
+	it('creates lightweight X dividers with hex pattern', () => {
+		const spy = vi.mocked(replicad.drawPolysides);
+		buildBin(makeParams({ dividersX: 1, lightweightDividers: true, height: 5 }));
+		expect(spy).toHaveBeenCalled();
+	});
+
+	it('creates lightweight Y dividers with hex pattern', () => {
+		const spy = vi.mocked(replicad.drawPolysides);
+		buildBin(makeParams({ dividersY: 1, lightweightDividers: true, height: 5 }));
+		expect(spy).toHaveBeenCalled();
+	});
+
+	it('skips hex pattern when lightweightDividers is false', () => {
+		const spy = vi.mocked(replicad.drawPolysides);
+		buildBin(makeParams({ dividersX: 1, lightweightDividers: false }));
+		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it('skips hex pattern when no dividers exist', () => {
+		const spy = vi.mocked(replicad.drawPolysides);
+		buildBin(makeParams({ dividersX: 0, dividersY: 0, lightweightDividers: true }));
+		expect(spy).not.toHaveBeenCalled();
 	});
 });
