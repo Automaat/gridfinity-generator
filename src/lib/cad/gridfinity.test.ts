@@ -58,6 +58,7 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 		labelTab: false,
 		dividersX: 0,
 		dividersY: 0,
+		bottomScoop: false,
 		...overrides
 	};
 }
@@ -217,5 +218,32 @@ describe('buildBin', () => {
 		// With height=1, stackingLip='standard': wallHeight = 7 - 7 - 4.75 = negative
 		const result = buildBin(makeParams({ height: 1, stackingLip: 'standard' }));
 		expect(result).toBeDefined();
+	});
+
+	it('creates bottom scoops when enabled', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		buildBin(makeParams({ bottomScoop: true }));
+		// drawCircle used for scoop cylinder (1 compartment = 1 scoop)
+		expect(spy).toHaveBeenCalled();
+	});
+
+	it('creates scoop per compartment with dividers', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		buildBin(makeParams({ bottomScoop: true, dividersX: 0, dividersY: 0 }));
+		const scoopsNoDividers = spy.mock.calls.length;
+
+		vi.clearAllMocks();
+		buildBin(makeParams({ bottomScoop: true, dividersX: 1, dividersY: 1 }));
+		const scoopsWithDividers = spy.mock.calls.length;
+
+		// 2x2=4 compartments vs 1
+		expect(scoopsWithDividers).toBeGreaterThan(scoopsNoDividers);
+	});
+
+	it('skips scoop when wall height too short', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		// height=1 + stackingLip='none' → wallHeight = 7-7 = 0
+		buildBin(makeParams({ bottomScoop: true, height: 1 }));
+		expect(spy).not.toHaveBeenCalled();
 	});
 });

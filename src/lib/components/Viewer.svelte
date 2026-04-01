@@ -2,6 +2,7 @@
 	import { Canvas, T } from '@threlte/core';
 	import { OrbitControls } from '@threlte/extras';
 	import { BufferGeometry, BufferAttribute, DoubleSide } from 'three';
+	import DimensionOverlay from './DimensionOverlay.svelte';
 
 	interface Props {
 		vertices: Float32Array | null;
@@ -33,10 +34,15 @@
 
 <div class="relative h-full w-full">
 	{#if loading}
-		<div class="absolute inset-0 z-10 flex items-center justify-center bg-black/20">
-			<div class="rounded-lg bg-zinc-800 px-4 py-2 text-sm text-zinc-300">Generating...</div>
+		<div class="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
+			<div class="flex items-center gap-3 rounded-lg bg-zinc-800 px-4 py-3">
+				<div class="h-5 w-5 animate-spin rounded-full border-2 border-zinc-500 border-t-blue-400"></div>
+				<span class="text-sm text-zinc-300">Generating...</span>
+			</div>
 		</div>
 	{/if}
+
+	<DimensionOverlay />
 
 	<Canvas>
 		<T.PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={10000}>

@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { get } from 'svelte/store';
-import { params, defaultParams, dimensions, type BinParams } from './params';
+import { params, defaultParams, dimensions, serializeParams, deserializeParams, type BinParams } from './params';
 
 describe('defaultParams', () => {
 	it('has correct default values', () => {
@@ -14,7 +14,8 @@ describe('defaultParams', () => {
 			stackingLip: 'standard',
 			labelTab: false,
 			dividersX: 0,
-			dividersY: 0
+			dividersY: 0,
+			bottomScoop: false
 		});
 	});
 });
@@ -46,7 +47,8 @@ describe('params store', () => {
 			stackingLip: 'reduced',
 			labelTab: true,
 			dividersX: 5,
-			dividersY: 3
+			dividersY: 3,
+			bottomScoop: true
 		};
 		params.set(custom);
 		expect(get(params)).toEqual(custom);
@@ -96,5 +98,62 @@ describe('dimensions derived store', () => {
 
 		// reset
 		params.set({ ...defaultParams });
+	});
+});
+
+describe('URL serialization', () => {
+	it('round-trips all params', () => {
+		const custom: BinParams = {
+			width: 4,
+			length: 3,
+			height: 7,
+			wallThickness: 1.6,
+			magnetHoles: true,
+			screwHoles: true,
+			stackingLip: 'reduced',
+			labelTab: true,
+			dividersX: 2,
+			dividersY: 1,
+			bottomScoop: true
+		};
+		const sp = serializeParams(custom);
+		const result = deserializeParams(sp);
+		expect(result).toEqual(custom);
+	});
+
+	it('omits default values from URL', () => {
+		const sp = serializeParams(defaultParams);
+		expect(sp.toString()).toBe('');
+	});
+
+	it('returns defaults for empty search', () => {
+		const result = deserializeParams(new URLSearchParams(''));
+		expect(result).toEqual(defaultParams);
+	});
+
+	it('clamps out-of-range values', () => {
+		const sp = new URLSearchParams('w=99&h=0&wt=5&dx=-1');
+		const result = deserializeParams(sp);
+		expect(result.width).toBe(6);
+		expect(result.height).toBe(1);
+		expect(result.wallThickness).toBe(2.0);
+		expect(result.dividersX).toBe(0);
+	});
+
+	it('handles partial URL', () => {
+		const sp = new URLSearchParams('w=3&mh=1');
+		const result = deserializeParams(sp);
+		expect(result.width).toBe(3);
+		expect(result.magnetHoles).toBe(true);
+		expect(result.length).toBe(defaultParams.length);
+		expect(result.height).toBe(defaultParams.height);
+	});
+
+	it('serializes stacking lip correctly', () => {
+		const p = { ...defaultParams, stackingLip: 'none' as const };
+		const sp = serializeParams(p);
+		expect(sp.get('sl')).toBe('n');
+		const result = deserializeParams(sp);
+		expect(result.stackingLip).toBe('none');
 	});
 });

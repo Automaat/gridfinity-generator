@@ -275,6 +275,42 @@ function buildLabelTabs(
 	return tabs;
 }
 
+function buildScoops(
+	p: BinParams,
+	innerW: number,
+	innerL: number,
+	wallBottom: number,
+	wallHeight: number
+): Solid | null {
+	const numX = p.dividersX + 1;
+	const numY = p.dividersY + 1;
+	const compartmentW = innerW / numX;
+	const compartmentL = innerL / numY;
+
+	const scoopRadius = Math.min(wallHeight, compartmentL * 0.6);
+	if (scoopRadius < 1) return null;
+
+	let scoops: Solid | null = null;
+
+	for (let ix = 0; ix < numX; ix++) {
+		for (let iy = 0; iy < numY; iy++) {
+			const xStart = -innerW / 2 + ix * compartmentW;
+			const frontY = -innerL / 2 + (iy + 1) * compartmentL;
+
+			// Cylinder along X axis, radius = scoopRadius
+			// Bottom tangent at wallBottom, front face at compartment's +Y wall
+			const cyl = (
+				drawCircle(scoopRadius).sketchOnPlane('YZ', xStart) as Sketch
+			).extrude(compartmentW) as Solid;
+
+			const positioned = cyl.translate(0, frontY, wallBottom + scoopRadius) as Solid;
+			scoops = scoops ? (scoops.fuse(positioned) as Solid) : positioned;
+		}
+	}
+
+	return scoops;
+}
+
 export function buildBin(p: BinParams): Solid {
 	const h = p.height * HEIGHT_UNIT;
 	const bodyW = bodySize(p.width);
@@ -342,6 +378,12 @@ export function buildBin(p: BinParams): Solid {
 	if (p.dividersX > 0 || p.dividersY > 0) {
 		const dividers = buildDividers(p, innerW, innerL, wallBottom, wallHeight);
 		if (dividers) bin = bin.fuse(dividers) as Solid;
+	}
+
+	// 5b. Bottom scoops
+	if (p.bottomScoop && wallHeight > 2) {
+		const scoops = buildScoops(p, innerW, innerL, wallBottom, wallHeight);
+		if (scoops) bin = bin.cut(scoops) as Solid;
 	}
 
 	// 6. Label tabs

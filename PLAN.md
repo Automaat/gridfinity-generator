@@ -81,7 +81,7 @@ src/
 2. ✅ Stacking lip chamfer profile (standard/reduced/none)
 3. ✅ Add corner fillets (outer 3.75mm, inner 2.8mm)
 4. ✅ Multi-unit grid: repeat base pattern across W×L units
-5. Bottom scoop (optional, standard Gridfinity feature)
+5. ✅ Bottom scoop (optional, standard Gridfinity feature)
 
 **Goal:** dimensionally accurate Gridfinity-compatible bins
 
@@ -95,14 +95,14 @@ src/
 
 **Goal:** fully configurable bins matching commercial generators
 
-### Phase 4 — Polish
+### Phase 4 — Polish ✅
 
-1. Presets: "small parts", "tool holder", "deep bin"
-2. Dimension overlay on 3D view
-3. Print time / filament estimate (based on volume)
-4. URL-encoded params (share config via link)
-5. Mobile-friendly layout
-6. Loading state during geometry rebuild
+1. ✅ Presets: "small parts", "tool holder", "deep bin"
+2. ✅ Dimension overlay on 3D view
+3. ✅ Print time / filament estimate (based on volume)
+4. ✅ URL-encoded params (share config via link)
+5. ✅ Mobile-friendly layout
+6. ✅ Loading state during geometry rebuild
 
 ## Key Technical Decisions
 
