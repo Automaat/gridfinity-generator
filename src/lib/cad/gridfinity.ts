@@ -287,9 +287,12 @@ function buildScoops(
 	const compartmentW = innerW / numX;
 	const compartmentL = innerL / numY;
 
-	// Scoop radius = wallHeight so the curved ramp spans floor to top of wall.
-	// Clamp to compartment depth so the scoop doesn't exceed the compartment.
-	const scoopRadius = Math.min(wallHeight, compartmentL * 0.8);
+	// Scoop: concave ramp at front (+Y) wall of each compartment.
+	// A cylinder centered at the floor-wall corner (Y=frontY, Z=wallBottom)
+	// with axis along X. When subtracted from the bin, the quarter of the
+	// cylinder that overlaps the wall creates a smooth curved ramp from
+	// the floor into the front wall, making it easy to pick up small parts.
+	const scoopRadius = wallHeight;
 	if (scoopRadius < 2) return null;
 
 	let scoops: Solid | null = null;
@@ -299,34 +302,13 @@ function buildScoops(
 			const xStart = -innerW / 2 + ix * compartmentW;
 			const frontY = -innerL / 2 + (iy + 1) * compartmentL;
 
-			// Cylinder axis along X. Circle sketch on YZ plane at compartment left edge,
-			// extruded across compartment width.
-			// Position: center at (xStart, frontY, wallBottom + scoopRadius).
-			// This places the cylinder tangent to the floor (wallBottom) at the front
-			// wall of the compartment. The curved surface cuts inward (-Y) and upward,
-			// creating a concave ramp from the floor.
 			const cyl = (
 				drawCircle(scoopRadius).sketchOnPlane('YZ', xStart) as Sketch
 			).extrude(compartmentW) as Solid;
 
-			// Bounding box to clip the scoop to the compartment interior.
-			// Without this, the cylinder extends above and behind the compartment.
-			const compartmentBackY = frontY - compartmentL;
-			const clipBox = (
-				drawRoundedRectangle(compartmentW + 2, compartmentL + 2, 0).sketchOnPlane(
-					'XY',
-					wallBottom
-				) as Sketch
-			).extrude(wallHeight) as Solid;
-			const clipPositioned = clipBox.translate(
-				xStart + compartmentW / 2,
-				compartmentBackY + compartmentL / 2,
-				0
-			) as Solid;
-
-			const positioned = cyl.translate(0, frontY, wallBottom + scoopRadius) as Solid;
-			const clipped = positioned.intersect(clipPositioned) as Solid;
-			scoops = scoops ? (scoops.fuse(clipped) as Solid) : clipped;
+			// Center at corner of floor and front inner wall
+			const positioned = cyl.translate(0, frontY, wallBottom) as Solid;
+			scoops = scoops ? (scoops.fuse(positioned) as Solid) : positioned;
 		}
 	}
 
