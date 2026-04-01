@@ -159,4 +159,32 @@ describe('URL serialization', () => {
 		const result = deserializeParams(sp);
 		expect(result.stackingLip).toBe('none');
 	});
+
+	it('serializes scoop walls as compact string', () => {
+		const p: BinParams = { ...defaultParams, scoopWalls: ['back', 'front'] };
+		const sp = serializeParams(p);
+		expect(sp.get('sw')).toBe('bf');
+		const result = deserializeParams(sp);
+		expect(result.scoopWalls).toEqual(['back', 'front']);
+	});
+
+	it('serializes scoop radius', () => {
+		const p: BinParams = { ...defaultParams, scoopWalls: ['left'], scoopRadius: 5 };
+		const sp = serializeParams(p);
+		expect(sp.get('sr')).toBe('5');
+		const result = deserializeParams(sp);
+		expect(result.scoopRadius).toBe(5);
+	});
+
+	it('clamps scoop radius to valid range', () => {
+		const sp = new URLSearchParams('sr=99');
+		const result = deserializeParams(sp);
+		expect(result.scoopRadius).toBe(20);
+	});
+
+	it('deserializes all four scoop walls', () => {
+		const sp = new URLSearchParams('sw=bflr');
+		const result = deserializeParams(sp);
+		expect(result.scoopWalls).toEqual(['back', 'front', 'left', 'right']);
+	});
 });

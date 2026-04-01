@@ -248,4 +248,31 @@ describe('buildBin', () => {
 		buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 0, height: 1 }));
 		expect(spy).not.toHaveBeenCalled();
 	});
+
+	it('creates front scoop', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['front'], scoopRadius: 0 }));
+		expect(result).toBeDefined();
+	});
+
+	it('creates left scoop', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['left'], scoopRadius: 0 }));
+		expect(result).toBeDefined();
+	});
+
+	it('creates right scoop', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['right'], scoopRadius: 0 }));
+		expect(result).toBeDefined();
+	});
+
+	it('creates multiple scoops', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		buildBin(makeParams({ scoopWalls: ['back', 'front'], scoopRadius: 0 }));
+		// 2 walls × 1 compartment = 2 scoop cylinders
+		expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it('uses custom scoop radius', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 3 }));
+		expect(result).toBeDefined();
+	});
 });
