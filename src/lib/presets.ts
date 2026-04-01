@@ -21,7 +21,7 @@ export const presets: Preset[] = [
 			labelTab: true,
 			dividersX: 0,
 			dividersY: 0,
-			scoopWall: 'none',
+			scoopWalls: [],
 			scoopRadius: 0
 		}
 	},
@@ -39,7 +39,7 @@ export const presets: Preset[] = [
 			labelTab: true,
 			dividersX: 2,
 			dividersY: 1,
-			scoopWall: 'back',
+			scoopWalls: ['back'],
 			scoopRadius: 0
 		}
 	},
@@ -57,7 +57,7 @@ export const presets: Preset[] = [
 			labelTab: false,
 			dividersX: 0,
 			dividersY: 0,
-			scoopWall: 'none',
+			scoopWalls: [],
 			scoopRadius: 0
 		}
 	},
@@ -75,7 +75,7 @@ export const presets: Preset[] = [
 			labelTab: false,
 			dividersX: 0,
 			dividersY: 0,
-			scoopWall: 'none',
+			scoopWalls: [],
 			scoopRadius: 0
 		}
 	},
@@ -93,7 +93,7 @@ export const presets: Preset[] = [
 			labelTab: true,
 			dividersX: 3,
 			dividersY: 1,
-			scoopWall: 'back',
+			scoopWalls: ['back'],
 			scoopRadius: 0
 		}
 	}

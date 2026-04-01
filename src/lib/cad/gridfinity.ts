@@ -335,26 +335,25 @@ function buildScoops(
 		for (let iy = 0; iy < numY; iy++) {
 			const xStart = -innerW / 2 + ix * compartmentW;
 			const yStart = -innerL / 2 + iy * compartmentL;
-			let ramp: Solid;
 
-			switch (p.scoopWall) {
-				case 'back':
-					ramp = buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X', false);
-					break;
-				case 'front':
-					ramp = buildSingleScoop(R, compartmentW, yStart + compartmentL, wallBottom, xStart, 'X', true);
-					break;
-				case 'left':
-					ramp = buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y', false);
-					break;
-				case 'right':
-					ramp = buildSingleScoop(R, compartmentL, xStart + compartmentW, wallBottom, yStart, 'Y', true);
-					break;
-				default:
-					return null;
+			for (const wall of p.scoopWalls) {
+				let ramp: Solid;
+				switch (wall) {
+					case 'back':
+						ramp = buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X', false);
+						break;
+					case 'front':
+						ramp = buildSingleScoop(R, compartmentW, yStart + compartmentL, wallBottom, xStart, 'X', true);
+						break;
+					case 'left':
+						ramp = buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y', false);
+						break;
+					case 'right':
+						ramp = buildSingleScoop(R, compartmentL, xStart + compartmentW, wallBottom, yStart, 'Y', true);
+						break;
+				}
+				scoops = scoops ? (scoops.fuse(ramp!) as Solid) : ramp!;
 			}
-
-			scoops = scoops ? (scoops.fuse(ramp) as Solid) : ramp;
 		}
 	}
 
@@ -431,7 +430,7 @@ export function buildBin(p: BinParams): Solid {
 	}
 
 	// 5b. Bottom scoops (fuse ramp into bin)
-	if (p.scoopWall !== 'none' && wallHeight > 2) {
+	if (p.scoopWalls.length > 0 && wallHeight > 2) {
 		const scoops = buildScoops(p, innerW, innerL, wallBottom, wallHeight);
 		if (scoops) bin = bin.fuse(scoops) as Solid;
 	}

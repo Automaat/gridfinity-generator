@@ -85,18 +85,31 @@
 			Label tab
 		</label>
 
-		<label class="block">
-			<span class="text-sm text-zinc-400">Scoop wall</span>
-			<select bind:value={$params.scoopWall} class={inputClass}>
-				<option value="none">None</option>
-				<option value="back">Back</option>
-				<option value="front">Front</option>
-				<option value="left">Left</option>
-				<option value="right">Right</option>
-			</select>
-		</label>
+		<div>
+			<span class="text-sm text-zinc-400">Scoop walls</span>
+			<div class="mt-1 grid grid-cols-2 gap-1">
+				{#each (['back', 'front', 'left', 'right'] as const) as wall}
+					<label class="flex items-center gap-2 text-sm text-zinc-400">
+						<input
+							type="checkbox"
+							checked={$params.scoopWalls.includes(wall)}
+							onchange={(e) => {
+								const checked = (e.target as HTMLInputElement).checked;
+								if (checked) {
+									$params.scoopWalls = [...$params.scoopWalls, wall];
+								} else {
+									$params.scoopWalls = $params.scoopWalls.filter((w) => w !== wall);
+								}
+							}}
+							class="accent-blue-500"
+						/>
+						{wall.charAt(0).toUpperCase() + wall.slice(1)}
+					</label>
+				{/each}
+			</div>
+		</div>
 
-		{#if $params.scoopWall !== 'none'}
+		{#if $params.scoopWalls.length > 0}
 			<label class="block">
 				<span class="text-sm text-zinc-400">Scoop radius ({$params.scoopRadius || 'auto'}mm)</span>
 				<input type="number" min="0" max="20" step="0.5" bind:value={$params.scoopRadius} class={inputClass} />

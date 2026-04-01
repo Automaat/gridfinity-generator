@@ -11,7 +11,7 @@ export interface BinParams {
 	labelTab: boolean;
 	dividersX: number;
 	dividersY: number;
-	scoopWall: 'none' | 'back' | 'front' | 'left' | 'right';
+	scoopWalls: ('back' | 'front' | 'left' | 'right')[];
 	scoopRadius: number;
 }
 
@@ -26,7 +26,7 @@ export const defaultParams: BinParams = {
 	labelTab: false,
 	dividersX: 0,
 	dividersY: 0,
-	scoopWall: 'none',
+	scoopWalls: [],
 	scoopRadius: 0
 };
 
@@ -49,7 +49,7 @@ const URL_KEYS: Record<string, keyof BinParams> = {
 	lt: 'labelTab',
 	dx: 'dividersX',
 	dy: 'dividersY',
-	sw: 'scoopWall',
+	sw: 'scoopWalls',
 	sr: 'scoopRadius'
 };
 
@@ -58,8 +58,8 @@ const REVERSE_KEYS = Object.fromEntries(Object.entries(URL_KEYS).map(([k, v]) =>
 const LIP_SHORT: Record<string, BinParams['stackingLip']> = { s: 'standard', r: 'reduced', n: 'none' };
 const LIP_TO_SHORT: Record<string, string> = { standard: 's', reduced: 'r', none: 'n' };
 
-const SCOOP_SHORT: Record<string, BinParams['scoopWall']> = { n: 'none', b: 'back', f: 'front', l: 'left', r: 'right' };
-const SCOOP_TO_SHORT: Record<string, string> = { none: 'n', back: 'b', front: 'f', left: 'l', right: 'r' };
+const SCOOP_CHAR_TO_WALL: Record<string, 'back' | 'front' | 'left' | 'right'> = { b: 'back', f: 'front', l: 'left', r: 'right' };
+const WALL_TO_CHAR: Record<string, string> = { back: 'b', front: 'f', left: 'l', right: 'r' };
 
 function clamp(v: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, v));
@@ -78,8 +78,9 @@ export function serializeParams(p: BinParams): URLSearchParams {
 			sp.set(short, val ? '1' : '0');
 		} else if (param === 'stackingLip') {
 			sp.set(short, LIP_TO_SHORT[val as string]);
-		} else if (param === 'scoopWall') {
-			sp.set(short, SCOOP_TO_SHORT[val as string]);
+		} else if (param === 'scoopWalls') {
+			const walls = val as string[];
+			sp.set(short, walls.map((w) => WALL_TO_CHAR[w]).join(''));
 		} else {
 			sp.set(short, String(val));
 		}
@@ -97,9 +98,8 @@ export function deserializeParams(search: URLSearchParams): BinParams {
 		if (param === 'stackingLip') {
 			const mapped = LIP_SHORT[raw];
 			if (mapped) p.stackingLip = mapped;
-		} else if (param === 'scoopWall') {
-			const mapped = SCOOP_SHORT[raw];
-			if (mapped) p.scoopWall = mapped;
+		} else if (param === 'scoopWalls') {
+			p.scoopWalls = [...raw].map((c) => SCOOP_CHAR_TO_WALL[c]).filter(Boolean);
 		} else if (param === 'scoopRadius') {
 			const parsed = parseFloat(raw);
 			p.scoopRadius = clamp(Number.isNaN(parsed) ? 0 : parsed, 0, 20);
