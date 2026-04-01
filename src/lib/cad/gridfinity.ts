@@ -281,11 +281,15 @@ function buildSingleScoop(
 	wallPos: number,
 	wallBottom: number,
 	extrudeStart: number,
-	axis: 'X' | 'Y'
+	axis: 'X' | 'Y',
+	flip: boolean
 ): Solid {
 	// Quarter-circle ramp: block in floor-wall corner, cylinder subtracted.
 	// axis='X': scoop along a Y-wall (back/front), extrude in X
 	// axis='Y': scoop along an X-wall (left/right), extrude in Y
+	// flip=false: ramp extends from wallPos toward +axis (back/left)
+	// flip=true: ramp extends from wallPos toward -axis (front/right)
+	const dir = flip ? -1 : 1;
 	const blockW = axis === 'X' ? extrudeLen : R;
 	const blockL = axis === 'X' ? R : extrudeLen;
 
@@ -293,18 +297,17 @@ function buildSingleScoop(
 		drawRoundedRectangle(blockW, blockL, 0).sketchOnPlane('XY', wallBottom) as Sketch
 	).extrude(R) as Solid;
 
-	const blockX = axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + R / 2;
-	const blockY = axis === 'X' ? wallPos + R / 2 : extrudeStart + extrudeLen / 2;
+	const blockX = axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + (dir * R) / 2;
+	const blockY = axis === 'X' ? wallPos + (dir * R) / 2 : extrudeStart + extrudeLen / 2;
 	const blockPos = block.translate(blockX, blockY, 0) as Solid;
 
 	const plane = axis === 'X' ? 'YZ' : 'XZ';
-	const cylStart = axis === 'X' ? extrudeStart : extrudeStart;
 	const cyl = (
-		drawCircle(R).sketchOnPlane(plane, cylStart) as Sketch
+		drawCircle(R).sketchOnPlane(plane, extrudeStart) as Sketch
 	).extrude(extrudeLen) as Solid;
 
-	const cylX = axis === 'X' ? 0 : wallPos + R;
-	const cylY = axis === 'X' ? wallPos + R : 0;
+	const cylX = axis === 'X' ? 0 : wallPos + dir * R;
+	const cylY = axis === 'X' ? wallPos + dir * R : 0;
 	const cylPos = cyl.translate(cylX, cylY, wallBottom + R) as Solid;
 
 	return blockPos.cut(cylPos) as Solid;
@@ -336,20 +339,16 @@ function buildScoops(
 
 			switch (p.scoopWall) {
 				case 'back':
-					// -Y wall of compartment
-					ramp = buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X');
+					ramp = buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X', false);
 					break;
 				case 'front':
-					// +Y wall — mirror: wallPos = frontY - R
-					ramp = buildSingleScoop(R, compartmentW, yStart + compartmentL - R, wallBottom, xStart, 'X');
+					ramp = buildSingleScoop(R, compartmentW, yStart + compartmentL, wallBottom, xStart, 'X', true);
 					break;
 				case 'left':
-					// -X wall of compartment
-					ramp = buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y');
+					ramp = buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y', false);
 					break;
 				case 'right':
-					// +X wall — mirror: wallPos = rightX - R
-					ramp = buildSingleScoop(R, compartmentL, xStart + compartmentW - R, wallBottom, yStart, 'Y');
+					ramp = buildSingleScoop(R, compartmentL, xStart + compartmentW, wallBottom, yStart, 'Y', true);
 					break;
 				default:
 					return null;
