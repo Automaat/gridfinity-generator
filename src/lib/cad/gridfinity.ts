@@ -288,12 +288,18 @@ function buildScoops(
 	const compartmentL = innerL / numY;
 
 	// Scoop: concave ramp at front (+Y) wall of each compartment.
-	// A cylinder centered at the floor-wall corner (Y=frontY, Z=wallBottom)
-	// with axis along X. When subtracted from the bin, the quarter of the
-	// cylinder that overlaps the wall creates a smooth curved ramp from
-	// the floor into the front wall, making it easy to pick up small parts.
+	// Cylinder centered at floor-wall corner, clipped to above floor level
+	// so it doesn't cut through the base.
 	const scoopRadius = wallHeight;
 	if (scoopRadius < 2) return null;
+
+	// Clip box: only keep the part of the cylinder above wallBottom
+	const clipBox = (
+		drawRoundedRectangle(innerW + 2, innerL + 2, 0).sketchOnPlane(
+			'XY',
+			wallBottom
+		) as Sketch
+	).extrude(wallHeight + scoopRadius) as Solid;
 
 	let scoops: Solid | null = null;
 
@@ -306,9 +312,9 @@ function buildScoops(
 				drawCircle(scoopRadius).sketchOnPlane('YZ', xStart) as Sketch
 			).extrude(compartmentW) as Solid;
 
-			// Center at corner of floor and front inner wall
 			const positioned = cyl.translate(0, frontY, wallBottom) as Solid;
-			scoops = scoops ? (scoops.fuse(positioned) as Solid) : positioned;
+			const clipped = positioned.intersect(clipBox) as Solid;
+			scoops = scoops ? (scoops.fuse(clipped) as Solid) : clipped;
 		}
 	}
 
