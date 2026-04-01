@@ -78,20 +78,20 @@ src/
 ### Phase 2 — Accurate Gridfinity Profile ✅
 
 1. ✅ Port exact base profile from OpenSCAD spec (lofted stepped platform)
-2. Port stacking lip chamfer profile
+2. ✅ Stacking lip chamfer profile (standard/reduced/none)
 3. ✅ Add corner fillets (outer 3.75mm, inner 2.8mm)
 4. ✅ Multi-unit grid: repeat base pattern across W×L units
 5. Bottom scoop (optional, standard Gridfinity feature)
 
 **Goal:** dimensionally accurate Gridfinity-compatible bins
 
-### Phase 3 — Compartments + Features (in progress)
+### Phase 3 — Compartments + Features ✅
 
-1. Compartment dividers (boolean subtract internal walls)
+1. ✅ Compartment dividers (evenly spaced internal walls, X and Y)
 2. ✅ Magnet holes (6.5mm × 2.4mm cylinder subtract at grid corners)
 3. ✅ Screw holes (3mm × 6mm cylinder through base)
-4. Label tab (angled surface at front)
-5. ✅ Wall thickness control
+4. ✅ Label tab (angled surface at front of each compartment)
+5. ✅ Wall thickness control (dynamic inner fillet)
 
 **Goal:** fully configurable bins matching commercial generators
 
