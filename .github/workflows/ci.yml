@@ -41,6 +41,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
           files: coverage/cobertura-coverage.xml
           fail_ci_if_error: true
+          skip_validation: true
 
       - name: Build
         run: npm run build
