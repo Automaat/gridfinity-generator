@@ -288,18 +288,18 @@ function buildScoops(
 	const compartmentL = innerL / numY;
 
 	// Scoop: concave ramp at front (+Y) wall of each compartment.
-	// Cylinder centered at floor-wall corner, clipped to above floor level
-	// so it doesn't cut through the base.
+	// Built by filling the floor-wall corner with a block, then cutting
+	// a cylinder to leave a smooth curved ramp.
+	//
+	// Cross-section (YZ plane, looking from -X):
+	//   wallTop ─────┐ wall
+	//                │
+	//        ╭───────┤  ← cylinder removes this area
+	//       ╱ ░░░░░░░│  ← remaining solid = ramp
+	//   floor────────┘
+	//
 	const scoopRadius = wallHeight;
 	if (scoopRadius < 2) return null;
-
-	// Clip box: only keep the part of the cylinder above wallBottom
-	const clipBox = (
-		drawRoundedRectangle(innerW + 2, innerL + 2, 0).sketchOnPlane(
-			'XY',
-			wallBottom
-		) as Sketch
-	).extrude(wallHeight + scoopRadius) as Solid;
 
 	let scoops: Solid | null = null;
 
@@ -308,13 +308,34 @@ function buildScoops(
 			const xStart = -innerW / 2 + ix * compartmentW;
 			const frontY = -innerL / 2 + (iy + 1) * compartmentL;
 
+			// Block filling the corner: from front wall inward by scoopRadius,
+			// from floor up by wallHeight, across compartment width
+			const block = (
+				drawRoundedRectangle(compartmentW, scoopRadius, 0).sketchOnPlane(
+					'XY',
+					wallBottom
+				) as Sketch
+			).extrude(wallHeight) as Solid;
+			const blockPos = block.translate(
+				xStart + compartmentW / 2,
+				frontY - scoopRadius / 2,
+				0
+			) as Solid;
+
+			// Cylinder to subtract: center at top of front wall,
+			// surface sweeps down to floor at the back of the ramp
 			const cyl = (
 				drawCircle(scoopRadius).sketchOnPlane('YZ', xStart) as Sketch
 			).extrude(compartmentW) as Solid;
+			const cylPos = cyl.translate(
+				0,
+				frontY,
+				wallBottom + scoopRadius
+			) as Solid;
 
-			const positioned = cyl.translate(0, frontY, wallBottom) as Solid;
-			const clipped = positioned.intersect(clipBox) as Solid;
-			scoops = scoops ? (scoops.fuse(clipped) as Solid) : clipped;
+			// Ramp = block minus cylinder
+			const ramp = blockPos.cut(cylPos) as Solid;
+			scoops = scoops ? (scoops.fuse(ramp) as Solid) : ramp;
 		}
 	}
 
@@ -390,10 +411,10 @@ export function buildBin(p: BinParams): Solid {
 		if (dividers) bin = bin.fuse(dividers) as Solid;
 	}
 
-	// 5b. Bottom scoops
+	// 5b. Bottom scoops (fuse ramp geometry into bin)
 	if (p.bottomScoop && wallHeight > 2) {
 		const scoops = buildScoops(p, innerW, innerL, wallBottom, wallHeight);
-		if (scoops) bin = bin.cut(scoops) as Solid;
+		if (scoops) bin = bin.fuse(scoops) as Solid;
 	}
 
 	// 6. Label tabs
