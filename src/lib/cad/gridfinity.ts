@@ -288,17 +288,9 @@ function buildScoops(
 	const compartmentL = innerL / numY;
 
 	// Scoop: concave ramp at front (+Y) wall of each compartment.
-	// Built by filling the floor-wall corner with a block, then cutting
-	// a cylinder to leave a smooth curved ramp.
-	//
-	// Cross-section (YZ plane, looking from -X):
-	//   wallTop ─────┐ wall
-	//                │
-	//        ╭───────┤  ← cylinder removes this area
-	//       ╱ ░░░░░░░│  ← remaining solid = ramp
-	//   floor────────┘
-	//
-	const scoopRadius = wallHeight;
+	// A block fills the floor-wall corner, then a cylinder is subtracted
+	// to leave a smooth quarter-circle ramp.
+	const scoopRadius = Math.min(wallHeight * 0.6, compartmentL * 0.4);
 	if (scoopRadius < 2) return null;
 
 	let scoops: Solid | null = null;
@@ -308,22 +300,22 @@ function buildScoops(
 			const xStart = -innerW / 2 + ix * compartmentW;
 			const frontY = -innerL / 2 + (iy + 1) * compartmentL;
 
-			// Block filling the corner: from front wall inward by scoopRadius,
-			// from floor up by wallHeight, across compartment width
+			// Block: fills corner from front wall inward by scoopRadius,
+			// from floor up by scoopRadius, across compartment width
 			const block = (
 				drawRoundedRectangle(compartmentW, scoopRadius, 0).sketchOnPlane(
 					'XY',
 					wallBottom
 				) as Sketch
-			).extrude(wallHeight) as Solid;
+			).extrude(scoopRadius) as Solid;
 			const blockPos = block.translate(
 				xStart + compartmentW / 2,
 				frontY - scoopRadius / 2,
 				0
 			) as Solid;
 
-			// Cylinder to subtract: center at top of front wall,
-			// surface sweeps down to floor at the back of the ramp
+			// Cylinder: center at (frontY, wallBottom + scoopRadius),
+			// tangent to both floor and front wall at the corner
 			const cyl = (
 				drawCircle(scoopRadius).sketchOnPlane('YZ', xStart) as Sketch
 			).extrude(compartmentW) as Solid;
@@ -333,7 +325,6 @@ function buildScoops(
 				wallBottom + scoopRadius
 			) as Solid;
 
-			// Ramp = block minus cylinder
 			const ramp = blockPos.cut(cylPos) as Solid;
 			scoops = scoops ? (scoops.fuse(ramp) as Solid) : ramp;
 		}
