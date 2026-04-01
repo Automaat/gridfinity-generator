@@ -275,6 +275,91 @@ function buildLabelTabs(
 	return tabs;
 }
 
+function buildSingleScoop(
+	R: number,
+	extrudeLen: number,
+	wallPos: number,
+	wallBottom: number,
+	extrudeStart: number,
+	axis: 'X' | 'Y',
+	flip: boolean
+): Solid {
+	// Quarter-circle ramp: block in floor-wall corner, cylinder subtracted.
+	// axis='X': scoop along a Y-wall (back/front), extrude in X
+	// axis='Y': scoop along an X-wall (left/right), extrude in Y
+	// flip=false: ramp extends from wallPos toward +axis (back/left)
+	// flip=true: ramp extends from wallPos toward -axis (front/right)
+	const dir = flip ? -1 : 1;
+	const blockW = axis === 'X' ? extrudeLen : R;
+	const blockL = axis === 'X' ? R : extrudeLen;
+
+	const block = (
+		drawRoundedRectangle(blockW, blockL, 0).sketchOnPlane('XY', wallBottom) as Sketch
+	).extrude(R) as Solid;
+
+	const blockX = axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + (dir * R) / 2;
+	const blockY = axis === 'X' ? wallPos + (dir * R) / 2 : extrudeStart + extrudeLen / 2;
+	const blockPos = block.translate(blockX, blockY, 0) as Solid;
+
+	const plane = axis === 'X' ? 'YZ' : 'XZ';
+	const cyl = (
+		drawCircle(R).sketchOnPlane(plane, extrudeStart) as Sketch
+	).extrude(extrudeLen) as Solid;
+
+	const cylX = axis === 'X' ? 0 : wallPos + dir * R;
+	const cylY = axis === 'X' ? wallPos + dir * R : 0;
+	const cylPos = cyl.translate(cylX, cylY, wallBottom + R) as Solid;
+
+	return blockPos.cut(cylPos) as Solid;
+}
+
+function buildScoops(
+	p: BinParams,
+	innerW: number,
+	innerL: number,
+	wallBottom: number,
+	wallHeight: number
+): Solid | null {
+	const numX = p.dividersX + 1;
+	const numY = p.dividersY + 1;
+	const compartmentW = innerW / numX;
+	const compartmentL = innerL / numY;
+
+	const autoR = wallHeight / 2;
+	const R = p.scoopRadius > 0 ? Math.min(p.scoopRadius, wallHeight) : autoR;
+	if (R < 2) return null;
+
+	let scoops: Solid | null = null;
+
+	for (let ix = 0; ix < numX; ix++) {
+		for (let iy = 0; iy < numY; iy++) {
+			const xStart = -innerW / 2 + ix * compartmentW;
+			const yStart = -innerL / 2 + iy * compartmentL;
+
+			for (const wall of p.scoopWalls) {
+				let ramp: Solid;
+				switch (wall) {
+					case 'back':
+						ramp = buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X', false);
+						break;
+					case 'front':
+						ramp = buildSingleScoop(R, compartmentW, yStart + compartmentL, wallBottom, xStart, 'X', true);
+						break;
+					case 'left':
+						ramp = buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y', false);
+						break;
+					case 'right':
+						ramp = buildSingleScoop(R, compartmentL, xStart + compartmentW, wallBottom, yStart, 'Y', true);
+						break;
+				}
+				scoops = scoops ? (scoops.fuse(ramp!) as Solid) : ramp!;
+			}
+		}
+	}
+
+	return scoops;
+}
+
 export function buildBin(p: BinParams): Solid {
 	const h = p.height * HEIGHT_UNIT;
 	const bodyW = bodySize(p.width);
@@ -342,6 +427,12 @@ export function buildBin(p: BinParams): Solid {
 	if (p.dividersX > 0 || p.dividersY > 0) {
 		const dividers = buildDividers(p, innerW, innerL, wallBottom, wallHeight);
 		if (dividers) bin = bin.fuse(dividers) as Solid;
+	}
+
+	// 5b. Bottom scoops (fuse ramp into bin)
+	if (p.scoopWalls.length > 0 && wallHeight > 2) {
+		const scoops = buildScoops(p, innerW, innerL, wallBottom, wallHeight);
+		if (scoops) bin = bin.fuse(scoops) as Solid;
 	}
 
 	// 6. Label tabs

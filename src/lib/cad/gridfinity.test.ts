@@ -6,6 +6,7 @@ function mockSolid(): Record<string, unknown> {
 	const solid: Record<string, unknown> = {};
 	solid.fuse = vi.fn(() => mockSolid());
 	solid.cut = vi.fn(() => mockSolid());
+	solid.intersect = vi.fn(() => mockSolid());
 	solid.translate = vi.fn(() => mockSolid());
 	solid.extrude = vi.fn(() => mockSolid());
 	solid.loftWith = vi.fn(() => mockSolid());
@@ -58,6 +59,8 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 		labelTab: false,
 		dividersX: 0,
 		dividersY: 0,
+		scoopWalls: [],
+		scoopRadius: 0,
 		...overrides
 	};
 }
@@ -216,6 +219,60 @@ describe('buildBin', () => {
 	it('returns early when wallHeight is zero or negative', () => {
 		// With height=1, stackingLip='standard': wallHeight = 7 - 7 - 4.75 = negative
 		const result = buildBin(makeParams({ height: 1, stackingLip: 'standard' }));
+		expect(result).toBeDefined();
+	});
+
+	it('creates bottom scoops when enabled', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 0 }));
+		// drawCircle used for scoop cylinder (1 compartment = 1 scoop)
+		expect(spy).toHaveBeenCalled();
+	});
+
+	it('creates scoop per compartment with dividers', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 0, dividersX: 0, dividersY: 0 }));
+		const scoopsNoDividers = spy.mock.calls.length;
+
+		vi.clearAllMocks();
+		buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 0, dividersX: 1, dividersY: 1 }));
+		const scoopsWithDividers = spy.mock.calls.length;
+
+		// 2x2=4 compartments vs 1
+		expect(scoopsWithDividers).toBeGreaterThan(scoopsNoDividers);
+	});
+
+	it('skips scoop when wall height too short', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		// height=1 + stackingLip='none' → wallHeight = 7-7 = 0
+		buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 0, height: 1 }));
+		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it('creates front scoop', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['front'], scoopRadius: 0 }));
+		expect(result).toBeDefined();
+	});
+
+	it('creates left scoop', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['left'], scoopRadius: 0 }));
+		expect(result).toBeDefined();
+	});
+
+	it('creates right scoop', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['right'], scoopRadius: 0 }));
+		expect(result).toBeDefined();
+	});
+
+	it('creates multiple scoops', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		buildBin(makeParams({ scoopWalls: ['back', 'front'], scoopRadius: 0 }));
+		// 2 walls × 1 compartment = 2 scoop cylinders
+		expect(spy.mock.calls.length).toBeGreaterThanOrEqual(2);
+	});
+
+	it('uses custom scoop radius', () => {
+		const result = buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 3 }));
 		expect(result).toBeDefined();
 	});
 });
