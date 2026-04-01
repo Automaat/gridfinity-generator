@@ -11,7 +11,8 @@ export interface BinParams {
 	labelTab: boolean;
 	dividersX: number;
 	dividersY: number;
-	bottomScoop: boolean;
+	scoopWall: 'none' | 'back' | 'front' | 'left' | 'right';
+	scoopRadius: number;
 }
 
 export const defaultParams: BinParams = {
@@ -25,7 +26,8 @@ export const defaultParams: BinParams = {
 	labelTab: false,
 	dividersX: 0,
 	dividersY: 0,
-	bottomScoop: false
+	scoopWall: 'none',
+	scoopRadius: 0
 };
 
 export const params = writable<BinParams>({ ...defaultParams });
@@ -47,13 +49,17 @@ const URL_KEYS: Record<string, keyof BinParams> = {
 	lt: 'labelTab',
 	dx: 'dividersX',
 	dy: 'dividersY',
-	bs: 'bottomScoop'
+	sw: 'scoopWall',
+	sr: 'scoopRadius'
 };
 
 const REVERSE_KEYS = Object.fromEntries(Object.entries(URL_KEYS).map(([k, v]) => [v, k]));
 
 const LIP_SHORT: Record<string, BinParams['stackingLip']> = { s: 'standard', r: 'reduced', n: 'none' };
 const LIP_TO_SHORT: Record<string, string> = { standard: 's', reduced: 'r', none: 'n' };
+
+const SCOOP_SHORT: Record<string, BinParams['scoopWall']> = { n: 'none', b: 'back', f: 'front', l: 'left', r: 'right' };
+const SCOOP_TO_SHORT: Record<string, string> = { none: 'n', back: 'b', front: 'f', left: 'l', right: 'r' };
 
 function clamp(v: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, v));
@@ -72,6 +78,8 @@ export function serializeParams(p: BinParams): URLSearchParams {
 			sp.set(short, val ? '1' : '0');
 		} else if (param === 'stackingLip') {
 			sp.set(short, LIP_TO_SHORT[val as string]);
+		} else if (param === 'scoopWall') {
+			sp.set(short, SCOOP_TO_SHORT[val as string]);
 		} else {
 			sp.set(short, String(val));
 		}
@@ -89,7 +97,13 @@ export function deserializeParams(search: URLSearchParams): BinParams {
 		if (param === 'stackingLip') {
 			const mapped = LIP_SHORT[raw];
 			if (mapped) p.stackingLip = mapped;
-		} else if (param === 'magnetHoles' || param === 'screwHoles' || param === 'labelTab' || param === 'bottomScoop') {
+		} else if (param === 'scoopWall') {
+			const mapped = SCOOP_SHORT[raw];
+			if (mapped) p.scoopWall = mapped;
+		} else if (param === 'scoopRadius') {
+			const parsed = parseFloat(raw);
+			p.scoopRadius = clamp(Number.isNaN(parsed) ? 0 : parsed, 0, 20);
+		} else if (param === 'magnetHoles' || param === 'screwHoles' || param === 'labelTab') {
 			(p as Record<string, unknown>)[param] = raw === '1';
 		} else if (param === 'wallThickness') {
 			const parsed = parseFloat(raw);

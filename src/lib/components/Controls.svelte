@@ -85,10 +85,23 @@
 			Label tab
 		</label>
 
-		<label class="flex items-center gap-2 text-sm text-zinc-400">
-			<input type="checkbox" bind:checked={$params.bottomScoop} class="accent-blue-500" />
-			Bottom scoop
+		<label class="block">
+			<span class="text-sm text-zinc-400">Scoop wall</span>
+			<select bind:value={$params.scoopWall} class={inputClass}>
+				<option value="none">None</option>
+				<option value="back">Back</option>
+				<option value="front">Front</option>
+				<option value="left">Left</option>
+				<option value="right">Right</option>
+			</select>
 		</label>
+
+		{#if $params.scoopWall !== 'none'}
+			<label class="block">
+				<span class="text-sm text-zinc-400">Scoop radius ({$params.scoopRadius || 'auto'}mm)</span>
+				<input type="number" min="0" max="20" step="0.5" bind:value={$params.scoopRadius} class={inputClass} />
+			</label>
+		{/if}
 	</div>
 
 	<hr class="border-zinc-700" />

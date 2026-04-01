@@ -275,6 +275,41 @@ function buildLabelTabs(
 	return tabs;
 }
 
+function buildSingleScoop(
+	R: number,
+	extrudeLen: number,
+	wallPos: number,
+	wallBottom: number,
+	extrudeStart: number,
+	axis: 'X' | 'Y'
+): Solid {
+	// Quarter-circle ramp: block in floor-wall corner, cylinder subtracted.
+	// axis='X': scoop along a Y-wall (back/front), extrude in X
+	// axis='Y': scoop along an X-wall (left/right), extrude in Y
+	const blockW = axis === 'X' ? extrudeLen : R;
+	const blockL = axis === 'X' ? R : extrudeLen;
+
+	const block = (
+		drawRoundedRectangle(blockW, blockL, 0).sketchOnPlane('XY', wallBottom) as Sketch
+	).extrude(R) as Solid;
+
+	const blockX = axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + R / 2;
+	const blockY = axis === 'X' ? wallPos + R / 2 : extrudeStart + extrudeLen / 2;
+	const blockPos = block.translate(blockX, blockY, 0) as Solid;
+
+	const plane = axis === 'X' ? 'YZ' : 'XZ';
+	const cylStart = axis === 'X' ? extrudeStart : extrudeStart;
+	const cyl = (
+		drawCircle(R).sketchOnPlane(plane, cylStart) as Sketch
+	).extrude(extrudeLen) as Solid;
+
+	const cylX = axis === 'X' ? 0 : wallPos + R;
+	const cylY = axis === 'X' ? wallPos + R : 0;
+	const cylPos = cyl.translate(cylX, cylY, wallBottom + R) as Solid;
+
+	return blockPos.cut(cylPos) as Solid;
+}
+
 function buildScoops(
 	p: BinParams,
 	innerW: number,
@@ -287,45 +322,39 @@ function buildScoops(
 	const compartmentW = innerW / numX;
 	const compartmentL = innerL / numY;
 
-	// Scoop: concave ramp at front (+Y) wall of each compartment.
-	// A block fills the floor-wall corner, then a cylinder is subtracted
-	// to leave a smooth quarter-circle ramp.
-	const scoopRadius = Math.min(wallHeight * 0.6, compartmentL * 0.4);
-	if (scoopRadius < 2) return null;
+	const autoR = wallHeight / 2;
+	const R = p.scoopRadius > 0 ? Math.min(p.scoopRadius, wallHeight) : autoR;
+	if (R < 2) return null;
 
 	let scoops: Solid | null = null;
 
 	for (let ix = 0; ix < numX; ix++) {
 		for (let iy = 0; iy < numY; iy++) {
 			const xStart = -innerW / 2 + ix * compartmentW;
-			const frontY = -innerL / 2 + (iy + 1) * compartmentL;
+			const yStart = -innerL / 2 + iy * compartmentL;
+			let ramp: Solid;
 
-			// Block: fills corner from front wall inward by scoopRadius,
-			// from floor up by scoopRadius, across compartment width
-			const block = (
-				drawRoundedRectangle(compartmentW, scoopRadius, 0).sketchOnPlane(
-					'XY',
-					wallBottom
-				) as Sketch
-			).extrude(scoopRadius) as Solid;
-			const blockPos = block.translate(
-				xStart + compartmentW / 2,
-				frontY - scoopRadius / 2,
-				0
-			) as Solid;
+			switch (p.scoopWall) {
+				case 'back':
+					// -Y wall of compartment
+					ramp = buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X');
+					break;
+				case 'front':
+					// +Y wall — mirror: wallPos = frontY - R
+					ramp = buildSingleScoop(R, compartmentW, yStart + compartmentL - R, wallBottom, xStart, 'X');
+					break;
+				case 'left':
+					// -X wall of compartment
+					ramp = buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y');
+					break;
+				case 'right':
+					// +X wall — mirror: wallPos = rightX - R
+					ramp = buildSingleScoop(R, compartmentL, xStart + compartmentW - R, wallBottom, yStart, 'Y');
+					break;
+				default:
+					return null;
+			}
 
-			// Cylinder: center at (frontY, wallBottom + scoopRadius),
-			// tangent to both floor and front wall at the corner
-			const cyl = (
-				drawCircle(scoopRadius).sketchOnPlane('YZ', xStart) as Sketch
-			).extrude(compartmentW) as Solid;
-			const cylPos = cyl.translate(
-				0,
-				frontY,
-				wallBottom + scoopRadius
-			) as Solid;
-
-			const ramp = blockPos.cut(cylPos) as Solid;
 			scoops = scoops ? (scoops.fuse(ramp) as Solid) : ramp;
 		}
 	}
@@ -402,8 +431,8 @@ export function buildBin(p: BinParams): Solid {
 		if (dividers) bin = bin.fuse(dividers) as Solid;
 	}
 
-	// 5b. Bottom scoops (fuse ramp geometry into bin)
-	if (p.bottomScoop && wallHeight > 2) {
+	// 5b. Bottom scoops (fuse ramp into bin)
+	if (p.scoopWall !== 'none' && wallHeight > 2) {
 		const scoops = buildScoops(p, innerW, innerL, wallBottom, wallHeight);
 		if (scoops) bin = bin.fuse(scoops) as Solid;
 	}

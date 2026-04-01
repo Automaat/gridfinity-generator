@@ -15,7 +15,8 @@ describe('defaultParams', () => {
 			labelTab: false,
 			dividersX: 0,
 			dividersY: 0,
-			bottomScoop: false
+			scoopWall: 'none',
+			scoopRadius: 0
 		});
 	});
 });
@@ -48,7 +49,8 @@ describe('params store', () => {
 			labelTab: true,
 			dividersX: 5,
 			dividersY: 3,
-			bottomScoop: true
+			scoopWall: 'back',
+			scoopRadius: 5
 		};
 		params.set(custom);
 		expect(get(params)).toEqual(custom);
@@ -114,7 +116,8 @@ describe('URL serialization', () => {
 			labelTab: true,
 			dividersX: 2,
 			dividersY: 1,
-			bottomScoop: true
+			scoopWall: 'back',
+			scoopRadius: 5
 		};
 		const sp = serializeParams(custom);
 		const result = deserializeParams(sp);
