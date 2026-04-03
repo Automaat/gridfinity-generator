@@ -35,7 +35,7 @@
 		"@threlte/core": "^8.5.5",
 		"@threlte/extras": "^9.14.1",
 		"@types/three": "^0.183.1",
-		"replicad": "^0.22.1",
+		"replicad": "^0.23.0",
 		"replicad-opencascadejs": "^0.22.0",
 		"three": "^0.183.2"
 	}
