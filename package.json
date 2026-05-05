@@ -34,9 +34,9 @@
 	"dependencies": {
 		"@threlte/core": "^8.5.5",
 		"@threlte/extras": "^9.14.1",
-		"@types/three": "^0.183.1",
+		"@types/three": "^0.184.0",
 		"replicad": "^0.23.0",
 		"replicad-opencascadejs": "^0.23.0",
-		"three": "^0.183.2"
+		"three": "^0.184.0"
 	}
 }
