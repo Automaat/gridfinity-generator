@@ -44,9 +44,8 @@ test.describe('controls panel', () => {
 		await page.goto('/');
 
 		const widthInput = page.getByRole('spinbutton', { name: /Width/ });
-		await widthInput.click();
-		await widthInput.fill('4');
-		await widthInput.dispatchEvent('input');
+		await widthInput.click({ clickCount: 3 });
+		await widthInput.pressSequentially('4');
 
 		await expect(page.getByText('Width (168mm)')).toBeVisible({ timeout: 5000 });
 	});
