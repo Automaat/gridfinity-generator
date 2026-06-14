@@ -1,51 +1,78 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import type { BinParams } from '$lib/stores/params';
 
-// Chainable mock for replicad Solid/Sketch objects
-function mockSolid(): Record<string, unknown> {
-	const solid: Record<string, unknown> = {};
-	solid.fuse = vi.fn(() => mockSolid());
-	solid.cut = vi.fn(() => mockSolid());
-	solid.intersect = vi.fn(() => mockSolid());
-	solid.translate = vi.fn(() => mockSolid());
-	solid.extrude = vi.fn(() => mockSolid());
-	solid.loftWith = vi.fn(() => mockSolid());
-	solid.mesh = vi.fn(() => ({ vertices: [], triangles: [], normals: [] }));
-	solid.meshEdges = vi.fn(() => ({ lines: [] }));
-	solid.blobSTEP = vi.fn(() => new Blob());
-	solid.blobSTL = vi.fn(() => new Blob());
-	return solid;
+// Structural mocks for the replicad chainable API. Each interface captures the
+// subset of Solid / Sketch / Drawing methods buildBin() exercises, replacing
+// untyped Record<string, unknown> so a typo or dropped method is a type error.
+interface MockSolid {
+	fuse: Mock<(other: MockSolid) => MockSolid>;
+	cut: Mock<(other: MockSolid) => MockSolid>;
+	intersect: Mock<(other: MockSolid) => MockSolid>;
+	translate: Mock<(x: number, y: number, z: number) => MockSolid>;
+	mesh: Mock<() => { vertices: number[]; triangles: number[]; normals: number[] }>;
+	meshEdges: Mock<() => { lines: number[] }>;
+	blobSTEP: Mock<() => Blob>;
+	blobSTL: Mock<() => Blob>;
 }
 
-function mockSketch(): Record<string, unknown> {
-	const sketch: Record<string, unknown> = {};
-	sketch.extrude = vi.fn(() => mockSolid());
-	sketch.loftWith = vi.fn(() => mockSolid());
-	return sketch;
+interface MockSketch {
+	extrude: Mock<(height: number) => MockSolid>;
+	loftWith: Mock<(other: MockSketch, config: { ruled: boolean }) => MockSolid>;
 }
 
-function mockDrawing(): Record<string, unknown> {
-	const drawing: Record<string, unknown> = {};
-	drawing.lineTo = vi.fn(() => drawing);
-	drawing.close = vi.fn(() => ({
-		sketchOnPlane: vi.fn(() => mockSketch())
-	}));
-	drawing.sketchOnPlane = vi.fn(() => mockSketch());
-	return drawing;
+// drawCircle / drawRoundedRectangle / Drawing.close() all yield a sketch source.
+interface MockSketchOnPlane {
+	sketchOnPlane: Mock<(plane?: string, origin?: number) => MockSketch>;
+}
+
+interface MockDrawing {
+	lineTo: Mock<(point: [number, number]) => MockDrawing>;
+	close: Mock<() => MockSketchOnPlane>;
+	sketchOnPlane: Mock<(plane?: string, origin?: number) => MockSketch>;
+}
+
+interface MockPolysides {
+	rotate: Mock<(angle: number) => MockSketchOnPlane>;
+}
+
+function mockSolid(): MockSolid {
+	return {
+		fuse: vi.fn<(other: MockSolid) => MockSolid>(() => mockSolid()),
+		cut: vi.fn<(other: MockSolid) => MockSolid>(() => mockSolid()),
+		intersect: vi.fn<(other: MockSolid) => MockSolid>(() => mockSolid()),
+		translate: vi.fn<(x: number, y: number, z: number) => MockSolid>(() => mockSolid()),
+		mesh: vi.fn<() => { vertices: number[]; triangles: number[]; normals: number[] }>(() => ({ vertices: [], triangles: [], normals: [] })),
+		meshEdges: vi.fn<() => { lines: number[] }>(() => ({ lines: [] })),
+		blobSTEP: vi.fn<() => Blob>(() => new Blob()),
+		blobSTL: vi.fn<() => Blob>(() => new Blob())
+	};
+}
+
+function mockSketch(): MockSketch {
+	return {
+		extrude: vi.fn<(height: number) => MockSolid>(() => mockSolid()),
+		loftWith: vi.fn<(other: MockSketch, config: { ruled: boolean }) => MockSolid>(() => mockSolid())
+	};
+}
+
+function mockSketchOnPlane(): MockSketchOnPlane {
+	return { sketchOnPlane: vi.fn<(plane?: string, origin?: number) => MockSketch>(() => mockSketch()) };
+}
+
+function mockDrawing(): MockDrawing {
+	return {
+		lineTo: vi.fn<(point: [number, number]) => MockDrawing>(() => mockDrawing()),
+		close: vi.fn<() => MockSketchOnPlane>(() => mockSketchOnPlane()),
+		sketchOnPlane: vi.fn<(plane?: string, origin?: number) => MockSketch>(() => mockSketch())
+	};
 }
 
 vi.mock('replicad', () => ({
-	draw: vi.fn(() => mockDrawing()),
-	drawCircle: vi.fn(() => ({
-		sketchOnPlane: vi.fn(() => mockSketch())
-	})),
-	drawRoundedRectangle: vi.fn(() => ({
-		sketchOnPlane: vi.fn(() => mockSketch())
-	})),
-	drawPolysides: vi.fn(() => ({
-		rotate: vi.fn(() => ({
-			sketchOnPlane: vi.fn(() => mockSketch())
-		}))
+	draw: vi.fn<(start?: [number, number]) => MockDrawing>(() => mockDrawing()),
+	drawCircle: vi.fn<(radius: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
+	drawRoundedRectangle: vi.fn<(w: number, l: number, r?: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
+	drawPolysides: vi.fn<(radius: number, sides: number) => MockPolysides>(() => ({
+		rotate: vi.fn<(angle: number) => MockSketchOnPlane>(() => mockSketchOnPlane())
 	}))
 }));
 
