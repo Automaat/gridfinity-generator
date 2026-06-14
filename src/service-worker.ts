@@ -26,24 +26,27 @@ const APP_ASSETS = [...build, ...files].filter(
 	(path) => !path.endsWith('.wasm') && !NON_SERVED.has(path)
 );
 
+const APP_ASSET_SET = new Set(APP_ASSETS);
+
 sw.addEventListener('install', (event) => {
 	event.waitUntil(
 		(async () => {
 			const cache = await caches.open(APP_CACHE);
 			// Per-asset add so a single 404 can't abort the whole install (unlike addAll).
 			await Promise.allSettled(APP_ASSETS.map((path) => cache.add(path)));
-			await sw.skipWaiting();
 		})()
 	);
 });
 
+// No skipWaiting/clients.claim: the new worker waits until open tabs close before
+// activating, so deleting the previous version's cache here can't 404 a hashed
+// asset that a still-running old client lazy-loads after a deploy.
 sw.addEventListener('activate', (event) => {
 	event.waitUntil(
 		(async () => {
 			for (const key of await caches.keys()) {
 				if (key !== APP_CACHE && key !== WASM_CACHE) await caches.delete(key);
 			}
-			await sw.clients.claim();
 		})()
 	);
 });
@@ -60,13 +63,13 @@ async function cacheFirst(cacheName: string, request: Request): Promise<Response
 sw.addEventListener('fetch', (event) => {
 	if (event.request.method !== 'GET') return;
 	const url = new URL(event.request.url);
-	if (url.protocol !== 'http:' && url.protocol !== 'https:') return;
+	if (url.origin !== sw.location.origin) return; // only manage our own assets
 
 	if (url.pathname.endsWith('.wasm')) {
 		event.respondWith(cacheFirst(WASM_CACHE, event.request));
 		return;
 	}
-	if (APP_ASSETS.includes(url.pathname)) {
+	if (APP_ASSET_SET.has(url.pathname)) {
 		event.respondWith(cacheFirst(APP_CACHE, event.request));
 	}
 });
