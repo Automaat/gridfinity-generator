@@ -1,20 +1,29 @@
-import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
-import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
-import { setOC } from 'replicad';
-import { buildBin } from './gridfinity';
+import manifoldModule from 'manifold-3d';
+import manifoldWasm from 'manifold-3d/manifold.wasm?url';
+import { buildBinManifold, setBinManifold } from './manifold-bin';
+import { manifoldToMesh } from './mesh-util';
 import type { BinParams } from '$lib/stores/params';
 import { classifyError, validateParams, type WorkerErrorCode } from './worker-errors';
 
-let initialized = false;
+// Preview tessellation for the OCCT fallback path (manifold bakes its own at
+// construction). Matches the precomputed default mesh and STL/STEP stay finer.
+const PREVIEW = { tolerance: 0.2, angularTolerance: 0.3 };
 
+let initialized = false;
 async function init() {
 	if (initialized) return;
-	const OC = await opencascade({ locateFile: () => opencascadeWasm });
-	setOC(OC as Parameters<typeof setOC>[0]);
+	const m = await manifoldModule({ locateFile: () => manifoldWasm });
+	m.setup();
+	setBinManifold(m);
 	initialized = true;
 }
 
 const ready = init();
+
+// Features not yet ported to the manifold engine fall back to OCCT for preview.
+function usesOcctOnly(p: BinParams): boolean {
+	return p.scoopWalls.length > 0 || p.lightweightDividers || p.labelTab || p.wallCut;
+}
 
 export type WorkerRequest =
 	| { type: 'build'; params: BinParams }
@@ -34,33 +43,44 @@ export type WorkerResponse =
 	| { type: 'error'; code: WorkerErrorCode; message: string; requestType: WorkerRequest['type'] }
 	| { type: 'ready' };
 
+function postMesh(vertices: Float32Array, triangles: Uint32Array, normals: Float32Array, edges: Float32Array) {
+	self.postMessage(
+		{ type: 'mesh', vertices, triangles, normals, edges } satisfies WorkerResponse,
+		{ transfer: [vertices.buffer, triangles.buffer, normals.buffer, edges.buffer] }
+	);
+}
+
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 	const msg = e.data;
 	try {
 		await ready;
 		validateParams(msg.params);
-		const shape = buildBin(msg.params);
 
 		if (msg.type === 'build') {
-			// Preview tolerance: 0.2mm linear meshes ~2× faster than 0.1mm with no
-			// visible change at screen scale (identical triangle count in practice).
-			// Exports keep replicad's finer defaults via blobSTEP/blobSTL.
-			const mesh = shape.mesh({ tolerance: 0.2, angularTolerance: 0.3 });
-			const edgeData = shape.meshEdges({ tolerance: 0.2, angularTolerance: 0.3 });
-			const vertices = new Float32Array(mesh.vertices);
-			const triangles = new Uint32Array(mesh.triangles);
-			const normals = new Float32Array(mesh.normals);
-			const edges = new Float32Array(edgeData.lines);
-			self.postMessage(
-				{ type: 'mesh', vertices, triangles, normals, edges } satisfies WorkerResponse,
-				{ transfer: [vertices.buffer, triangles.buffer, normals.buffer, edges.buffer] }
-			);
+			if (usesOcctOnly(msg.params)) {
+				const { buildOcctBin } = await import('./occt');
+				const shape = await buildOcctBin(msg.params);
+				const mesh = shape.mesh(PREVIEW);
+				const edgeData = shape.meshEdges(PREVIEW);
+				postMesh(
+					new Float32Array(mesh.vertices),
+					new Uint32Array(mesh.triangles),
+					new Float32Array(mesh.normals),
+					new Float32Array(edgeData.lines)
+				);
+			} else {
+				const solid = buildBinManifold(msg.params);
+				const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
+				postMesh(vertices, triangles, normals, edges);
+			}
 		} else if (msg.type === 'exportSTEP') {
-			const blob = shape.blobSTEP();
-			self.postMessage({ type: 'exportSTEP', blob } satisfies WorkerResponse);
+			const { buildOcctBin } = await import('./occt');
+			const shape = await buildOcctBin(msg.params);
+			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP() } satisfies WorkerResponse);
 		} else if (msg.type === 'exportSTL') {
-			const blob = shape.blobSTL({ binary: true });
-			self.postMessage({ type: 'exportSTL', blob } satisfies WorkerResponse);
+			const { buildOcctBin } = await import('./occt');
+			const shape = await buildOcctBin(msg.params);
+			self.postMessage({ type: 'exportSTL', blob: shape.blobSTL({ binary: true }) } satisfies WorkerResponse);
 		}
 	} catch (err) {
 		const { code, message } = classifyError(err);
@@ -68,5 +88,5 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 	}
 };
 
-// signal ready after WASM loads
+// signal ready after the manifold engine loads (small WASM; OCCT stays lazy)
 ready.then(() => self.postMessage({ type: 'ready' } satisfies WorkerResponse));

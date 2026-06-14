@@ -1,46 +1,29 @@
 // Generates static/default-mesh.json: the meshed default bin, rendered on first
 // paint so the viewport shows a real bin instantly instead of waiting for the
-// ~4.6 MB OpenCascade WASM to download/compile. Must match the worker's preview
-// tolerance exactly (see worker.ts) so the swap to the live mesh is seamless.
+// engine WASM. Built with the manifold engine so it matches the live preview
+// tessellation exactly (seamless swap).
 //
 // Run after changing defaultParams or the base geometry: `npm run gen:default-mesh`.
-import { createRequire } from 'node:module';
-import { mkdtempSync, writeFileSync, copyFileSync } from 'node:fs';
-import { tmpdir } from 'node:os';
+import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 
-const require = createRequire(import.meta.url);
-const ocPkg = path.dirname(require.resolve('replicad-opencascadejs/package.json'));
-const wasmPath = path.join(ocPkg, 'src/replicad_single.wasm');
+const ManifoldModule = (await import('manifold-3d')).default;
+const mani = await ManifoldModule();
+mani.setup();
 
-// The emscripten glue is an ES module that still references __dirname/require in
-// its Node branch, so Node can't auto-classify it. Copy to a temp .mjs and shim
-// the globals it expects before importing.
-const tmp = mkdtempSync(path.join(tmpdir(), 'oc-'));
-const glueMjs = path.join(tmp, 'glue.mjs');
-copyFileSync(path.join(ocPkg, 'src/replicad_single.js'), glueMjs);
-globalThis.__dirname = path.join(ocPkg, 'src');
-globalThis.require = require;
-const glue = (await import(glueMjs)).default;
-
-const replicad = await import('replicad');
-replicad.setOC(await glue({ locateFile: () => wasmPath }));
-
-const { buildBin } = await import('../src/lib/cad/gridfinity.ts');
+const { buildBinManifold, setBinManifold } = await import('../src/lib/cad/manifold-bin.ts');
+const { manifoldToMesh } = await import('../src/lib/cad/mesh-util.ts');
 const { defaultParams } = await import('../src/lib/stores/params.ts');
+setBinManifold(mani);
 
-const PREVIEW = { tolerance: 0.2, angularTolerance: 0.3 };
-const shape = buildBin(defaultParams);
-const mesh = shape.mesh(PREVIEW);
-const edges = shape.meshEdges(PREVIEW);
-
-const b64 = (Arr, data) => Buffer.from(new Arr(data).buffer).toString('base64');
+const mesh = manifoldToMesh(buildBinManifold(defaultParams));
+const b64 = (a) => Buffer.from(a.buffer, a.byteOffset, a.byteLength).toString('base64');
 const out = {
 	params: defaultParams,
-	vertices: b64(Float32Array, mesh.vertices),
-	normals: b64(Float32Array, mesh.normals),
-	triangles: b64(Uint32Array, mesh.triangles),
-	edges: b64(Float32Array, edges.lines)
+	vertices: b64(mesh.vertices),
+	normals: b64(mesh.normals),
+	triangles: b64(mesh.triangles),
+	edges: b64(mesh.edges)
 };
 
 const dest = path.join(import.meta.dirname, '../static/default-mesh.json');
