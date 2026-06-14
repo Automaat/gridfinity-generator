@@ -124,13 +124,22 @@ const CODECS: Codecs = {
 
 const PARAM_KEYS = Object.keys(CODECS) as (keyof BinParams)[];
 
+// Generic helpers preserve the per-field link between a param key and its codec.
+// Inside a single type parameter K, `CODECS[param]` is `Codec<K>`, so encode's
+// argument and decode's result line up with `BinParams[K]` — no casts needed.
+function encodeField<K extends keyof BinParams>(p: BinParams, param: K): string {
+	return CODECS[param].encode(p[param]);
+}
+
+function decodeField<K extends keyof BinParams>(p: BinParams, param: K, raw: string): void {
+	p[param] = CODECS[param].decode(raw, defaultParams[param]);
+}
+
 export function serializeParams(p: BinParams): URLSearchParams {
 	const sp = new URLSearchParams();
 	for (const param of PARAM_KEYS) {
-		const value = p[param];
-		if (value === defaultParams[param]) continue;
-		const codec = CODECS[param] as Codec<typeof param>;
-		sp.set(codec.key, codec.encode(value));
+		if (p[param] === defaultParams[param]) continue;
+		sp.set(CODECS[param].key, encodeField(p, param));
 	}
 	return sp;
 }
@@ -138,10 +147,9 @@ export function serializeParams(p: BinParams): URLSearchParams {
 export function deserializeParams(search: URLSearchParams): BinParams {
 	const p = { ...defaultParams };
 	for (const param of PARAM_KEYS) {
-		const codec = CODECS[param] as Codec<typeof param>;
-		const raw = search.get(codec.key);
+		const raw = search.get(CODECS[param].key);
 		if (raw === null) continue;
-		(p[param] as BinParams[typeof param]) = codec.decode(raw, defaultParams[param]);
+		decodeField(p, param, raw);
 	}
 	return p;
 }
