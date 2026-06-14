@@ -27,9 +27,10 @@ const HEX_WEB = 2;
 const HEX_MARGIN = 3;
 const HEX_CUT_OVERSHOOT = 0.1;
 
-// Circle/arc tessellation for the preview. ~32 segments keeps holes and corner
-// fillets smooth at screen scale without inflating triangle count.
-const CIRCLE_SEGMENTS = 32;
+// Circle/arc tessellation. 32 segments keeps holes and corner fillets smooth at
+// screen scale for the preview; exports pass a higher count via buildBinManifold.
+const PREVIEW_SEGMENTS = 32;
+let circleSegments = PREVIEW_SEGMENTS;
 
 let M: ManifoldToplevel | null = null;
 export function setBinManifold(m: ManifoldToplevel): void {
@@ -50,7 +51,7 @@ function bodySize(units: number): number {
 function roundedRectCS(w: number, l: number, r: number) {
 	const { CrossSection } = oc();
 	if (r <= 0) return CrossSection.square([w, l], true);
-	const quarter = Math.max(1, Math.round(CIRCLE_SEGMENTS / 4));
+	const quarter = Math.max(1, Math.round(circleSegments / 4));
 	return CrossSection.square([w - 2 * r, l - 2 * r], true).offset(r, 'Round', 2, quarter * 4);
 }
 
@@ -103,10 +104,10 @@ function prismAlongY(ptsXZ: [number, number][], length: number): Manifold {
 	return oc().Manifold.extrude(cs, length).rotate([90, 0, 0]).translate([0, length, 0]);
 }
 function cylinderAlongX(radius: number, length: number): Manifold {
-	return oc().Manifold.cylinder(length, radius, radius, CIRCLE_SEGMENTS).rotate([0, 90, 0]);
+	return oc().Manifold.cylinder(length, radius, radius, circleSegments).rotate([0, 90, 0]);
 }
 function cylinderAlongY(radius: number, length: number): Manifold {
-	return oc().Manifold.cylinder(length, radius, radius, CIRCLE_SEGMENTS).rotate([-90, 0, 0]);
+	return oc().Manifold.cylinder(length, radius, radius, circleSegments).rotate([-90, 0, 0]);
 }
 
 function unitBase(): Manifold {
@@ -134,10 +135,10 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Man
 			for (const [ox, oy] of offsets) {
 				const parts: Manifold[] = [];
 				if (p.magnetHoles) {
-					parts.push(Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, CIRCLE_SEGMENTS));
+					parts.push(Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, circleSegments));
 				}
 				if (p.screwHoles) {
-					parts.push(Manifold.cylinder(SCREW_HOLE_DEPTH, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, CIRCLE_SEGMENTS));
+					parts.push(Manifold.cylinder(SCREW_HOLE_DEPTH, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, circleSegments));
 				}
 				if (parts.length === 0) continue;
 				const cutter = (parts.length === 1 ? parts[0] : Manifold.union(parts));
@@ -355,7 +356,8 @@ function buildWallCut(
 		: prismAlongY(pts, 2 * crossHalf).translate([0, -crossHalf, 0]);
 }
 
-export function buildBinManifold(p: BinParams): Manifold {
+export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: { segments?: number } = {}): Manifold {
+	circleSegments = segments;
 	const { Manifold } = oc();
 	const h = p.height * HEIGHT_UNIT;
 	const bodyW = bodySize(p.width);

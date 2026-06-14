@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { BinParams } from '$lib/stores/params';
 import { buildBinManifold, setBinManifold } from './manifold-bin';
-import { manifoldToMesh } from './mesh-util';
+import { manifoldToMesh, manifoldToStlBlob } from './mesh-util';
 
 // Unlike the OCCT path (which mocks replicad), the manifold engine is exercised
 // against the real WASM — mocking a CSG kernel would verify nothing. manifold
@@ -132,5 +132,23 @@ describe('manifoldToMesh', () => {
 		let maxIdx = 0;
 		for (const i of m.triangles) maxIdx = Math.max(maxIdx, i);
 		expect(maxIdx).toBeLessThan(vertCount);
+	});
+
+	it('finer export tessellation yields more triangles than preview', () => {
+		const p = makeParams({ width: 2, magnetHoles: true });
+		const preview = buildBinManifold(p).getMesh().triVerts.length / 3;
+		const fine = buildBinManifold(p, { segments: 64 }).getMesh().triVerts.length / 3;
+		expect(fine).toBeGreaterThan(preview);
+	});
+});
+
+describe('manifoldToStlBlob', () => {
+	it('writes a valid binary STL (header count matches triangles)', async () => {
+		const solid = buildBinManifold(makeParams({ width: 2, magnetHoles: true }), { segments: 48 });
+		const nTri = solid.getMesh().triVerts.length / 3;
+		const blob = manifoldToStlBlob(solid);
+		expect(blob.size).toBe(84 + nTri * 50); // 80 header + 4 count + 50/triangle
+		const dv = new DataView(await blob.arrayBuffer());
+		expect(dv.getUint32(80, true)).toBe(nTri);
 	});
 });

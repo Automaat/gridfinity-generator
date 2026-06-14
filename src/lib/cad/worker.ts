@@ -1,13 +1,15 @@
 import manifoldModule from 'manifold-3d';
 import manifoldWasm from 'manifold-3d/manifold.wasm?url';
 import { buildBinManifold, setBinManifold } from './manifold-bin';
-import { manifoldToMesh } from './mesh-util';
+import { manifoldToMesh, manifoldToStlBlob } from './mesh-util';
 import type { BinParams } from '$lib/stores/params';
 import { classifyError, validateParams, type WorkerErrorCode } from './worker-errors';
 
-// The live preview runs entirely on the manifold engine (small WASM, loaded
-// eagerly). OpenCascade is dynamic-imported only for STEP/STL export, so the
-// interactive path never downloads the ~4.6MB kernel.
+// Preview and STL export both run on the manifold engine (small WASM, eager).
+// STL is rebuilt at a finer tessellation than the preview. OpenCascade is
+// dynamic-imported only for STEP (which needs a BRep), so the interactive path
+// and the common STL export never download the ~4.6MB kernel.
+const STL_SEGMENTS = 64;
 let initialized = false;
 async function init() {
 	if (initialized) return;
@@ -59,9 +61,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 			const shape = await buildOcctBin(msg.params);
 			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP() } satisfies WorkerResponse);
 		} else if (msg.type === 'exportSTL') {
-			const { buildOcctBin } = await import('./occt');
-			const shape = await buildOcctBin(msg.params);
-			self.postMessage({ type: 'exportSTL', blob: shape.blobSTL({ binary: true }) } satisfies WorkerResponse);
+			const solid = buildBinManifold(msg.params, { segments: STL_SEGMENTS });
+			self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid) } satisfies WorkerResponse);
 		}
 	} catch (err) {
 		const { code, message } = classifyError(err);
