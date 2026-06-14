@@ -224,4 +224,36 @@ describe('URL serialization', () => {
 		expect(deserializeParams(new URLSearchParams('wcf=5')).wallCutLowFraction).toBe(0.95);
 		expect(deserializeParams(new URLSearchParams('wcf=-1')).wallCutLowFraction).toBe(0);
 	});
+
+	it('assigns a unique short key to every param', () => {
+		// non-default value per param, chosen to stay in range so a key is emitted
+		const nonDefault: BinParams = {
+			width: 3,
+			length: 2,
+			height: 4,
+			wallThickness: 1.6,
+			magnetHoles: true,
+			screwHoles: true,
+			stackingLip: 'none',
+			labelTab: true,
+			dividersX: 1,
+			dividersY: 1,
+			lightweightDividers: true,
+			scoopWalls: ['back'],
+			scoopRadius: 5,
+			wallCut: true,
+			wallCutSide: 'back',
+			wallCutLowFraction: 0.5,
+			wallCutRun: 0.5
+		};
+		const urlKeys = new Set<string>();
+		for (const param of Object.keys(defaultParams) as (keyof BinParams)[]) {
+			const sp = serializeParams({ ...defaultParams, [param]: nonDefault[param] });
+			const emitted = [...sp.keys()];
+			expect(emitted).toHaveLength(1); // exactly one param differs -> one key
+			expect(emitted[0]).not.toBe(''); // guard against an empty/missing codec key
+			urlKeys.add(emitted[0]);
+		}
+		expect(urlKeys.size).toBe(Object.keys(defaultParams).length);
+	});
 });
