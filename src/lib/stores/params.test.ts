@@ -17,7 +17,11 @@ describe('defaultParams', () => {
 			dividersY: 0,
 			lightweightDividers: false,
 			scoopWalls: [],
-			scoopRadius: 0
+			scoopRadius: 0,
+			wallCut: false,
+			wallCutSide: 'front',
+			wallCutLowFraction: 0,
+			wallCutRun: 1
 		});
 	});
 });
@@ -52,7 +56,11 @@ describe('params store', () => {
 			dividersY: 3,
 			lightweightDividers: true,
 			scoopWalls: ['back', 'front'],
-			scoopRadius: 5
+			scoopRadius: 5,
+			wallCut: true,
+			wallCutSide: 'right',
+			wallCutLowFraction: 0.5,
+			wallCutRun: 0.6
 		};
 		params.set(custom);
 		expect(get(params)).toEqual(custom);
@@ -120,7 +128,11 @@ describe('URL serialization', () => {
 			dividersY: 1,
 			lightweightDividers: true,
 			scoopWalls: ['back', 'front'],
-			scoopRadius: 5
+			scoopRadius: 5,
+			wallCut: true,
+			wallCutSide: 'back',
+			wallCutLowFraction: 0.25,
+			wallCutRun: 0.75
 		};
 		const sp = serializeParams(custom);
 		const result = deserializeParams(sp);
@@ -189,5 +201,27 @@ describe('URL serialization', () => {
 		const sp = new URLSearchParams('sw=bflr');
 		const result = deserializeParams(sp);
 		expect(result.scoopWalls).toEqual(['back', 'front', 'left', 'right']);
+	});
+
+	it('round-trips wall cut params', () => {
+		const p: BinParams = {
+			...defaultParams,
+			wallCut: true,
+			wallCutSide: 'left',
+			wallCutLowFraction: 0.3
+		};
+		const sp = serializeParams(p);
+		expect(sp.get('wc')).toBe('1');
+		expect(sp.get('wcs')).toBe('l');
+		expect(sp.get('wcf')).toBe('0.3');
+		const result = deserializeParams(sp);
+		expect(result.wallCut).toBe(true);
+		expect(result.wallCutSide).toBe('left');
+		expect(result.wallCutLowFraction).toBe(0.3);
+	});
+
+	it('clamps wall cut low fraction to valid range', () => {
+		expect(deserializeParams(new URLSearchParams('wcf=5')).wallCutLowFraction).toBe(0.95);
+		expect(deserializeParams(new URLSearchParams('wcf=-1')).wallCutLowFraction).toBe(0);
 	});
 });

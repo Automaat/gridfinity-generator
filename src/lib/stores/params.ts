@@ -14,6 +14,10 @@ export interface BinParams {
 	lightweightDividers: boolean;
 	scoopWalls: ('back' | 'front' | 'left' | 'right')[];
 	scoopRadius: number;
+	wallCut: boolean;
+	wallCutSide: 'back' | 'front' | 'left' | 'right';
+	wallCutLowFraction: number;
+	wallCutRun: number;
 }
 
 export const defaultParams: BinParams = {
@@ -29,7 +33,11 @@ export const defaultParams: BinParams = {
 	dividersY: 0,
 	lightweightDividers: false,
 	scoopWalls: [],
-	scoopRadius: 0
+	scoopRadius: 0,
+	wallCut: false,
+	wallCutSide: 'front',
+	wallCutLowFraction: 0,
+	wallCutRun: 1
 };
 
 export const params = writable<BinParams>({ ...defaultParams });
@@ -53,7 +61,11 @@ const URL_KEYS: Record<string, keyof BinParams> = {
 	dy: 'dividersY',
 	ld: 'lightweightDividers',
 	sw: 'scoopWalls',
-	sr: 'scoopRadius'
+	sr: 'scoopRadius',
+	wc: 'wallCut',
+	wcs: 'wallCutSide',
+	wcf: 'wallCutLowFraction',
+	wcr: 'wallCutRun'
 };
 
 const REVERSE_KEYS = Object.fromEntries(Object.entries(URL_KEYS).map(([k, v]) => [v, k]));
@@ -84,6 +96,8 @@ export function serializeParams(p: BinParams): URLSearchParams {
 		} else if (param === 'scoopWalls') {
 			const walls = val as string[];
 			sp.set(short, walls.map((w) => WALL_TO_CHAR[w]).join(''));
+		} else if (param === 'wallCutSide') {
+			sp.set(short, WALL_TO_CHAR[val as string]);
 		} else {
 			sp.set(short, String(val));
 		}
@@ -106,7 +120,16 @@ export function deserializeParams(search: URLSearchParams): BinParams {
 		} else if (param === 'scoopRadius') {
 			const parsed = parseFloat(raw);
 			p.scoopRadius = clamp(Number.isNaN(parsed) ? 0 : parsed, 0, 20);
-		} else if (param === 'magnetHoles' || param === 'screwHoles' || param === 'labelTab' || param === 'lightweightDividers') {
+		} else if (param === 'wallCutSide') {
+			const mapped = SCOOP_CHAR_TO_WALL[raw];
+			if (mapped) p.wallCutSide = mapped;
+		} else if (param === 'wallCutLowFraction') {
+			const parsed = parseFloat(raw);
+			p.wallCutLowFraction = clamp(Number.isNaN(parsed) ? defaultParams.wallCutLowFraction : parsed, 0, 0.95);
+		} else if (param === 'wallCutRun') {
+			const parsed = parseFloat(raw);
+			p.wallCutRun = clamp(Number.isNaN(parsed) ? defaultParams.wallCutRun : parsed, 0.1, 1);
+		} else if (param === 'magnetHoles' || param === 'screwHoles' || param === 'labelTab' || param === 'lightweightDividers' || param === 'wallCut') {
 			(p as Record<string, unknown>)[param] = raw === '1';
 		} else if (param === 'wallThickness') {
 			const parsed = parseFloat(raw);

@@ -23,7 +23,11 @@ export const presets: Preset[] = [
 			dividersY: 0,
 			lightweightDividers: false,
 			scoopWalls: [],
-			scoopRadius: 0
+			scoopRadius: 0,
+			wallCut: false,
+			wallCutSide: 'front',
+			wallCutLowFraction: 0,
+			wallCutRun: 1
 		}
 	},
 	{
@@ -42,7 +46,11 @@ export const presets: Preset[] = [
 			dividersY: 1,
 			lightweightDividers: false,
 			scoopWalls: ['back'],
-			scoopRadius: 0
+			scoopRadius: 0,
+			wallCut: false,
+			wallCutSide: 'front',
+			wallCutLowFraction: 0,
+			wallCutRun: 1
 		}
 	},
 	{
@@ -61,7 +69,11 @@ export const presets: Preset[] = [
 			dividersY: 0,
 			lightweightDividers: false,
 			scoopWalls: [],
-			scoopRadius: 0
+			scoopRadius: 0,
+			wallCut: false,
+			wallCutSide: 'front',
+			wallCutLowFraction: 0,
+			wallCutRun: 1
 		}
 	},
 	{
@@ -80,7 +92,11 @@ export const presets: Preset[] = [
 			dividersY: 0,
 			lightweightDividers: false,
 			scoopWalls: [],
-			scoopRadius: 0
+			scoopRadius: 0,
+			wallCut: false,
+			wallCutSide: 'front',
+			wallCutLowFraction: 0,
+			wallCutRun: 1
 		}
 	},
 	{
@@ -99,7 +115,11 @@ export const presets: Preset[] = [
 			dividersY: 1,
 			lightweightDividers: false,
 			scoopWalls: ['back'],
-			scoopRadius: 0
+			scoopRadius: 0,
+			wallCut: false,
+			wallCutSide: 'front',
+			wallCutLowFraction: 0,
+			wallCutRun: 1
 		}
 	}
 ];

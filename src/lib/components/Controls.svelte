@@ -130,6 +130,55 @@
 
 	<hr class="border-zinc-700" />
 
+	<div class="space-y-2">
+		<label class="flex items-center gap-2 text-sm text-zinc-400">
+			<input type="checkbox" bind:checked={$params.wallCut} class="accent-blue-500" />
+			Wall cut (diagonal slope)
+		</label>
+
+		{#if $params.wallCut}
+			<label class="block">
+				<span class="text-sm text-zinc-400">Slope down toward</span>
+				<select bind:value={$params.wallCutSide} class={inputClass}>
+					<option value="front">Front</option>
+					<option value="back">Back</option>
+					<option value="left">Left</option>
+					<option value="right">Right</option>
+				</select>
+			</label>
+
+			<label class="block">
+				<span class="text-sm text-zinc-400">
+					Low side height ({Math.round($params.wallCutLowFraction * 100)}%)
+				</span>
+				<input
+					type="range"
+					min="0"
+					max="0.95"
+					step="0.05"
+					bind:value={$params.wallCutLowFraction}
+					class="mt-1 w-full accent-blue-500"
+				/>
+			</label>
+
+			<label class="block">
+				<span class="text-sm text-zinc-400">
+					Slope length ({Math.round($params.wallCutRun * 100)}%)
+				</span>
+				<input
+					type="range"
+					min="0.1"
+					max="1"
+					step="0.05"
+					bind:value={$params.wallCutRun}
+					class="mt-1 w-full accent-blue-500"
+				/>
+			</label>
+		{/if}
+	</div>
+
+	<hr class="border-zinc-700" />
+
 	<div class="space-y-3">
 		<label class="block">
 			<span class="text-sm text-zinc-400">Dividers X</span>
