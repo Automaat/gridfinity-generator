@@ -40,6 +40,12 @@
 	// After a timeout-triggered respawn, skip the auto-rebuild so a genuinely
 	// hanging param set can't loop forever; the next param change retries.
 	let skipAutoBuild = false;
+	// Manifold builds are fast (~20-250ms), so instead of a long input debounce we
+	// build eagerly and coalesce: while a build runs, keep only the latest pending
+	// params and build them when it returns. No backlog; always converges to latest.
+	let buildInFlight = false;
+	let pendingBuild: BinParams | null = null;
+	let urlTimer: ReturnType<typeof setTimeout>;
 
 	function clearOpTimer() {
 		if (opTimer !== null) {
@@ -60,6 +66,8 @@
 		loading = false;
 		exporting = false;
 		inFlight = 0;
+		buildInFlight = false;
+		pendingBuild = null;
 		clearOpTimer();
 	}
 
@@ -67,6 +75,8 @@
 		worker?.terminate();
 		workerReady = false;
 		inFlight = 0; // the terminated worker's queued ops will never reply
+		buildInFlight = false;
+		pendingBuild = null;
 		worker = new Worker(new URL('$lib/cad/worker.ts', import.meta.url), { type: 'module' });
 		worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
 			const msg = e.data;
@@ -79,11 +89,19 @@
 				}
 			} else if (msg.type === 'mesh') {
 				opResolved();
+				buildInFlight = false;
 				vertices = msg.vertices;
 				triangles = msg.triangles;
 				normals = msg.normals;
 				edges = msg.edges;
-				loading = false;
+				// A param changed mid-build: build the latest now; otherwise settle.
+				if (pendingBuild) {
+					const next = pendingBuild;
+					pendingBuild = null;
+					requestBuild(next);
+				} else {
+					loading = false;
+				}
 			} else if (msg.type === 'exportSTEP' || msg.type === 'exportSTL') {
 				opResolved();
 				downloadBlob(msg.blob, msg.type === 'exportSTEP' ? 'bin.step' : 'bin.stl');
@@ -146,13 +164,20 @@
 	onDestroy(() => {
 		worker?.terminate();
 		clearTimeout(debounceTimer);
+		clearTimeout(urlTimer);
 		clearOpTimer();
 	});
 
 	function requestBuild(p: BinParams) {
 		if (!worker || !workerReady) return;
+		if (buildInFlight) {
+			pendingBuild = p; // supersede any earlier pending params
+			return;
+		}
 		buildError = null;
 		loading = true;
+		buildInFlight = true;
+		pendingBuild = null;
 		inFlight++;
 		startOpTimer();
 		worker.postMessage({ type: 'build', params: p } satisfies WorkerRequest);
@@ -179,15 +204,16 @@
 		URL.revokeObjectURL(url);
 	}
 
-	// debounced rebuild + URL sync on param change
+	// Build on a short debounce (coalescing absorbs bursts); sync the URL on a
+	// longer one so dragging a slider doesn't spam history.replaceState.
 	const unsubscribe = params.subscribe((p) => {
 		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => {
-			requestBuild(p);
-			const sp = serializeParams(p);
-			const qs = sp.toString();
+		debounceTimer = setTimeout(() => requestBuild(p), 40);
+		clearTimeout(urlTimer);
+		urlTimer = setTimeout(() => {
+			const qs = serializeParams(p).toString();
 			history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
-		}, 150);
+		}, 250);
 	});
 
 	onDestroy(unsubscribe);
