@@ -46,7 +46,7 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	}
 
 	// Dividers
-	const dividerFill = p.lightweightDividers ? 0.45 : 1.0;
+	const dividerFill = p.lightweightDividers ? 0.38 : 1.0;
 	if (p.dividersX > 0) {
 		volumeMm3 += p.dividersX * p.wallThickness * innerL * wallHeight * dividerFill;
 	}

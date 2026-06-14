@@ -197,8 +197,9 @@ function buildStackingLip(
 
 // Lightweight divider hex pattern
 const HEX_RADIUS = 6;
-const HEX_WEB = 3;
-const HEX_MARGIN = 4;
+const HEX_WEB = 2; // strut between holes — 2mm stays rigid and self-supporting on FDM
+const HEX_MARGIN = 3;
+const HEX_CUT_OVERSHOOT = 0.1;
 
 function cutHexPattern(
 	wall: Solid,
@@ -222,6 +223,10 @@ function cutHexPattern(
 	const gridW = (cols - 1) * colSpacing;
 	const gridH = (rows - 1) * rowSpacing;
 
+	// Oversize the cutter past both wall faces — coincident faces make the
+	// OCCT boolean leave the wall uncut (no through-hole forms).
+	const cutDepth = wallThickness + 2 * HEX_CUT_OVERSHOOT;
+
 	let holes: Solid | null = null;
 
 	for (let row = 0; row < rows; row++) {
@@ -237,8 +242,8 @@ function cutHexPattern(
 			const hex = (
 				drawPolysides(HEX_RADIUS, 6)
 					.rotate(30)
-					.sketchOnPlane(plane, -wallThickness / 2) as Sketch
-			).extrude(wallThickness) as Solid;
+					.sketchOnPlane(plane, -cutDepth / 2) as Sketch
+			).extrude(cutDepth) as Solid;
 
 			const positioned =
 				plane === 'YZ'
