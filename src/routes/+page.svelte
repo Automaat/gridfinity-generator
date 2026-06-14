@@ -3,7 +3,8 @@
 	import { params, serializeParams, deserializeParams, type BinParams } from '$lib/stores/params';
 	import Viewer from '$lib/components/Viewer.svelte';
 	import Controls from '$lib/components/Controls.svelte';
-	import type { WorkerRequest, WorkerResponse, WorkerErrorCode } from '$lib/cad/worker';
+	import type { WorkerRequest, WorkerResponse } from '$lib/cad/worker';
+	import type { WorkerErrorCode } from '$lib/cad/worker-errors';
 
 	// Worker computation is 200-500ms; a build that takes this long means the
 	// worker is wedged (e.g. a WASM hang that can't be interrupted from inside).
@@ -113,7 +114,9 @@
 	}
 
 	function handleExport(format: 'step' | 'stl') {
-		if (!worker || !workerReady) return;
+		// Don't overlap with a build/export — the worker is serial and a second
+		// op would clear the in-flight operation's timeout watchdog.
+		if (!worker || !workerReady || loading || exporting) return;
 		buildError = null;
 		exporting = true;
 		startOpTimer();

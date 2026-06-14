@@ -19,6 +19,14 @@ describe('validateParams', () => {
 	it('rejects non-positive wall thickness', () => {
 		expect(() => validateParams({ ...defaultParams, wallThickness: 0 })).toThrow(InvalidParamsError);
 	});
+
+	it('rejects negative divider counts', () => {
+		expect(() => validateParams({ ...defaultParams, dividersX: -1 })).toThrow(InvalidParamsError);
+	});
+
+	it('rejects negative scoop radius', () => {
+		expect(() => validateParams({ ...defaultParams, scoopRadius: -1 })).toThrow(InvalidParamsError);
+	});
 });
 
 describe('classifyError', () => {
@@ -34,11 +42,13 @@ describe('classifyError', () => {
 	it('detects WASM/OpenCascade failures', () => {
 		expect(classifyError(new Error('abort(OOB)')).code).toBe('WASMError');
 		expect(classifyError(new Error('Standard_ConstructionError: OpenCascade')).code).toBe('WASMError');
-		expect(classifyError(new Error('uncaught exception')).code).toBe('WASMError');
+		expect(classifyError(new Error('std::out_of_range')).code).toBe('WASMError');
 	});
 
-	it('falls back to Unknown for unrecognized errors', () => {
+	it('falls back to Unknown for vague/unrecognized errors', () => {
 		expect(classifyError(new Error('something odd')).code).toBe('Unknown');
+		// bare "exception" is too vague to attribute to the engine
+		expect(classifyError(new Error('uncaught exception')).code).toBe('Unknown');
 	});
 
 	it('handles non-Error throwables', () => {

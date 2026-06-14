@@ -23,6 +23,12 @@ export function validateParams(p: BinParams): void {
 	if (p.wallThickness <= 0) {
 		throw new InvalidParamsError('Wall thickness must be positive');
 	}
+	if (p.dividersX < 0 || p.dividersY < 0) {
+		throw new InvalidParamsError('Divider counts cannot be negative');
+	}
+	if (p.scoopRadius < 0) {
+		throw new InvalidParamsError('Scoop radius cannot be negative');
+	}
 }
 
 // OpenCascade/WASM surface failures as plain Errors; classify them so the UI can
@@ -33,10 +39,21 @@ export function classifyError(err: unknown): { code: WorkerErrorCode; message: s
 	}
 	const message = err instanceof Error ? err.message : String(err);
 	const lower = message.toLowerCase();
-	if (lower.includes('memory') || lower.includes('oom') || lower.includes('allocation') || lower.includes('enlarge')) {
+	if (
+		lower.includes('out of memory') ||
+		lower.includes('oom') ||
+		lower.includes('enlarge memory') ||
+		lower.includes('bad_alloc')
+	) {
 		return { code: 'OutOfMemory', message };
 	}
-	if (lower.includes('abort') || lower.includes('wasm') || lower.includes('opencascade') || lower.includes('std::') || lower.includes('exception')) {
+	if (
+		lower.includes('abort(') ||
+		lower.includes('wasm') ||
+		lower.includes('opencascade') ||
+		lower.includes('std::') ||
+		lower.includes('standard_')
+	) {
 		return { code: 'WASMError', message };
 	}
 	return { code: 'Unknown', message };

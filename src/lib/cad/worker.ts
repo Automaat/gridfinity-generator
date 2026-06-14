@@ -5,8 +5,6 @@ import { buildBin } from './gridfinity';
 import type { BinParams } from '$lib/stores/params';
 import { classifyError, validateParams, type WorkerErrorCode } from './worker-errors';
 
-export { type WorkerErrorCode } from './worker-errors';
-
 let initialized = false;
 
 async function init() {
