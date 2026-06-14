@@ -73,6 +73,45 @@ describe('buildBinManifold', () => {
 		expect(s.volume()).toBeGreaterThan(0);
 		expect(span(s, 2)).toBeLessThanOrEqual(7 + 0.01);
 	});
+
+	it('scoops on every wall add material without changing footprint', () => {
+		const plain = buildBinManifold(makeParams({ width: 3, length: 2, height: 5 }));
+		const scooped = buildBinManifold(makeParams({ width: 3, length: 2, height: 5, scoopWalls: ['back', 'front', 'left', 'right'] }));
+		expect(scooped.volume()).toBeGreaterThan(plain.volume());
+		expect(span(scooped, 0)).toBeCloseTo(span(plain, 0), 1);
+		expect(span(scooped, 1)).toBeCloseTo(span(plain, 1), 1);
+	});
+
+	it('label tabs add material at the top', () => {
+		const plain = buildBinManifold(makeParams({ width: 3, height: 5 })).volume();
+		const tabbed = buildBinManifold(makeParams({ width: 3, height: 5, labelTab: true })).volume();
+		expect(tabbed).toBeGreaterThan(plain);
+	});
+
+	it('lightweight dividers remove material vs solid dividers (both axes)', () => {
+		for (const o of [{ dividersX: 1 }, { dividersY: 1 }]) {
+			const solid = buildBinManifold(makeParams({ width: 2, length: 2, height: 6, ...o })).volume();
+			const light = buildBinManifold(makeParams({ width: 2, length: 2, height: 6, lightweightDividers: true, ...o })).volume();
+			expect(light).toBeLessThan(solid);
+		}
+	});
+
+	it('wall cut removes material on every side', () => {
+		const plain = buildBinManifold(makeParams({ width: 3, length: 2, height: 6 })).volume();
+		for (const wallCutSide of ['front', 'back', 'left', 'right'] as const) {
+			const cut = buildBinManifold(makeParams({ width: 3, length: 2, height: 6, wallCut: true, wallCutSide, wallCutLowFraction: 0.2 }));
+			expect(cut.volume()).toBeGreaterThan(0);
+			expect(cut.volume()).toBeLessThan(plain);
+		}
+	});
+
+	it('builds an all-features bin without error', () => {
+		const s = buildBinManifold(makeParams({
+			width: 3, length: 2, height: 6, magnetHoles: true, screwHoles: true, stackingLip: 'standard',
+			labelTab: true, dividersX: 2, dividersY: 1, scoopWalls: ['back'], wallCut: true, wallCutSide: 'front'
+		}));
+		expect(s.volume()).toBeGreaterThan(0);
+	});
 });
 
 describe('manifoldToMesh', () => {

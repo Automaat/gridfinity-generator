@@ -5,10 +5,9 @@ import { manifoldToMesh } from './mesh-util';
 import type { BinParams } from '$lib/stores/params';
 import { classifyError, validateParams, type WorkerErrorCode } from './worker-errors';
 
-// Preview tessellation for the OCCT fallback path (manifold bakes its own at
-// construction). Matches the precomputed default mesh and STL/STEP stay finer.
-const PREVIEW = { tolerance: 0.2, angularTolerance: 0.3 };
-
+// The live preview runs entirely on the manifold engine (small WASM, loaded
+// eagerly). OpenCascade is dynamic-imported only for STEP/STL export, so the
+// interactive path never downloads the ~4.6MB kernel.
 let initialized = false;
 async function init() {
 	if (initialized) return;
@@ -19,11 +18,6 @@ async function init() {
 }
 
 const ready = init();
-
-// Features not yet ported to the manifold engine fall back to OCCT for preview.
-function usesOcctOnly(p: BinParams): boolean {
-	return p.scoopWalls.length > 0 || p.lightweightDividers || p.labelTab || p.wallCut;
-}
 
 export type WorkerRequest =
 	| { type: 'build'; params: BinParams }
@@ -57,22 +51,9 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 		validateParams(msg.params);
 
 		if (msg.type === 'build') {
-			if (usesOcctOnly(msg.params)) {
-				const { buildOcctBin } = await import('./occt');
-				const shape = await buildOcctBin(msg.params);
-				const mesh = shape.mesh(PREVIEW);
-				const edgeData = shape.meshEdges(PREVIEW);
-				postMesh(
-					new Float32Array(mesh.vertices),
-					new Uint32Array(mesh.triangles),
-					new Float32Array(mesh.normals),
-					new Float32Array(edgeData.lines)
-				);
-			} else {
-				const solid = buildBinManifold(msg.params);
-				const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
-				postMesh(vertices, triangles, normals, edges);
-			}
+			const solid = buildBinManifold(msg.params);
+			const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
+			postMesh(vertices, triangles, normals, edges);
 		} else if (msg.type === 'exportSTEP') {
 			const { buildOcctBin } = await import('./occt');
 			const shape = await buildOcctBin(msg.params);

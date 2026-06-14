@@ -20,6 +20,12 @@ const HOLE_DISTANCE_FROM_EDGE = 8;
 const LIP_OFFSET_BOTTOM = 2.95;
 const LIP_OFFSET_MID = 0.8;
 const FLOOR_THICKNESS = 2.25;
+const LABEL_TAB_HEIGHT = 14;
+const LABEL_TAB_DEPTH = 4.5;
+const HEX_RADIUS = 6;
+const HEX_WEB = 2;
+const HEX_MARGIN = 3;
+const HEX_CUT_OVERSHOOT = 0.1;
 
 // Circle/arc tessellation for the preview. ~32 segments keeps holes and corner
 // fillets smooth at screen scale without inflating triangle count.
@@ -64,6 +70,43 @@ function chamfer(
 	const a = roundedPrism(wA, lA, rA, eps, zA);
 	const b = roundedPrism(wB, lB, rB, eps, zB - eps);
 	return oc().Manifold.hull([a, b]);
+}
+
+// Axis-aligned box centered in X/Y at (cx, cy), bottom resting at zBase.
+function box(w: number, l: number, h: number, cx: number, cy: number, zBase: number): Manifold {
+	return oc().Manifold.cube([w, l, h]).translate([cx - w / 2, cy - l / 2, zBase]);
+}
+
+// CrossSection treats a clockwise contour as a hole, so normalize to CCW (the
+// source polygons flip orientation depending on bin side / slope direction).
+function ensureCCW(pts: [number, number][]): [number, number][] {
+	let area = 0;
+	for (let i = 0; i < pts.length; i++) {
+		const [x1, y1] = pts[i];
+		const [x2, y2] = pts[(i + 1) % pts.length];
+		area += x1 * y2 - x2 * y1;
+	}
+	return area < 0 ? pts.slice().reverse() : pts;
+}
+
+// A prism whose cross-section lies in a world plane, extruded along world X or Y.
+// Both use proper rotations (no mirroring) so the section shape is preserved, and
+// each spans its axis [0, length]. `ptsYZ`/`ptsXZ` are world-plane points.
+//   X: section→(-Z, Y) then rotate([0,90,0]) ⇒ extrude→+X
+//   Y: section→(X, Z) then rotate([90,0,0])+shift ⇒ extrude→+Y
+function prismAlongX(ptsYZ: [number, number][], length: number): Manifold {
+	const cs = new (oc().CrossSection)(ensureCCW(ptsYZ.map(([y, z]) => [-z, y])));
+	return oc().Manifold.extrude(cs, length).rotate([0, 90, 0]);
+}
+function prismAlongY(ptsXZ: [number, number][], length: number): Manifold {
+	const cs = new (oc().CrossSection)(ensureCCW(ptsXZ.map(([x, z]) => [x, z])));
+	return oc().Manifold.extrude(cs, length).rotate([90, 0, 0]).translate([0, length, 0]);
+}
+function cylinderAlongX(radius: number, length: number): Manifold {
+	return oc().Manifold.cylinder(length, radius, radius, CIRCLE_SEGMENTS).rotate([0, 90, 0]);
+}
+function cylinderAlongY(radius: number, length: number): Manifold {
+	return oc().Manifold.cylinder(length, radius, radius, CIRCLE_SEGMENTS).rotate([-90, 0, 0]);
 }
 
 function unitBase(): Manifold {
@@ -130,6 +173,56 @@ function buildStackingLip(bodyW: number, bodyL: number, topZ: number, lipHeight:
 	return outer.subtract(cavity);
 }
 
+function hexPointsCentered(): [number, number][] {
+	const pts: [number, number][] = [];
+	for (let i = 0; i < 6; i++) {
+		const a = ((30 + 60 * i) * Math.PI) / 180;
+		pts.push([HEX_RADIUS * Math.cos(a), HEX_RADIUS * Math.sin(a)]);
+	}
+	return pts;
+}
+
+// Punch a self-supporting hex lattice through a divider wall (built at the origin,
+// cut along its thickness axis before it is translated into position).
+function cutHexPattern(
+	wall: Manifold, faceWidth: number, faceHeight: number, wallThickness: number,
+	axis: 'X' | 'Y', wallBottom: number
+): Manifold {
+	const { Manifold } = oc();
+	const usableW = faceWidth - 2 * HEX_MARGIN;
+	const usableH = faceHeight - 2 * HEX_MARGIN;
+	if (usableW < 2 * HEX_RADIUS || usableH < 2 * HEX_RADIUS) return wall;
+
+	const colSpacing = Math.sqrt(3) * HEX_RADIUS + HEX_WEB;
+	const rowSpacing = 1.5 * HEX_RADIUS + HEX_WEB;
+	const cols = Math.floor(usableW / colSpacing);
+	const rows = Math.floor(usableH / rowSpacing);
+	if (cols < 1 || rows < 1) return wall;
+
+	const gridW = (cols - 1) * colSpacing;
+	const gridH = (rows - 1) * rowSpacing;
+	const cutDepth = wallThickness + 2 * HEX_CUT_OVERSHOOT;
+	const hex = hexPointsCentered();
+	const cutters: Manifold[] = [];
+
+	for (let row = 0; row < rows; row++) {
+		const isOdd = row % 2 === 1;
+		const maxCols = isOdd ? cols - 1 : cols;
+		const rowOffset = isOdd ? colSpacing / 2 : 0;
+		for (let col = 0; col < maxCols; col++) {
+			const u = -gridW / 2 + col * colSpacing + rowOffset;
+			const v = -gridH / 2 + row * rowSpacing;
+			const zCenter = wallBottom + faceHeight / 2 + v;
+			cutters.push(
+				axis === 'X'
+					? prismAlongX(hex, cutDepth).translate([-cutDepth / 2, u, zCenter])
+					: prismAlongY(hex, cutDepth).translate([u, -cutDepth / 2, zCenter])
+			);
+		}
+	}
+	return cutters.length ? wall.subtract(Manifold.union(cutters)) : wall;
+}
+
 function buildDividers(
 	p: BinParams, innerW: number, innerL: number, wallBottom: number, wallHeight: number
 ): Manifold | null {
@@ -139,18 +232,127 @@ function buildDividers(
 		const spacing = innerW / (p.dividersX + 1);
 		for (let i = 1; i <= p.dividersX; i++) {
 			const xPos = -innerW / 2 + i * spacing;
-			walls.push(roundedPrism(p.wallThickness, innerL, 0, wallHeight, wallBottom).translate([xPos, 0, 0]));
+			let wall = roundedPrism(p.wallThickness, innerL, 0, wallHeight, wallBottom);
+			if (p.lightweightDividers) wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'X', wallBottom);
+			walls.push(wall.translate([xPos, 0, 0]));
 		}
 	}
 	if (p.dividersY > 0) {
 		const spacing = innerL / (p.dividersY + 1);
 		for (let i = 1; i <= p.dividersY; i++) {
 			const yPos = -innerL / 2 + i * spacing;
-			walls.push(roundedPrism(innerW, p.wallThickness, 0, wallHeight, wallBottom).translate([0, yPos, 0]));
+			let wall = roundedPrism(innerW, p.wallThickness, 0, wallHeight, wallBottom);
+			if (p.lightweightDividers) wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'Y', wallBottom);
+			walls.push(wall.translate([0, yPos, 0]));
 		}
 	}
 	if (walls.length === 0) return null;
 	return walls.length === 1 ? walls[0] : Manifold.union(walls);
+}
+
+function buildLabelTabs(
+	p: BinParams, innerW: number, innerL: number, wallBottom: number, wallHeight: number
+): Manifold | null {
+	const { Manifold } = oc();
+	const topZ = wallBottom + wallHeight;
+	const tabHeight = Math.min(LABEL_TAB_HEIGHT, wallHeight);
+	const tabDepth = Math.min(LABEL_TAB_DEPTH, innerL - 1);
+	const numCompartments = p.dividersX + 1;
+	const compartmentW = innerW / numCompartments;
+	const frontY = innerL / 2;
+	const tabs: Manifold[] = [];
+	for (let i = 0; i < numCompartments; i++) {
+		const cx = -innerW / 2 + compartmentW / 2 + i * compartmentW;
+		const tabW = compartmentW - (i > 0 ? p.wallThickness : 0);
+		// Right-triangle ledge in the Y-Z plane, extruded along X by the tab width.
+		const tri: [number, number][] = [
+			[frontY, topZ], [frontY - tabDepth, topZ], [frontY, topZ - tabHeight]
+		];
+		tabs.push(prismAlongX(tri, tabW).translate([cx - tabW / 2, 0, 0]));
+	}
+	if (tabs.length === 0) return null;
+	return tabs.length === 1 ? tabs[0] : Manifold.union(tabs);
+}
+
+function buildSingleScoop(
+	R: number, extrudeLen: number, wallPos: number, wallBottom: number,
+	extrudeStart: number, axis: 'X' | 'Y', flip: boolean
+): Manifold {
+	const dir = flip ? -1 : 1;
+	const blockW = axis === 'X' ? extrudeLen : R;
+	const blockL = axis === 'X' ? R : extrudeLen;
+	const blockX = axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + (dir * R) / 2;
+	const blockY = axis === 'X' ? wallPos + (dir * R) / 2 : extrudeStart + extrudeLen / 2;
+	const block = box(blockW, blockL, R, blockX, blockY, wallBottom);
+	const cyl =
+		axis === 'X'
+			? cylinderAlongX(R, extrudeLen).translate([extrudeStart, wallPos + dir * R, wallBottom + R])
+			: cylinderAlongY(R, extrudeLen).translate([wallPos + dir * R, extrudeStart, wallBottom + R]);
+	return block.subtract(cyl);
+}
+
+function buildScoops(
+	p: BinParams, innerW: number, innerL: number, wallBottom: number, wallHeight: number
+): Manifold | null {
+	const { Manifold } = oc();
+	const numX = p.dividersX + 1;
+	const numY = p.dividersY + 1;
+	const compartmentW = innerW / numX;
+	const compartmentL = innerL / numY;
+	const R = p.scoopRadius > 0 ? Math.min(p.scoopRadius, wallHeight) : wallHeight / 2;
+	if (R < 2) return null;
+
+	const scoops: Manifold[] = [];
+	for (let ix = 0; ix < numX; ix++) {
+		for (let iy = 0; iy < numY; iy++) {
+			const xStart = -innerW / 2 + ix * compartmentW;
+			const yStart = -innerL / 2 + iy * compartmentL;
+			for (const wall of p.scoopWalls) {
+				switch (wall) {
+					case 'back':
+						scoops.push(buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X', false));
+						break;
+					case 'front':
+						scoops.push(buildSingleScoop(R, compartmentW, yStart + compartmentL, wallBottom, xStart, 'X', true));
+						break;
+					case 'left':
+						scoops.push(buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y', false));
+						break;
+					case 'right':
+						scoops.push(buildSingleScoop(R, compartmentL, xStart + compartmentW, wallBottom, yStart, 'Y', true));
+						break;
+				}
+			}
+		}
+	}
+	if (scoops.length === 0) return null;
+	return scoops.length === 1 ? scoops[0] : Manifold.union(scoops);
+}
+
+function buildWallCut(
+	p: BinParams, bodyW: number, bodyL: number, wallBottom: number, wallHeight: number, lipHeight: number
+): Manifold {
+	const margin = 1;
+	const topMostZ = wallBottom + wallHeight + lipHeight;
+	const ceilingZ = topMostZ + 5;
+	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
+	const axis: 'X' | 'Y' = p.wallCutSide === 'front' || p.wallCutSide === 'back' ? 'Y' : 'X';
+	const lowAtPositive = p.wallCutSide === 'front' || p.wallCutSide === 'right';
+	const spanHalf = (axis === 'Y' ? bodyL : bodyW) / 2 + margin;
+	const crossHalf = (axis === 'Y' ? bodyW : bodyL) / 2 + margin;
+	const lowS = lowAtPositive ? spanHalf : -spanHalf;
+	const highS = lowAtPositive ? -spanHalf : spanHalf;
+	const slopeEndS = highS + p.wallCutRun * (lowS - highS);
+
+	// Polygon = everything above the sloped profile, capped at the ceiling.
+	const pts: [number, number][] = [[highS, topMostZ], [slopeEndS, lowZ]];
+	if (p.wallCutRun < 1) pts.push([lowS, lowZ]);
+	pts.push([lowS, ceilingZ], [highS, ceilingZ]);
+
+	// Extrude the (s, z) profile across the full cross-axis.
+	return axis === 'Y'
+		? prismAlongX(pts, 2 * crossHalf).translate([-crossHalf, 0, 0])
+		: prismAlongY(pts, 2 * crossHalf).translate([0, -crossHalf, 0]);
 }
 
 export function buildBinManifold(p: BinParams): Manifold {
@@ -201,9 +403,26 @@ export function buildBinManifold(p: BinParams): Manifold {
 		if (dividers) bin = bin.add(dividers);
 	}
 
+	// 5b. Bottom scoops
+	if (p.scoopWalls.length > 0 && wallHeight > 2) {
+		const scoops = buildScoops(p, innerW, innerL, wallBottom, wallHeight);
+		if (scoops) bin = bin.add(scoops);
+	}
+
+	// 6. Label tabs
+	if (p.labelTab && wallHeight >= LABEL_TAB_HEIGHT / 2) {
+		const tabs = buildLabelTabs(p, innerW, innerL, wallBottom, wallHeight);
+		if (tabs) bin = bin.add(tabs);
+	}
+
 	// 7. Stacking lip
 	if (lipHeight > 0) {
 		bin = bin.add(buildStackingLip(bodyW, bodyL, wallBottom + wallHeight, lipHeight));
+	}
+
+	// 8. Diagonal wall cut
+	if (p.wallCut) {
+		bin = bin.subtract(buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipHeight));
 	}
 
 	return bin;
