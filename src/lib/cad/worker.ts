@@ -3,6 +3,7 @@ import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url
 import { setOC } from 'replicad';
 import { buildBin } from './gridfinity';
 import type { BinParams } from '$lib/stores/params';
+import { classifyError, validateParams, type WorkerErrorCode } from './worker-errors';
 
 let initialized = false;
 
@@ -30,13 +31,14 @@ export type WorkerResponse =
 		}
 	| { type: 'exportSTEP'; blob: Blob }
 	| { type: 'exportSTL'; blob: Blob }
-	| { type: 'error'; message: string }
+	| { type: 'error'; code: WorkerErrorCode; message: string; requestType: WorkerRequest['type'] }
 	| { type: 'ready' };
 
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
+	const msg = e.data;
 	try {
 		await ready;
-		const msg = e.data;
+		validateParams(msg.params);
 		const shape = buildBin(msg.params);
 
 		if (msg.type === 'build') {
@@ -58,10 +60,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 			self.postMessage({ type: 'exportSTL', blob } satisfies WorkerResponse);
 		}
 	} catch (err) {
-		self.postMessage({
-			type: 'error',
-			message: err instanceof Error ? err.message : String(err)
-		} satisfies WorkerResponse);
+		const { code, message } = classifyError(err);
+		self.postMessage({ type: 'error', code, message, requestType: msg.type } satisfies WorkerResponse);
 	}
 };
 

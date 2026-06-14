@@ -10,9 +10,10 @@
 		normals: Float32Array | null;
 		edges: Float32Array | null;
 		loading: boolean;
+		error?: { title: string; message: string } | null;
 	}
 
-	let { vertices, triangles, normals, edges, loading }: Props = $props();
+	let { vertices, triangles, normals, edges, loading, error = null }: Props = $props();
 
 	let meshGeometry = $derived.by(() => {
 		if (!vertices || !triangles || !normals) return null;
@@ -38,6 +39,13 @@
 			<div class="flex items-center gap-3 rounded-lg bg-zinc-800 px-4 py-3">
 				<div class="h-5 w-5 animate-spin rounded-full border-2 border-zinc-500 border-t-blue-400"></div>
 				<span class="text-sm text-zinc-300">Generating...</span>
+			</div>
+		</div>
+	{:else if error}
+		<div class="absolute inset-x-0 top-0 z-10 flex justify-center p-4" role="alert">
+			<div class="max-w-md rounded-lg border border-red-500/50 bg-red-950/90 px-4 py-3 shadow-lg">
+				<p class="text-sm font-semibold text-red-300">{error.title}</p>
+				<p class="mt-1 break-words text-xs text-red-200/80">{error.message}</p>
 			</div>
 		</div>
 	{/if}
