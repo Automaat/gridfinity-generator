@@ -251,6 +251,7 @@ describe('URL serialization', () => {
 			const sp = serializeParams({ ...defaultParams, [param]: nonDefault[param] });
 			const emitted = [...sp.keys()];
 			expect(emitted).toHaveLength(1); // exactly one param differs -> one key
+			expect(emitted[0]).not.toBe(''); // guard against an empty/missing codec key
 			urlKeys.add(emitted[0]);
 		}
 		expect(urlKeys.size).toBe(Object.keys(defaultParams).length);

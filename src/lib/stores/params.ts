@@ -72,9 +72,8 @@ interface Codec<K extends keyof BinParams> {
 	decode: (raw: string, def: BinParams[K]) => BinParams[K];
 }
 
-function num(min: number, max: number, round = false): Codec<'width'> {
+function num(min: number, max: number, round = false): Omit<Codec<'width'>, 'key'> {
 	return {
-		key: '',
 		encode: (v) => String(v),
 		decode: (raw, def) => {
 			const parsed = parseFloat(raw);
