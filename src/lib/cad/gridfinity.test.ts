@@ -8,6 +8,7 @@ interface MockSolid {
 	fuse: Mock<(other: MockSolid) => MockSolid>;
 	cut: Mock<(other: MockSolid) => MockSolid>;
 	intersect: Mock<(other: MockSolid) => MockSolid>;
+	clone: Mock<() => MockSolid>;
 	translate: Mock<(x: number, y: number, z: number) => MockSolid>;
 	mesh: Mock<() => { vertices: number[]; triangles: number[]; normals: number[] }>;
 	meshEdges: Mock<() => { lines: number[] }>;
@@ -40,6 +41,7 @@ function mockSolid(): MockSolid {
 		fuse: vi.fn<(other: MockSolid) => MockSolid>(() => mockSolid()),
 		cut: vi.fn<(other: MockSolid) => MockSolid>(() => mockSolid()),
 		intersect: vi.fn<(other: MockSolid) => MockSolid>(() => mockSolid()),
+		clone: vi.fn<() => MockSolid>(() => mockSolid()),
 		translate: vi.fn<(x: number, y: number, z: number) => MockSolid>(() => mockSolid()),
 		mesh: vi.fn<() => { vertices: number[]; triangles: number[]; normals: number[] }>(() => ({ vertices: [], triangles: [], normals: [] })),
 		meshEdges: vi.fn<() => { lines: number[] }>(() => ({ lines: [] })),
@@ -73,7 +75,8 @@ vi.mock('replicad', () => ({
 	drawRoundedRectangle: vi.fn<(w: number, l: number, r?: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
 	drawPolysides: vi.fn<(radius: number, sides: number) => MockPolysides>(() => ({
 		rotate: vi.fn<(angle: number) => MockSketchOnPlane>(() => mockSketchOnPlane())
-	}))
+	})),
+	makeCompound: vi.fn<(shapes: MockSolid[]) => MockSolid>(() => mockSolid())
 }));
 
 const { buildBin } = await import('./gridfinity');
