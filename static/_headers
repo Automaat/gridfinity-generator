@@ -1,0 +1,9 @@
+# Cache-Control for static hosts that honor _headers (Cloudflare Pages, Netlify).
+# SvelteKit/Vite emit content-hashed assets under /_app/immutable — including the
+# OpenCascade WASM imported via ?url — so they can be cached forever and safely.
+/_app/immutable/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# WASM served from anywhere under the build output: long-lived, revalidate cheap.
+/*.wasm
+  Cache-Control: public, max-age=31536000, immutable
