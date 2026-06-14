@@ -128,8 +128,12 @@ Before committing:
 
 - **Static only:** No server-side code. Everything runs client-side (WASM + Worker)
 - **Mobile:** Must work on mobile browsers. WASM memory is limited — avoid holding multiple Solid instances simultaneously
-- **Bundle size:** OpenCascade WASM binary is ~15MB. Loaded async in worker, not blocking initial render
+- **Bundle size:** OpenCascade WASM binary is ~15MB raw (~4.6MB gzipped) — ~85% of the client payload. Loaded async in worker, not blocking initial render
 - **WASM format:** Worker uses ES module format (`worker: { format: 'es' }` in vite config). Assets include `*.wasm` files (`assetsInclude: ['**/*.wasm']`)
+- **WASM loading strategy:** The WASM is imported via `?url` (`worker.ts`), so Vite emits it as a content-hashed immutable asset under `/_app/immutable`. Caching layers:
+  - **HTTP:** `static/_headers` sets `Cache-Control: immutable, max-age=1y` for `/_app/immutable/*` and `*.wasm` (Cloudflare Pages / Netlify; Vercel applies immutable headers to `/_app/immutable` automatically)
+  - **Service worker** (`src/service-worker.ts`, auto-registered in prod): precaches the app shell on install; caches the WASM on first fetch in a version-independent `opencascade-wasm` cache. Because the URL is content-hashed, an unchanged engine survives deploys with no re-download. First visit is unchanged; repeat visits and offline navigations are instant
+  - **Don't precache the WASM on SW install** — that re-downloads ~4.6MB on every deploy. Cache it lazily on first fetch instead
 
 ## Anti-Patterns
 

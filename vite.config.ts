@@ -20,7 +20,8 @@ export default defineConfig({
 					'src/**/*.d.ts',
 					'src/**/*.svelte',
 					'src/routes/**',
-					'src/lib/cad/worker.ts'
+					'src/lib/cad/worker.ts',
+					'src/service-worker.ts'
 				]
 		}
 	}
