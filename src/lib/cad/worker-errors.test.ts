@@ -16,16 +16,21 @@ describe('validateParams', () => {
 		expect(() => validateParams({ ...defaultParams, length: 0 })).toThrow(InvalidParamsError);
 	});
 
-	it('rejects non-positive wall thickness', () => {
+	it('rejects non-positive or non-finite wall thickness', () => {
 		expect(() => validateParams({ ...defaultParams, wallThickness: 0 })).toThrow(InvalidParamsError);
+		expect(() => validateParams({ ...defaultParams, wallThickness: NaN })).toThrow(InvalidParamsError);
+		expect(() => validateParams({ ...defaultParams, wallThickness: Infinity })).toThrow(InvalidParamsError);
 	});
 
-	it('rejects negative divider counts', () => {
+	it('rejects negative, fractional, or non-finite divider counts', () => {
 		expect(() => validateParams({ ...defaultParams, dividersX: -1 })).toThrow(InvalidParamsError);
+		expect(() => validateParams({ ...defaultParams, dividersX: 1.5 })).toThrow(InvalidParamsError);
+		expect(() => validateParams({ ...defaultParams, dividersY: NaN })).toThrow(InvalidParamsError);
 	});
 
-	it('rejects negative scoop radius', () => {
+	it('rejects negative or non-finite scoop radius', () => {
 		expect(() => validateParams({ ...defaultParams, scoopRadius: -1 })).toThrow(InvalidParamsError);
+		expect(() => validateParams({ ...defaultParams, scoopRadius: NaN })).toThrow(InvalidParamsError);
 	});
 });
 

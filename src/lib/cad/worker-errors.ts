@@ -20,14 +20,14 @@ export function validateParams(p: BinParams): void {
 	if (p.width < 1 || p.length < 1 || p.height < 1) {
 		throw new InvalidParamsError('Grid dimensions must be at least 1 unit');
 	}
-	if (p.wallThickness <= 0) {
-		throw new InvalidParamsError('Wall thickness must be positive');
+	if (!Number.isFinite(p.wallThickness) || p.wallThickness <= 0) {
+		throw new InvalidParamsError('Wall thickness must be a positive number');
 	}
-	if (p.dividersX < 0 || p.dividersY < 0) {
-		throw new InvalidParamsError('Divider counts cannot be negative');
+	if (!Number.isInteger(p.dividersX) || !Number.isInteger(p.dividersY) || p.dividersX < 0 || p.dividersY < 0) {
+		throw new InvalidParamsError('Divider counts must be non-negative integers');
 	}
-	if (p.scoopRadius < 0) {
-		throw new InvalidParamsError('Scoop radius cannot be negative');
+	if (!Number.isFinite(p.scoopRadius) || p.scoopRadius < 0) {
+		throw new InvalidParamsError('Scoop radius must be a non-negative number');
 	}
 }
 

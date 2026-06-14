@@ -32,6 +32,10 @@
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
 	let opTimer: ReturnType<typeof setTimeout> | null = null;
+	// Operations posted to the (serial, FIFO) worker but not yet answered. The
+	// watchdog stays armed while any remain, so a completed op can't disarm the
+	// timeout for one still queued behind it.
+	let inFlight = 0;
 	// After a timeout-triggered respawn, skip the auto-rebuild so a genuinely
 	// hanging param set can't loop forever; the next param change retries.
 	let skipAutoBuild = false;
@@ -43,16 +47,25 @@
 		}
 	}
 
+	// One outstanding op resolved: re-arm the watchdog for any still queued.
+	function opResolved() {
+		inFlight = Math.max(0, inFlight - 1);
+		if (inFlight > 0) startOpTimer();
+		else clearOpTimer();
+	}
+
 	function setError(code: WorkerErrorCode, message: string) {
 		buildError = { code, message };
 		loading = false;
 		exporting = false;
+		inFlight = 0;
 		clearOpTimer();
 	}
 
 	function spawnWorker() {
 		worker?.terminate();
 		workerReady = false;
+		inFlight = 0; // the terminated worker's queued ops will never reply
 		worker = new Worker(new URL('$lib/cad/worker.ts', import.meta.url), { type: 'module' });
 		worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
 			const msg = e.data;
@@ -64,14 +77,14 @@
 					requestBuild($params);
 				}
 			} else if (msg.type === 'mesh') {
-				clearOpTimer();
+				opResolved();
 				vertices = msg.vertices;
 				triangles = msg.triangles;
 				normals = msg.normals;
 				edges = msg.edges;
 				loading = false;
 			} else if (msg.type === 'exportSTEP' || msg.type === 'exportSTL') {
-				clearOpTimer();
+				opResolved();
 				downloadBlob(msg.blob, msg.type === 'exportSTEP' ? 'bin.step' : 'bin.stl');
 				exporting = false;
 			} else if (msg.type === 'error') {
@@ -109,6 +122,7 @@
 		if (!worker || !workerReady) return;
 		buildError = null;
 		loading = true;
+		inFlight++;
 		startOpTimer();
 		worker.postMessage({ type: 'build', params: p } satisfies WorkerRequest);
 	}
@@ -119,6 +133,7 @@
 		if (!worker || !workerReady || loading || exporting) return;
 		buildError = null;
 		exporting = true;
+		inFlight++;
 		startOpTimer();
 		const type = format === 'step' ? 'exportSTEP' : 'exportSTL';
 		worker.postMessage({ type, params: $params } satisfies WorkerRequest);
