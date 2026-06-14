@@ -48,102 +48,101 @@ export const dimensions = derived(params, ($p) => ({
 	heightMm: $p.height * 7
 }));
 
-const URL_KEYS: Record<string, keyof BinParams> = {
-	w: 'width',
-	l: 'length',
-	h: 'height',
-	wt: 'wallThickness',
-	mh: 'magnetHoles',
-	sh: 'screwHoles',
-	sl: 'stackingLip',
-	lt: 'labelTab',
-	dx: 'dividersX',
-	dy: 'dividersY',
-	ld: 'lightweightDividers',
-	sw: 'scoopWalls',
-	sr: 'scoopRadius',
-	wc: 'wallCut',
-	wcs: 'wallCutSide',
-	wcf: 'wallCutLowFraction',
-	wcr: 'wallCutRun'
-};
-
-const REVERSE_KEYS = Object.fromEntries(Object.entries(URL_KEYS).map(([k, v]) => [v, k]));
-
-const LIP_SHORT: Record<string, BinParams['stackingLip']> = { s: 'standard', r: 'reduced', n: 'none' };
-const LIP_TO_SHORT: Record<string, string> = { standard: 's', reduced: 'r', none: 'n' };
-
-const SCOOP_CHAR_TO_WALL: Record<string, 'back' | 'front' | 'left' | 'right'> = { b: 'back', f: 'front', l: 'left', r: 'right' };
-const WALL_TO_CHAR: Record<string, string> = { back: 'b', front: 'f', left: 'l', right: 'r' };
-
 function clamp(v: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, v));
 }
 
+// Source-of-truth enum mappings (param value -> URL char). Reverse indices are
+// generated, so adding an enum member never requires touching a second table.
+const LIP_TO_CHAR = { standard: 's', reduced: 'r', none: 'n' } as const;
+const WALL_TO_CHAR = { back: 'b', front: 'f', left: 'l', right: 'r' } as const;
+
+function invert<V extends string, K extends string>(map: Record<K, V>): Record<string, K> {
+	return Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k])) as Record<string, K>;
+}
+
+const CHAR_TO_LIP = invert(LIP_TO_CHAR);
+const CHAR_TO_WALL = invert(WALL_TO_CHAR);
+
+// Per-field codec: short URL key + bidirectional encode/decode. Single source
+// of truth — adding a param means adding one entry here (plus the interface).
+interface Codec<K extends keyof BinParams> {
+	key: string;
+	encode: (value: BinParams[K]) => string;
+	decode: (raw: string, def: BinParams[K]) => BinParams[K];
+}
+
+function num(min: number, max: number, round = false): Codec<'width'> {
+	return {
+		key: '',
+		encode: (v) => String(v),
+		decode: (raw, def) => {
+			const parsed = parseFloat(raw);
+			const base = Number.isNaN(parsed) ? def : parsed;
+			return clamp(round ? Math.round(base) : base, min, max);
+		}
+	};
+}
+
+const bool: Omit<Codec<'magnetHoles'>, 'key'> = {
+	encode: (v) => (v ? '1' : '0'),
+	decode: (raw) => raw === '1'
+};
+
+type Codecs = { [K in keyof BinParams]: Codec<K> };
+
+const CODECS: Codecs = {
+	width: { ...num(1, 6, true), key: 'w' },
+	length: { ...num(1, 6, true), key: 'l' },
+	height: { ...num(1, 10, true), key: 'h' },
+	wallThickness: { ...num(0.8, 2.0), key: 'wt' },
+	magnetHoles: { ...bool, key: 'mh' },
+	screwHoles: { ...bool, key: 'sh' },
+	stackingLip: {
+		key: 'sl',
+		encode: (v) => LIP_TO_CHAR[v],
+		decode: (raw, def) => CHAR_TO_LIP[raw] ?? def
+	},
+	labelTab: { ...bool, key: 'lt' },
+	dividersX: { ...num(0, 5, true), key: 'dx' },
+	dividersY: { ...num(0, 5, true), key: 'dy' },
+	lightweightDividers: { ...bool, key: 'ld' },
+	scoopWalls: {
+		key: 'sw',
+		encode: (v) => v.map((w) => WALL_TO_CHAR[w]).join(''),
+		decode: (raw) => [...raw].map((c) => CHAR_TO_WALL[c]).filter(Boolean)
+	},
+	scoopRadius: { ...num(0, 20), key: 'sr' },
+	wallCut: { ...bool, key: 'wc' },
+	wallCutSide: {
+		key: 'wcs',
+		encode: (v) => WALL_TO_CHAR[v],
+		decode: (raw, def) => CHAR_TO_WALL[raw] ?? def
+	},
+	wallCutLowFraction: { ...num(0, 0.95), key: 'wcf' },
+	wallCutRun: { ...num(0.1, 1), key: 'wcr' }
+};
+
+const PARAM_KEYS = Object.keys(CODECS) as (keyof BinParams)[];
+
 export function serializeParams(p: BinParams): URLSearchParams {
 	const sp = new URLSearchParams();
-	const d = defaultParams;
-
-	for (const [param, short] of Object.entries(REVERSE_KEYS)) {
-		const val = p[param as keyof BinParams];
-		const def = d[param as keyof BinParams];
-		if (val === def) continue;
-
-		if (typeof val === 'boolean') {
-			sp.set(short, val ? '1' : '0');
-		} else if (param === 'stackingLip') {
-			sp.set(short, LIP_TO_SHORT[val as string]);
-		} else if (param === 'scoopWalls') {
-			const walls = val as string[];
-			sp.set(short, walls.map((w) => WALL_TO_CHAR[w]).join(''));
-		} else if (param === 'wallCutSide') {
-			sp.set(short, WALL_TO_CHAR[val as string]);
-		} else {
-			sp.set(short, String(val));
-		}
+	for (const param of PARAM_KEYS) {
+		const value = p[param];
+		if (value === defaultParams[param]) continue;
+		const codec = CODECS[param] as Codec<typeof param>;
+		sp.set(codec.key, codec.encode(value));
 	}
 	return sp;
 }
 
 export function deserializeParams(search: URLSearchParams): BinParams {
 	const p = { ...defaultParams };
-
-	for (const [short, param] of Object.entries(URL_KEYS)) {
-		const raw = search.get(short);
+	for (const param of PARAM_KEYS) {
+		const codec = CODECS[param] as Codec<typeof param>;
+		const raw = search.get(codec.key);
 		if (raw === null) continue;
-
-		if (param === 'stackingLip') {
-			const mapped = LIP_SHORT[raw];
-			if (mapped) p.stackingLip = mapped;
-		} else if (param === 'scoopWalls') {
-			p.scoopWalls = [...raw].map((c) => SCOOP_CHAR_TO_WALL[c]).filter(Boolean);
-		} else if (param === 'scoopRadius') {
-			const parsed = parseFloat(raw);
-			p.scoopRadius = clamp(Number.isNaN(parsed) ? 0 : parsed, 0, 20);
-		} else if (param === 'wallCutSide') {
-			const mapped = SCOOP_CHAR_TO_WALL[raw];
-			if (mapped) p.wallCutSide = mapped;
-		} else if (param === 'wallCutLowFraction') {
-			const parsed = parseFloat(raw);
-			p.wallCutLowFraction = clamp(Number.isNaN(parsed) ? defaultParams.wallCutLowFraction : parsed, 0, 0.95);
-		} else if (param === 'wallCutRun') {
-			const parsed = parseFloat(raw);
-			p.wallCutRun = clamp(Number.isNaN(parsed) ? defaultParams.wallCutRun : parsed, 0.1, 1);
-		} else if (param === 'magnetHoles' || param === 'screwHoles' || param === 'labelTab' || param === 'lightweightDividers' || param === 'wallCut') {
-			(p as Record<string, unknown>)[param] = raw === '1';
-		} else if (param === 'wallThickness') {
-			const parsed = parseFloat(raw);
-			p.wallThickness = clamp(Number.isNaN(parsed) ? defaultParams.wallThickness : parsed, 0.8, 2.0);
-		} else if (param === 'width' || param === 'length') {
-			const parsed = parseFloat(raw);
-			(p as Record<string, unknown>)[param] = clamp(Math.round(Number.isNaN(parsed) ? (defaultParams[param] as number) : parsed), 1, 6);
-		} else if (param === 'height') {
-			const parsed = parseFloat(raw);
-			p.height = clamp(Math.round(Number.isNaN(parsed) ? defaultParams.height : parsed), 1, 10);
-		} else if (param === 'dividersX' || param === 'dividersY') {
-			const parsed = parseFloat(raw);
-			(p as Record<string, unknown>)[param] = clamp(Math.round(Number.isNaN(parsed) ? 0 : parsed), 0, 5);
-		}
+		(p[param] as BinParams[typeof param]) = codec.decode(raw, defaultParams[param]);
 	}
 	return p;
 }
