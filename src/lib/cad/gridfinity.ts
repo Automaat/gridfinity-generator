@@ -428,6 +428,48 @@ function buildScoops(
 	return scoops;
 }
 
+function buildWallCut(
+	p: BinParams,
+	bodyW: number,
+	bodyL: number,
+	wallBottom: number,
+	wallHeight: number,
+	lipHeight: number
+): Solid {
+	// Diagonal planar cut: walls/dividers stay full height on one side and
+	// slope down to `wallCutLowFraction` of wall height on the opposite side.
+	const margin = 1; // overshoot footprint so outer walls cut cleanly through
+	const topMostZ = wallBottom + wallHeight + lipHeight;
+	const ceilingZ = topMostZ + 5;
+	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
+
+	const axis: 'Y' | 'X' =
+		p.wallCutSide === 'front' || p.wallCutSide === 'back' ? 'Y' : 'X';
+	// Slope descends toward the selected side; opposite side keeps full height.
+	const lowAtPositive = p.wallCutSide === 'front' || p.wallCutSide === 'right';
+
+	const spanHalf = (axis === 'Y' ? bodyL : bodyW) / 2 + margin;
+	const crossHalf = (axis === 'Y' ? bodyW : bodyL) / 2 + margin;
+	const lowS = lowAtPositive ? spanHalf : -spanHalf;
+	const highS = lowAtPositive ? -spanHalf : spanHalf;
+	const plane = axis === 'Y' ? 'YZ' : 'XZ';
+
+	// Slope descends over `wallCutRun` of the span from the high side, then runs
+	// flat at lowZ to the low edge (base-only beyond the slope when lowZ is the
+	// floor). Polygon = everything above that profile, capped at the ceiling.
+	const slopeEndS = highS + p.wallCutRun * (lowS - highS);
+
+	const pen = draw([highS, topMostZ]).lineTo([slopeEndS, lowZ]);
+	const withFlat = p.wallCutRun < 1 ? pen.lineTo([lowS, lowZ]) : pen;
+
+	return withFlat
+		.lineTo([lowS, ceilingZ])
+		.lineTo([highS, ceilingZ])
+		.close()
+		.sketchOnPlane(plane, -crossHalf)
+		.extrude(2 * crossHalf) as Solid;
+}
+
 export function buildBin(p: BinParams): Solid {
 	const h = p.height * HEIGHT_UNIT;
 	const bodyW = bodySize(p.width);
@@ -514,6 +556,12 @@ export function buildBin(p: BinParams): Solid {
 		const lipTopZ = wallBottom + wallHeight;
 		const lip = buildStackingLip(bodyW, bodyL, lipTopZ, lipHeight);
 		bin = bin.fuse(lip) as Solid;
+	}
+
+	// 8. Diagonal wall cut (slope walls/dividers down toward one side)
+	if (p.wallCut) {
+		const cut = buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipHeight);
+		bin = bin.cut(cut) as Solid;
 	}
 
 	return bin;

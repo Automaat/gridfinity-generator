@@ -67,6 +67,10 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 		lightweightDividers: false,
 		scoopWalls: [],
 		scoopRadius: 0,
+		wallCut: false,
+		wallCutSide: 'front',
+		wallCutLowFraction: 0,
+		wallCutRun: 1,
 		...overrides
 	};
 }
@@ -304,5 +308,38 @@ describe('buildBin', () => {
 		const spy = vi.mocked(replicad.drawPolysides);
 		buildBin(makeParams({ dividersX: 0, dividersY: 0, lightweightDividers: true }));
 		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it('applies diagonal wall cut when enabled', () => {
+		const spy = vi.mocked(replicad.draw);
+		const callsBefore = spy.mock.calls.length;
+		buildBin(makeParams({ wallCut: true }));
+		// Wall cut builds a polygon cutter via draw()
+		expect(spy.mock.calls.length).toBeGreaterThan(callsBefore);
+	});
+
+	it('skips wall cut when disabled', () => {
+		const spy = vi.mocked(replicad.draw);
+		buildBin(makeParams({ wallCut: false, labelTab: false }));
+		expect(spy).not.toHaveBeenCalled();
+	});
+
+	it('builds wall cut for each side', () => {
+		for (const side of ['back', 'front', 'left', 'right'] as const) {
+			const result = buildBin(makeParams({ wallCut: true, wallCutSide: side }));
+			expect(result).toBeDefined();
+		}
+	});
+
+	it('handles wall cut with dividers and lip', () => {
+		const result = buildBin(
+			makeParams({ wallCut: true, dividersX: 2, stackingLip: 'standard', height: 5 })
+		);
+		expect(result).toBeDefined();
+	});
+
+	it('builds partial-run wall cut (slope ends early)', () => {
+		const result = buildBin(makeParams({ wallCut: true, wallCutRun: 0.5 }));
+		expect(result).toBeDefined();
 	});
 });
