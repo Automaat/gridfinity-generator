@@ -51,14 +51,22 @@
 </script>
 
 <div class="relative h-full w-full">
-	{#if loading}
+	{#if loading && !meshGeometry}
 		<div class="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
 			<div class="flex items-center gap-3 rounded-lg bg-zinc-800 px-4 py-3">
 				<div class="h-5 w-5 animate-spin rounded-full border-2 border-zinc-500 border-t-blue-400"></div>
 				<span class="text-sm text-zinc-300">Generating...</span>
 			</div>
 		</div>
-	{:else if error}
+	{:else if loading}
+		<!-- A mesh is already on screen (placeholder or prior build); don't hide it -->
+		<div class="absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full bg-zinc-800/90 px-3 py-1.5 shadow-lg">
+			<div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-500 border-t-blue-400"></div>
+			<span class="text-xs text-zinc-300">Generating...</span>
+		</div>
+	{/if}
+
+	{#if error}
 		<div class="absolute inset-x-0 top-0 z-10 flex justify-center p-4" role="alert">
 			<div class="max-w-md rounded-lg border border-red-500/50 bg-red-950/90 px-4 py-3 shadow-lg">
 				<p class="text-sm font-semibold text-red-300">{error.title}</p>

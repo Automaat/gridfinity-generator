@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
+	import { base } from '$app/paths';
 	import { params, serializeParams, deserializeParams, type BinParams } from '$lib/stores/params';
 	import Viewer from '$lib/components/Viewer.svelte';
 	import Controls from '$lib/components/Controls.svelte';
@@ -110,7 +111,37 @@
 		const urlParams = deserializeParams(new URLSearchParams(window.location.search));
 		params.set(urlParams);
 		spawnWorker();
+		// Paint the precomputed default bin immediately so the first visit shows a
+		// real model while the ~4.6MB WASM still loads. Only valid for the default
+		// view — any URL params mean a different bin, so let the worker build it.
+		if (serializeParams(urlParams).toString() === '') {
+			loadDefaultMesh();
+		}
 	});
+
+	function base64ToBytes(b64: string): Uint8Array {
+		const bin = atob(b64);
+		const bytes = new Uint8Array(bin.length);
+		for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+		return bytes;
+	}
+
+	async function loadDefaultMesh() {
+		try {
+			const res = await fetch(`${base}/default-mesh.json`);
+			if (!res.ok) return;
+			const d = await res.json();
+			// The worker may have answered first on a warm (cached WASM) load — don't
+			// overwrite a freshly built mesh with the static placeholder.
+			if (vertices) return;
+			vertices = new Float32Array(base64ToBytes(d.vertices).buffer);
+			normals = new Float32Array(base64ToBytes(d.normals).buffer);
+			triangles = new Uint32Array(base64ToBytes(d.triangles).buffer);
+			edges = new Float32Array(base64ToBytes(d.edges).buffer);
+		} catch {
+			// Ignore — the worker will produce the mesh once WASM is ready.
+		}
+	}
 
 	onDestroy(() => {
 		worker?.terminate();

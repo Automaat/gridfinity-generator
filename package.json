@@ -14,7 +14,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"gen:default-mesh": "node scripts/gen-default-mesh.mjs"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.59.0",
