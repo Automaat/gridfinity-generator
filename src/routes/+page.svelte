@@ -3,13 +3,26 @@
 	import { params, serializeParams, deserializeParams, type BinParams } from '$lib/stores/params';
 	import Viewer from '$lib/components/Viewer.svelte';
 	import Controls from '$lib/components/Controls.svelte';
-	import type { WorkerRequest, WorkerResponse } from '$lib/cad/worker';
+	import type { WorkerRequest, WorkerResponse, WorkerErrorCode } from '$lib/cad/worker';
+
+	// Worker computation is 200-500ms; a build that takes this long means the
+	// worker is wedged (e.g. a WASM hang that can't be interrupted from inside).
+	const OP_TIMEOUT_MS = 20000;
+
+	const ERROR_LABELS: Record<WorkerErrorCode, string> = {
+		InvalidParams: 'Invalid parameters',
+		WASMError: 'Geometry engine error',
+		OutOfMemory: 'Out of memory',
+		Timeout: 'Timed out',
+		Unknown: 'Unexpected error'
+	};
 
 	let worker: Worker | null = $state(null);
 	let workerReady = $state(false);
 	let loading = $state(true);
 	let exporting = $state(false);
 	let controlsOpen = $state(false);
+	let buildError: { code: WorkerErrorCode; message: string } | null = $state(null);
 
 	let vertices: Float32Array | null = $state(null);
 	let triangles: Uint32Array | null = $state(null);
@@ -17,48 +30,93 @@
 	let edges: Float32Array | null = $state(null);
 
 	let debounceTimer: ReturnType<typeof setTimeout>;
+	let opTimer: ReturnType<typeof setTimeout> | null = null;
+	// After a timeout-triggered respawn, skip the auto-rebuild so a genuinely
+	// hanging param set can't loop forever; the next param change retries.
+	let skipAutoBuild = false;
 
-	onMount(() => {
-		const urlParams = deserializeParams(new URLSearchParams(window.location.search));
-		params.set(urlParams);
+	function clearOpTimer() {
+		if (opTimer !== null) {
+			clearTimeout(opTimer);
+			opTimer = null;
+		}
+	}
 
+	function setError(code: WorkerErrorCode, message: string) {
+		buildError = { code, message };
+		loading = false;
+		exporting = false;
+		clearOpTimer();
+	}
+
+	function spawnWorker() {
+		worker?.terminate();
+		workerReady = false;
 		worker = new Worker(new URL('$lib/cad/worker.ts', import.meta.url), { type: 'module' });
 		worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
 			const msg = e.data;
 			if (msg.type === 'ready') {
 				workerReady = true;
-				requestBuild($params);
+				if (skipAutoBuild) {
+					skipAutoBuild = false;
+				} else {
+					requestBuild($params);
+				}
 			} else if (msg.type === 'mesh') {
+				clearOpTimer();
 				vertices = msg.vertices;
 				triangles = msg.triangles;
 				normals = msg.normals;
 				edges = msg.edges;
 				loading = false;
 			} else if (msg.type === 'exportSTEP' || msg.type === 'exportSTL') {
+				clearOpTimer();
 				downloadBlob(msg.blob, msg.type === 'exportSTEP' ? 'bin.step' : 'bin.stl');
 				exporting = false;
 			} else if (msg.type === 'error') {
-				console.error('Worker error:', msg.message);
-				loading = false;
-				exporting = false;
+				console.error(`Worker error [${msg.code}] on ${msg.requestType}:`, msg.message);
+				setError(msg.code, msg.message);
 			}
 		};
+	}
+
+	// A wedged worker never replies, so the timer terminates and respawns it; the
+	// fresh worker re-builds the current params once it signals ready.
+	function startOpTimer() {
+		clearOpTimer();
+		opTimer = setTimeout(() => {
+			console.error('Worker operation timed out; respawning worker');
+			setError('Timeout', `Operation exceeded ${OP_TIMEOUT_MS / 1000}s — the geometry engine was restarted.`);
+			skipAutoBuild = true;
+			spawnWorker();
+		}, OP_TIMEOUT_MS);
+	}
+
+	onMount(() => {
+		const urlParams = deserializeParams(new URLSearchParams(window.location.search));
+		params.set(urlParams);
+		spawnWorker();
 	});
 
 	onDestroy(() => {
 		worker?.terminate();
 		clearTimeout(debounceTimer);
+		clearOpTimer();
 	});
 
 	function requestBuild(p: BinParams) {
 		if (!worker || !workerReady) return;
+		buildError = null;
 		loading = true;
+		startOpTimer();
 		worker.postMessage({ type: 'build', params: p } satisfies WorkerRequest);
 	}
 
 	function handleExport(format: 'step' | 'stl') {
 		if (!worker || !workerReady) return;
+		buildError = null;
 		exporting = true;
+		startOpTimer();
 		const type = format === 'step' ? 'exportSTEP' : 'exportSTL';
 		worker.postMessage({ type, params: $params } satisfies WorkerRequest);
 	}
@@ -100,7 +158,14 @@
 	</aside>
 
 	<main class="relative flex-1">
-		<Viewer {vertices} {triangles} {normals} {edges} {loading} />
+		<Viewer
+			{vertices}
+			{triangles}
+			{normals}
+			{edges}
+			{loading}
+			error={buildError && { title: ERROR_LABELS[buildError.code], message: buildError.message }}
+		/>
 
 		<!-- Mobile controls toggle -->
 		<button
