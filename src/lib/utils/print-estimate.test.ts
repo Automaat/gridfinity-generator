@@ -31,7 +31,7 @@ describe('estimatePrint', () => {
 	it('lightweight dividers use less filament than solid', () => {
 		const solid = estimatePrint(makeParams({ dividersX: 2, dividersY: 1 }));
 		const light = estimatePrint(makeParams({ dividersX: 2, dividersY: 1, lightweightDividers: true }));
-		expect(light.volumeCm3).toBeLessThan(solid.volumeCm3);
+		expect(light.filamentGrams).toBeLessThan(solid.filamentGrams);
 	});
 
 	it('increases with stacking lip', () => {
