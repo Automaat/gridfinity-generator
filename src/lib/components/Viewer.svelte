@@ -4,6 +4,7 @@
 	import { OrbitControls } from '@threlte/extras';
 	import { BufferGeometry, BufferAttribute, DoubleSide } from 'three';
 	import DimensionOverlay from './DimensionOverlay.svelte';
+	import DividerGizmos from './DividerGizmos.svelte';
 
 	// Cap device pixel ratio: phones report dpr 3, which renders 9× the pixels of
 	// dpr 1 for no visible gain on this simple scene. 2 is the quality/fillrate knee.
@@ -19,6 +20,10 @@
 	}
 
 	let { vertices, triangles, normals, edges, loading, error = null }: Props = $props();
+
+	// True while a divider handle is hovered/dragged — freezes OrbitControls so
+	// grabbing a divider repositions it instead of orbiting the camera.
+	let dividerDragging = $state(false);
 
 	let meshGeometry = $derived.by(() => {
 		if (!vertices || !triangles || !normals) return null;
@@ -50,7 +55,10 @@
 	});
 </script>
 
-<div class="relative h-full w-full">
+<div
+	class="relative h-full w-full"
+	style="background: radial-gradient(120% 90% at 50% -10%, #2a3a52 0%, #14202f 45%, #080b11 100%)"
+>
 	{#if loading && !meshGeometry}
 		<div class="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
 			<div class="flex items-center gap-3 rounded-lg bg-zinc-800 px-4 py-3">
@@ -80,6 +88,7 @@
 	<Canvas {dpr}>
 		<T.PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={10000}>
 			<OrbitControls
+				enabled={!dividerDragging}
 				enableDamping
 				minDistance={10}
 				maxDistance={1000}
@@ -104,8 +113,10 @@
 					<T.LineBasicMaterial color="#1a1a2e" />
 				</T.LineSegments>
 			{/if}
+
+			<DividerGizmos onDraggingChange={(v) => (dividerDragging = v)} />
 		</T.Group>
 
-		<T.GridHelper args={[500, 50, '#333', '#222']} />
+		<T.GridHelper args={[500, 50, '#3a4a63', '#1c2433']} />
 	</Canvas>
 </div>

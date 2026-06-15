@@ -224,11 +224,26 @@
 	<title>Gridfinity Bin Generator</title>
 </svelte:head>
 
-<div class="flex h-screen flex-col bg-zinc-900 text-zinc-100 md:flex-row">
+{#snippet logo()}
+	<div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/15 ring-1 ring-inset ring-blue-500/30">
+		<svg viewBox="0 0 24 24" fill="currentColor" class="h-5 w-5 text-blue-400">
+			<rect x="3" y="3" width="8" height="8" rx="2.2" />
+			<rect x="13" y="3" width="8" height="8" rx="2.2" />
+			<rect x="3" y="13" width="8" height="8" rx="2.2" />
+			<rect x="13" y="13" width="8" height="8" rx="2.2" />
+		</svg>
+	</div>
+{/snippet}
+
+<div class="flex h-screen flex-col bg-zinc-950 text-zinc-100 md:flex-row">
 	<!-- Desktop sidebar -->
-	<aside class="hidden w-72 shrink-0 overflow-y-auto border-r border-zinc-700 bg-zinc-800 md:block">
-		<div class="border-b border-zinc-700 px-4 py-3">
-			<h1 class="text-base font-bold">Gridfinity Generator</h1>
+	<aside class="hidden w-80 shrink-0 overflow-y-auto border-r border-zinc-800 bg-zinc-900 md:block">
+		<div class="sticky top-0 z-10 flex items-center gap-2.5 border-b border-zinc-800 bg-zinc-900/95 px-4 py-3.5 backdrop-blur">
+			{@render logo()}
+			<div>
+				<h1 class="text-sm font-bold leading-tight">Gridfinity Generator</h1>
+				<p class="text-[11px] text-zinc-500">Parametric bins · live preview</p>
+			</div>
 		</div>
 		<Controls onexport={handleExport} {exporting} {loading} />
 	</aside>
@@ -245,14 +260,15 @@
 
 		<!-- Mobile controls toggle -->
 		<button
-			onclick={() => (controlsOpen = !controlsOpen)}
-			class="fixed bottom-4 right-4 z-40 flex h-12 w-12 items-center justify-center rounded-full bg-blue-600 text-white shadow-lg hover:bg-blue-500 md:hidden"
+			onclick={() => (controlsOpen = true)}
+			class="fixed bottom-5 right-5 z-40 flex items-center gap-2 rounded-full bg-blue-600 px-4 py-3 text-sm font-semibold text-white shadow-xl shadow-blue-900/40 ring-1 ring-white/10 transition hover:bg-blue-500 active:scale-95 md:hidden"
 			aria-label="Toggle controls"
 		>
-			<svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+			<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
 				<path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
 			</svg>
+			Customize
 		</button>
 	</main>
 </div>
@@ -261,19 +277,29 @@
 {#if controlsOpen}
 	<!-- Backdrop -->
 	<button
-		class="fixed inset-0 z-40 bg-black/40 md:hidden"
+		class="fixed inset-0 z-40 bg-black/50 backdrop-blur-sm md:hidden"
 		onclick={() => (controlsOpen = false)}
 		aria-label="Close controls"
 	></button>
-	<div class="fixed inset-x-0 bottom-0 z-50 max-h-[70vh] overflow-y-auto rounded-t-xl bg-zinc-800 md:hidden">
-		<div class="sticky top-0 flex items-center justify-between border-b border-zinc-700 bg-zinc-800 px-4 py-3">
-			<h1 class="text-base font-bold">Gridfinity Generator</h1>
-			<button onclick={() => (controlsOpen = false)} class="text-zinc-400 hover:text-zinc-200" aria-label="Close controls">
-				<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-					<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
-				</svg>
-			</button>
+	<div class="fixed inset-x-0 bottom-0 z-50 flex max-h-[85vh] flex-col overflow-hidden rounded-t-2xl border-t border-zinc-800 bg-zinc-900 text-zinc-100 shadow-2xl md:hidden">
+		<div class="shrink-0 border-b border-zinc-800 bg-zinc-900">
+			<div class="flex justify-center pt-2.5">
+				<div class="h-1 w-10 rounded-full bg-zinc-700"></div>
+			</div>
+			<div class="flex items-center justify-between gap-2.5 px-4 py-3">
+				<div class="flex items-center gap-2.5">
+					{@render logo()}
+					<h1 class="text-sm font-bold">Gridfinity Generator</h1>
+				</div>
+				<button onclick={() => (controlsOpen = false)} class="rounded-lg p-1 text-zinc-400 transition hover:bg-zinc-800 hover:text-zinc-200" aria-label="Close controls">
+					<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+						<path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12" />
+					</svg>
+				</button>
+			</div>
 		</div>
-		<Controls onexport={handleExport} {exporting} {loading} />
+		<div class="overflow-y-auto">
+			<Controls onexport={handleExport} {exporting} {loading} />
+		</div>
 	</div>
 {/if}
