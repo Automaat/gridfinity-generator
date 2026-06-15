@@ -196,12 +196,15 @@
 			<label class="block">
 				<span class={lbl}>Connector</span>
 				<select bind:value={$baseplateParams.connector} class={selectInput} style:background-image={chevron}>
+					<option value="filament">Filament pin (1.75mm)</option>
 					<option value="dovetail">Dovetail (snap-fit)</option>
 					<option value="screw">Screw-together (M3)</option>
 					<option value="none">None (flush)</option>
 				</select>
 			</label>
-			{#if $baseplateParams.connector === 'screw'}
+			{#if $baseplateParams.connector === 'filament'}
+				<p class="text-xs text-zinc-500">Push a 1.75mm filament scrap through the seam holes to pin tiles together — no hardware.</p>
+			{:else if $baseplateParams.connector === 'screw'}
 				<p class="text-xs text-zinc-500">Bolt tiles edge-to-edge with M3 screws through the seam walls.</p>
 			{:else if $baseplateParams.connector === 'none'}
 				<p class="text-xs text-zinc-500">Tiles butt together — held by the drawer (or glue).</p>

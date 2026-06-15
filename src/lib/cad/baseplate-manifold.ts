@@ -35,11 +35,18 @@ const DT_TIP = 8; // mm tab width at the tip (must exceed neck to lock)
 const DT_ANCHOR = 1.5; // mm the tab roots back into its own tile body
 const DT_CLEARANCE = 0.15; // mm added to the female pocket per side
 
-// Screw-together (gridfinity-rebuilt style): a solid wall along each seam edge
-// with a horizontal M3 clearance hole per shared cell; bolt adjacent tiles.
-const SCREW_WALL = 6; // mm the solid rail reaches into the tile body
-const SCREW_CLEAR_R = 1.7; // M3 clearance hole radius
-const SCREW_BOLT_LEN = SCREW_WALL + 0.4; // hole length (overshoots the seam face)
+// Side-pin connectors: a solid wall along each seam edge with one horizontal hole
+// per shared cell. `screw` = M3 bolt clearance; `filament` = a 1.75mm filament
+// scrap pushed through both tiles as a dowel pin (no hardware). Holes sit at
+// mid-height, below the receiving profile, so the grid surface is untouched.
+const SCREW_WALL = 6; // mm rail reaches into the tile body
+const SCREW_R = 1.7; // M3 clearance radius
+const FIL_WALL = 4;
+const FIL_R = 0.9; // 1.8mm — snug on 1.75mm filament
+
+function pinParams(connector: BaseplateParams['connector']): { wall: number; r: number } {
+	return connector === 'screw' ? { wall: SCREW_WALL, r: SCREW_R } : { wall: FIL_WALL, r: FIL_R };
+}
 
 // Gap between spread-out tiles in the single combined STL — must clear the male
 // tabs / rails, which protrude past the footprint.
@@ -102,22 +109,20 @@ function dovetailTab(seam: Seam, along: number, thickness: number, female: boole
 	return Manifold.extrude(cs, h).translate([0, 0, female ? -0.1 : 0]);
 }
 
-// Solid wall along a seam edge — material to bolt through (screw-together style).
-function screwRail(seam: Seam, thickness: number): Manifold {
+// Solid wall along a seam edge — material to pin/bolt through.
+function pinRail(seam: Seam, thickness: number, wall: number): Manifold {
 	const len = seam.max - seam.min;
 	const mid = (seam.min + seam.max) / 2;
-	const into = seam.pos + (seam.bodyDir * SCREW_WALL) / 2; // rail center, inside the body
-	return seam.axis === 'x'
-		? box(SCREW_WALL, len, thickness, into, mid, 0)
-		: box(len, SCREW_WALL, thickness, mid, into, 0);
+	const into = seam.pos + (seam.bodyDir * wall) / 2; // rail center, inside the body
+	return seam.axis === 'x' ? box(wall, len, thickness, into, mid, 0) : box(len, wall, thickness, mid, into, 0);
 }
 
-// Horizontal M3 clearance hole through a seam rail, at mid-height.
-function screwHole(seam: Seam, along: number, thickness: number, segments: number): Manifold {
-	const { Manifold } = oc();
-	const cyl = Manifold.cylinder(SCREW_BOLT_LEN, SCREW_CLEAR_R, SCREW_CLEAR_R, segments);
+// Horizontal hole through a seam rail at mid-height, from the seam face into the body.
+function pinHole(seam: Seam, along: number, thickness: number, wall: number, r: number, segments: number): Manifold {
+	const len = wall + 0.4;
+	const cyl = oc().Manifold.cylinder(len, r, r, segments);
 	const aligned = seam.axis === 'x' ? cyl.rotate([0, 90, 0]) : cyl.rotate([-90, 0, 0]); // spans +x / +y over [0, len]
-	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - SCREW_BOLT_LEN + 0.2;
+	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - len + 0.2;
 	const z = thickness / 2;
 	return seam.axis === 'x' ? aligned.translate([start, along, z]) : aligned.translate([along, start, z]);
 }
@@ -198,11 +203,12 @@ function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, 
 		}
 		if (adds.length > 0) solid = solid.add(Manifold.union(adds));
 		if (cuts.length > 0) solid = solid.subtract(Manifold.union(cuts));
-	} else if (bp.connector === 'screw') {
-		if (tile.seams.length > 0) solid = solid.add(Manifold.union(tile.seams.map((s) => screwRail(s, thickness))));
+	} else if (bp.connector === 'screw' || bp.connector === 'filament') {
+		const { wall, r } = pinParams(bp.connector);
+		if (tile.seams.length > 0) solid = solid.add(Manifold.union(tile.seams.map((s) => pinRail(s, thickness, wall))));
 		const holes: Manifold[] = [];
 		for (const seam of tile.seams) {
-			for (const along of seamCellCenters(seam)) holes.push(screwHole(seam, along, thickness, segments));
+			for (const along of seamCellCenters(seam)) holes.push(pinHole(seam, along, thickness, wall, r, segments));
 		}
 		if (holes.length > 0) solid = solid.subtract(Manifold.union(holes));
 	}

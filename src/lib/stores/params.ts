@@ -201,7 +201,7 @@ export interface BaseplateParams {
 	bedWidth: number; // mm — printer bed size, the split target
 	bedDepth: number;
 	splitAlgorithm: 'ideal' | 'incremental';
-	connector: 'none' | 'dovetail' | 'screw'; // how split tiles join (no-op when a single tile)
+	connector: 'none' | 'filament' | 'dovetail' | 'screw'; // how split tiles join (no-op when a single tile)
 	exportLayout: 'zip' | 'combined'; // multi-tile STL delivery
 }
 
@@ -215,7 +215,7 @@ export const defaultBaseplate: BaseplateParams = {
 	bedWidth: 220,
 	bedDepth: 220,
 	splitAlgorithm: 'ideal',
-	connector: 'dovetail',
+	connector: 'filament',
 	exportLayout: 'zip'
 };
 
@@ -231,7 +231,7 @@ const ALIGN_TO_CHAR = { low: 'l', center: 'c', high: 'h' } as const;
 const STYLE_TO_CHAR = { simple: 's', magnet: 'm' } as const;
 const ALGO_TO_CHAR = { ideal: 'i', incremental: 'n' } as const;
 const LAYOUT_TO_CHAR = { zip: 'z', combined: 'c' } as const;
-const CONNECTOR_TO_CHAR = { none: 'n', dovetail: 'd', screw: 's' } as const;
+const CONNECTOR_TO_CHAR = { none: 'n', filament: 'f', dovetail: 'd', screw: 's' } as const;
 const CHAR_TO_ALIGN = invert(ALIGN_TO_CHAR);
 const CHAR_TO_STYLE = invert(STYLE_TO_CHAR);
 const CHAR_TO_ALGO = invert(ALGO_TO_CHAR);

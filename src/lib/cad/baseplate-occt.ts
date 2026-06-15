@@ -34,8 +34,13 @@ const DT_TIP = 8;
 const DT_ANCHOR = 1.5;
 const DT_CLEARANCE = 0.15;
 const SCREW_WALL = 6;
-const SCREW_CLEAR_R = 1.7;
-const SCREW_BOLT_LEN = SCREW_WALL + 0.4;
+const SCREW_R = 1.7;
+const FIL_WALL = 4;
+const FIL_R = 0.9;
+
+function pinParams(connector: BaseplateParams['connector']): { wall: number; r: number } {
+	return connector === 'screw' ? { wall: SCREW_WALL, r: SCREW_R } : { wall: FIL_WALL, r: FIL_R };
+}
 
 function cellCorners(tile: BaseplateTile): [number, number][] {
 	const seen = new Set<string>();
@@ -93,24 +98,25 @@ function dovetailTabSolid(seam: Seam, along: number, thickness: number, female: 
 	return (dw.close().sketchOnPlane('XY', z0) as Sketch).extrude(h) as Solid;
 }
 
-function screwRailSolid(seam: Seam, thickness: number): Solid {
+function pinRailSolid(seam: Seam, thickness: number, wall: number): Solid {
 	const len = seam.max - seam.min;
 	const mid = (seam.min + seam.max) / 2;
-	const into = seam.pos + (seam.bodyDir * SCREW_WALL) / 2;
-	const w = seam.axis === 'x' ? SCREW_WALL : len;
-	const l = seam.axis === 'x' ? len : SCREW_WALL;
+	const into = seam.pos + (seam.bodyDir * wall) / 2;
+	const w = seam.axis === 'x' ? wall : len;
+	const l = seam.axis === 'x' ? len : wall;
 	const cx = seam.axis === 'x' ? into : mid;
 	const cy = seam.axis === 'x' ? mid : into;
 	return (drawRoundedRectangle(w, l, 0).sketchOnPlane('XY') as Sketch).extrude(thickness).translate(cx, cy, 0) as Solid;
 }
 
-function screwHoleSolid(seam: Seam, along: number, thickness: number): Solid {
+function pinHoleSolid(seam: Seam, along: number, thickness: number, wall: number, r: number): Solid {
 	const z = thickness / 2;
-	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - SCREW_BOLT_LEN + 0.2;
-	// Horizontal M3 clearance hole: sketch on the plane normal to the seam, extrude through the rail.
+	const len = wall + 0.4;
+	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - len + 0.2;
+	// Horizontal hole: sketch on the plane normal to the seam, extrude through the rail.
 	return seam.axis === 'x'
-		? ((drawCircle(SCREW_CLEAR_R).sketchOnPlane('YZ', start) as Sketch).extrude(SCREW_BOLT_LEN).translate(0, along, z) as Solid)
-		: ((drawCircle(SCREW_CLEAR_R).sketchOnPlane('XZ', start) as Sketch).extrude(SCREW_BOLT_LEN).translate(along, 0, z) as Solid);
+		? ((drawCircle(r).sketchOnPlane('YZ', start) as Sketch).extrude(len).translate(0, along, z) as Solid)
+		: ((drawCircle(r).sketchOnPlane('XZ', start) as Sketch).extrude(len).translate(along, 0, z) as Solid);
 }
 
 function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: number, foot: Solid): Solid {
@@ -167,13 +173,14 @@ function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: num
 		}
 		if (adds.length > 0) solid = solid.fuse(makeCompound(adds) as Solid) as Solid;
 		if (cuts.length > 0) solid = solid.cut(makeCompound(cuts) as Solid) as Solid;
-	} else if (bp.connector === 'screw') {
+	} else if (bp.connector === 'screw' || bp.connector === 'filament') {
+		const { wall, r } = pinParams(bp.connector);
 		if (tile.seams.length > 0) {
-			solid = solid.fuse(makeCompound(tile.seams.map((s) => screwRailSolid(s, thickness))) as Solid) as Solid;
+			solid = solid.fuse(makeCompound(tile.seams.map((s) => pinRailSolid(s, thickness, wall))) as Solid) as Solid;
 		}
 		const holes: Solid[] = [];
 		for (const seam of tile.seams) {
-			for (const along of seamCellCenters(seam)) holes.push(screwHoleSolid(seam, along, thickness));
+			for (const along of seamCellCenters(seam)) holes.push(pinHoleSolid(seam, along, thickness, wall, r));
 		}
 		if (holes.length > 0) solid = solid.cut(makeCompound(holes) as Solid) as Solid;
 	}
