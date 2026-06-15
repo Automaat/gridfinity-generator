@@ -5,6 +5,7 @@
 	import { BufferGeometry, BufferAttribute, DoubleSide } from 'three';
 	import DimensionOverlay from './DimensionOverlay.svelte';
 	import DividerGizmos from './DividerGizmos.svelte';
+	import { mode } from '$lib/stores/params';
 
 	// Cap device pixel ratio: phones report dpr 3, which renders 9× the pixels of
 	// dpr 1 for no visible gain on this simple scene. 2 is the quality/fillrate knee.
@@ -83,7 +84,9 @@
 		</div>
 	{/if}
 
-	<DimensionOverlay />
+	{#if $mode === 'bin'}
+		<DimensionOverlay />
+	{/if}
 
 	<Canvas {dpr}>
 		<T.PerspectiveCamera makeDefault position={[120, 80, 120]} fov={45} near={0.1} far={10000}>
@@ -114,7 +117,9 @@
 				</T.LineSegments>
 			{/if}
 
-			<DividerGizmos onDraggingChange={(v) => (dividerDragging = v)} />
+			{#if $mode === 'bin'}
+				<DividerGizmos onDraggingChange={(v) => (dividerDragging = v)} />
+			{/if}
 		</T.Group>
 
 		<T.GridHelper args={[500, 50, '#3a4a63', '#1c2433']} />

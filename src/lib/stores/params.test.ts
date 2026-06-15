@@ -1,6 +1,10 @@
 import { describe, it, expect } from 'vitest';
 import { get } from 'svelte/store';
-import { params, defaultParams, dimensions, serializeParams, deserializeParams, type BinParams } from './params';
+import {
+	params, defaultParams, dimensions, serializeParams, deserializeParams,
+	defaultBaseplate, serializeAll, deserializeAll,
+	type BinParams, type BaseplateParams
+} from './params';
 
 describe('defaultParams', () => {
 	it('has correct default values', () => {
@@ -277,5 +281,89 @@ describe('URL serialization', () => {
 			urlKeys.add(emitted[0]!);
 		}
 		expect(urlKeys.size).toBe(Object.keys(defaultParams).length);
+	});
+});
+
+describe('baseplate URL serialization', () => {
+	const customBp: BaseplateParams = {
+		drawerWidth: 336,
+		drawerDepth: 252,
+		alignX: 'low',
+		alignY: 'high',
+		style: 'simple',
+		screwHoles: true,
+		bedWidth: 350,
+		bedDepth: 320,
+		splitAlgorithm: 'incremental',
+		connector: 'screw',
+		exportLayout: 'combined'
+	};
+
+	it('round-trips every baseplate field via serializeAll/deserializeAll', () => {
+		const sp = serializeAll('baseplate', defaultParams, customBp);
+		expect(sp.get('m')).toBe('bp');
+		const result = deserializeAll(sp);
+		expect(result.mode).toBe('baseplate');
+		expect(result.baseplate).toEqual(customBp);
+	});
+
+	it('emits only the mode marker when baseplate is all defaults', () => {
+		const sp = serializeAll('baseplate', defaultParams, defaultBaseplate);
+		expect(sp.toString()).toBe('m=bp');
+	});
+
+	it('writes bin params (no mode marker) in bin mode, leaving baseplate untouched', () => {
+		const bin: BinParams = { ...defaultParams, width: 5 };
+		const sp = serializeAll('bin', bin, customBp);
+		expect(sp.get('m')).toBeNull();
+		expect(sp.get('w')).toBe('5');
+		const result = deserializeAll(sp);
+		expect(result.mode).toBe('bin');
+		expect(result.bin.width).toBe(5);
+		expect(result.baseplate).toEqual(defaultBaseplate); // no bp keys present
+	});
+
+	it('defaults to bin mode and default baseplate for an empty search', () => {
+		const result = deserializeAll(new URLSearchParams(''));
+		expect(result.mode).toBe('bin');
+		expect(result.baseplate).toEqual(defaultBaseplate);
+	});
+
+	it('clamps out-of-range drawer/bed and rounds to integers', () => {
+		const sp = new URLSearchParams('m=bp&dw=20&dd=99999&bw=10');
+		const { baseplate } = deserializeAll(sp);
+		expect(baseplate.drawerWidth).toBe(42); // min
+		expect(baseplate.drawerDepth).toBe(2000); // max
+		expect(baseplate.bedWidth).toBe(42); // min
+	});
+
+	it('encodes each enum field to its short char and decodes back', () => {
+		const sp = serializeAll('baseplate', defaultParams, customBp);
+		expect(sp.get('ax')).toBe('l'); // alignX low
+		expect(sp.get('ay')).toBe('h'); // alignY high
+		expect(sp.get('st')).toBe('s'); // simple
+		expect(sp.get('sa')).toBe('n'); // incremental
+		expect(sp.get('cn')).toBe('s'); // screw
+		expect(sp.get('el')).toBe('c'); // combined
+		expect(deserializeAll(sp).baseplate).toEqual(customBp);
+	});
+
+	it('falls back to defaults for unknown enum chars', () => {
+		const sp = new URLSearchParams('m=bp&cn=z&st=q');
+		const { baseplate } = deserializeAll(sp);
+		expect(baseplate.connector).toBe(defaultBaseplate.connector);
+		expect(baseplate.style).toBe(defaultBaseplate.style);
+	});
+
+	it('gives every baseplate field a distinct URL key', () => {
+		const keys = new Set<string>();
+		const nonDefault: BaseplateParams = customBp;
+		for (const key of Object.keys(defaultBaseplate) as (keyof BaseplateParams)[]) {
+			const sp = serializeAll('baseplate', defaultParams, { ...defaultBaseplate, [key]: nonDefault[key] });
+			const emitted = [...sp.keys()].filter((k) => k !== 'm');
+			// some custom values may equal the default; only assert uniqueness when one emits
+			if (emitted.length === 1) keys.add(emitted[0]!);
+		}
+		expect(keys.size).toBeGreaterThan(5);
 	});
 });

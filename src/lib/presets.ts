@@ -1,10 +1,36 @@
-import type { BinParams } from '$lib/stores/params';
+import type { BinParams, BaseplateParams } from '$lib/stores/params';
 
 export interface Preset {
 	name: string;
 	description: string;
 	params: BinParams;
 }
+
+export interface BaseplatePreset {
+	name: string;
+	description: string;
+	params: BaseplateParams;
+}
+
+// Build-plate sizes (mm) for common printers — selecting one fills bed W×D in the
+// baseplate tiler. Usable area; trim a few mm for clips/skirt if your slicer warns.
+export interface PrinterBed {
+	name: string;
+	w: number;
+	d: number;
+}
+
+export const printerBeds: PrinterBed[] = [
+	{ name: 'Bambu Lab H2D', w: 350, d: 320 },
+	{ name: 'Bambu Lab X1 / P1 / A1', w: 256, d: 256 },
+	{ name: 'Bambu Lab A1 mini', w: 180, d: 180 },
+	{ name: 'Prusa MK4 / MK3S', w: 250, d: 210 },
+	{ name: 'Prusa XL', w: 360, d: 360 },
+	{ name: 'Prusa Mini+', w: 180, d: 180 },
+	{ name: 'Creality Ender 3 / K1', w: 220, d: 220 },
+	{ name: 'Creality K1 Max', w: 300, d: 300 },
+	{ name: 'Voron 2.4 (350)', w: 350, d: 350 }
+];
 
 export const presets: Preset[] = [
 	{
@@ -120,6 +146,27 @@ export const presets: Preset[] = [
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
 			wallCutRun: 1
+		}
+	}
+];
+
+export const baseplatePresets: BaseplatePreset[] = [
+	{
+		name: 'IKEA Alex drawer',
+		description: 'Magnetic baseplate for an Alex drawer (~552×360mm), split for a 220mm bed',
+		params: {
+			drawerWidth: 552, drawerDepth: 360, alignX: 'center', alignY: 'center',
+			style: 'magnet', screwHoles: false, bedWidth: 220, bedDepth: 220,
+			splitAlgorithm: 'ideal', connector: 'filament', exportLayout: 'zip'
+		}
+	},
+	{
+		name: 'Small drawer (simple)',
+		description: 'Single-piece no-magnet grid, fits a 256mm bed',
+		params: {
+			drawerWidth: 252, drawerDepth: 210, alignX: 'center', alignY: 'center',
+			style: 'simple', screwHoles: false, bedWidth: 256, bedDepth: 256,
+			splitAlgorithm: 'ideal', connector: 'filament', exportLayout: 'zip'
 		}
 	}
 ];

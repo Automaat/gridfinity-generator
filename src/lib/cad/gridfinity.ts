@@ -52,7 +52,7 @@ function bodySize(units: number): number {
 	return units * GRID_UNIT - TOLERANCE;
 }
 
-function buildUnitBase(): Solid {
+export function buildUnitBase(): Solid {
 	const unitBody = GRID_UNIT - TOLERANCE; // 41.5
 
 	// 4 Z-levels with (size, radius) at each:

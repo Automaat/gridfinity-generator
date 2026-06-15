@@ -10,17 +10,22 @@ src/
 │   ├── cad/
 │   │   ├── gridfinity.ts      # Parametric bin geometry (replicad API)
 │   │   ├── gridfinity.test.ts  # Geometry unit tests
-│   │   ├── worker.ts           # Web Worker: builds mesh, exports STEP/STL
+│   │   ├── manifold-bin.ts     # Fast bin geometry + shared manifold primitives
+│   │   ├── baseplate-layout.ts # Pure tile-split/dovetail/skirt math (engine-free, tested)
+│   │   ├── baseplate-manifold.ts # Baseplate preview + STL (manifold), uses manifold-bin prims
+│   │   ├── baseplate-occt.ts   # Baseplate STEP (replicad, lazy), reuses gridfinity buildUnitBase
+│   │   ├── worker.ts           # Web Worker: builds mesh, exports STEP/STL (bin + baseplate)
 │   │   └── opencascade.d.ts    # WASM type declarations
 │   ├── components/
-│   │   ├── Viewer.svelte       # Threlte 3D viewport
-│   │   ├── Controls.svelte     # Parameter panel (sliders, toggles)
+│   │   ├── Viewer.svelte       # Threlte 3D viewport (overlays bin-mode only)
+│   │   ├── Controls.svelte     # Bin/Baseplate mode toggle + bin parameter panel
+│   │   ├── BaseplateControls.svelte # Drawer/bed/style/tiling panel
 │   │   └── DimensionOverlay.svelte
 │   ├── stores/
-│   │   └── params.ts           # Svelte store + URL serialization
+│   │   └── params.ts           # BinParams + BaseplateParams stores, mode, URL serialization
 │   ├── utils/
 │   │   └── print-estimate.ts   # Filament/time estimation
-│   └── presets.ts              # Common bin configurations
+│   └── presets.ts              # Common bin + baseplate configurations
 ├── routes/
 │   ├── +page.svelte            # Main app layout
 │   └── +layout.svelte
@@ -114,6 +119,7 @@ When modifying geometry, cross-reference constants at top of `gridfinity.ts` aga
 - **Coordinate system:** Origin is at center of grid footprint. Multi-unit grids offset by `((units - 1) * 42) / 2`
 - **Stacking lip:** Female cavity mirrors base profile inverted. The lip offset constants (`LIP_OFFSET_BOTTOM=2.95`, `LIP_OFFSET_MID=0.8`) must match base profile exactly or bins won't stack. The lip **protrudes above** `height×7` (`STACKING_LIP_PROTRUSION=3.551`): a lipped bin's total Z is `units×7 + 3.551`. Wall fills the nominal height; the lip base overlaps the rim ~1.2mm as support. Both geometry paths (`manifold-bin.ts` STL + `gridfinity.ts` STEP) must change together.
 - **Zero-size sketches:** `drawRoundedRectangle` with radius=0 works but produces sharp corners — use it intentionally for divider walls
+- **Baseplate sockets:** The receiving socket is the bin foot (`unitBase()`/`buildUnitBase()`) subtracted from the plate top, flush at top. Plates are **skeletonized** (each cell floor opened through the plate — the canonical gridfinity-rebuilt look, far less filament); the magnet style preserves scalloped corner pads inside the opening (full-height, `MAGNET_BOSS_R`) and the **magnet pocket opens upward from the cavity floor** (`socketZ`), facing the bin foot's magnet — NOT downward. Both baseplate paths (`baseplate-manifold.ts` STL/preview + `baseplate-occt.ts` STEP) must change together, and the tile/seam/skirt math lives in the engine-free `baseplate-layout.ts` (the single tested source; it emits generic `Seam`s, geometry turns them into the chosen connector). Tiles use square corners (r=0) so they butt seamlessly. Connectors (`BaseplateParams.connector`): `filament` (default — Ø1.8 horizontal holes for a 1.75mm filament-scrap dowel pin, placed LOW (`FIL_Z`) in the existing seam floor so NO rib is added and the grid surface stays clean cells), `screw` (a solid seam rail `pinRail` + horizontal M3 holes at mid-height, gridfinity-rebuilt style — has visible seam walls), `dovetail` (small in-plane snap-tabs in the rim), or `none`. Filament keeps the seam clean; only `screw` adds a visible rib (M3 needs the meat). Filament suits thicker (magnet) plates; thin simple plates have little floor below the profile.
 
 ## Quality Gates
 

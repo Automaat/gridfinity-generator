@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { base } from '$app/paths';
-	import { params, serializeParams, deserializeParams, type BinParams } from '$lib/stores/params';
+	import { params, baseplateParams, mode, serializeAll, deserializeAll } from '$lib/stores/params';
 	import Viewer from '$lib/components/Viewer.svelte';
 	import Controls from '$lib/components/Controls.svelte';
 	import type { WorkerRequest, WorkerResponse } from '$lib/cad/worker';
@@ -44,7 +44,9 @@
 	// build eagerly and coalesce: while a build runs, keep only the latest pending
 	// params and build them when it returns. No backlog; always converges to latest.
 	let buildInFlight = false;
-	let pendingBuild: BinParams | null = null;
+	// Latest store values are always read at build time, so coalescing only needs a
+	// "rebuild pending" flag — works for either mode (bin or baseplate).
+	let pendingBuild = false;
 	let urlTimer: ReturnType<typeof setTimeout>;
 
 	function clearOpTimer() {
@@ -67,7 +69,7 @@
 		exporting = false;
 		inFlight = 0;
 		buildInFlight = false;
-		pendingBuild = null;
+		pendingBuild = false;
 		clearOpTimer();
 	}
 
@@ -76,7 +78,7 @@
 		workerReady = false;
 		inFlight = 0; // the terminated worker's queued ops will never reply
 		buildInFlight = false;
-		pendingBuild = null;
+		pendingBuild = false;
 		worker = new Worker(new URL('$lib/cad/worker.ts', import.meta.url), { type: 'module' });
 		worker.addEventListener('message', (e: MessageEvent<WorkerResponse>) => {
 			const msg = e.data;
@@ -85,7 +87,7 @@
 				if (skipAutoBuild) {
 					skipAutoBuild = false;
 				} else {
-					requestBuild($params);
+					requestBuild();
 				}
 			} else if (msg.type === 'mesh') {
 				opResolved();
@@ -96,15 +98,14 @@
 				edges = msg.edges;
 				// A param changed mid-build: build the latest now; otherwise settle.
 				if (pendingBuild) {
-					const next = pendingBuild;
-					pendingBuild = null;
-					requestBuild(next);
+					pendingBuild = false;
+					requestBuild();
 				} else {
 					loading = false;
 				}
 			} else if (msg.type === 'exportSTEP' || msg.type === 'exportSTL') {
 				opResolved();
-				downloadBlob(msg.blob, msg.type === 'exportSTEP' ? 'bin.step' : 'bin.stl');
+				downloadBlob(msg.blob, msg.filename);
 				exporting = false;
 			} else if (msg.type === 'error') {
 				console.error(`Worker error [${msg.code}] on ${msg.requestType}:`, msg.message);
@@ -126,14 +127,16 @@
 	}
 
 	onMount(() => {
-		const urlParams = deserializeParams(new URLSearchParams(window.location.search));
-		params.set(urlParams);
+		const url = new URLSearchParams(window.location.search);
+		const { mode: m, bin, baseplate } = deserializeAll(url);
+		mode.set(m);
+		params.set(bin);
+		baseplateParams.set(baseplate);
 		spawnWorker();
 		// Paint the precomputed default bin immediately so the first visit shows a
-		// real model while the worker starts up (loads the manifold WASM and runs
-		// the first build). Only valid for the default view — any URL params mean a
-		// different bin, so let the worker build it.
-		if (serializeParams(urlParams).toString() === '') {
+		// real model while the worker starts up. Only valid for the default bin view
+		// — any params (or baseplate mode) mean a different model, so let the worker build it.
+		if (m === 'bin' && serializeAll(m, bin, baseplate).toString() === '') {
 			loadDefaultMesh();
 		}
 	});
@@ -169,19 +172,23 @@
 		clearOpTimer();
 	});
 
-	function requestBuild(p: BinParams) {
+	function requestBuild() {
 		if (!worker || !workerReady) return;
 		if (buildInFlight) {
-			pendingBuild = p; // supersede any earlier pending params
+			pendingBuild = true; // rebuild from the latest stores once this one returns
 			return;
 		}
 		buildError = null;
 		loading = true;
 		buildInFlight = true;
-		pendingBuild = null;
+		pendingBuild = false;
 		inFlight++;
 		startOpTimer();
-		worker.postMessage({ type: 'build', params: p } satisfies WorkerRequest);
+		const req: WorkerRequest =
+			$mode === 'baseplate'
+				? { type: 'buildBaseplate', params: $baseplateParams }
+				: { type: 'build', params: $params };
+		worker.postMessage(req);
 	}
 
 	function handleExport(format: 'step' | 'stl') {
@@ -192,8 +199,11 @@
 		exporting = true;
 		inFlight++;
 		startOpTimer();
-		const type = format === 'step' ? 'exportSTEP' : 'exportSTL';
-		worker.postMessage({ type, params: $params } satisfies WorkerRequest);
+		const req: WorkerRequest =
+			$mode === 'baseplate'
+				? { type: format === 'step' ? 'exportBaseplateSTEP' : 'exportBaseplateSTL', params: $baseplateParams }
+				: { type: format === 'step' ? 'exportSTEP' : 'exportSTL', params: $params };
+		worker.postMessage(req);
 	}
 
 	function downloadBlob(blob: Blob, filename: string) {
@@ -206,18 +216,26 @@
 	}
 
 	// Build on a short debounce (coalescing absorbs bursts); sync the URL on a
-	// longer one so dragging a slider doesn't spam history.replaceState.
-	const unsubscribe = params.subscribe((p) => {
+	// longer one so dragging a slider doesn't spam history.replaceState. Any of the
+	// three stores (mode, bin params, baseplate params) can drive a rebuild.
+	function scheduleBuildAndSync() {
 		clearTimeout(debounceTimer);
-		debounceTimer = setTimeout(() => requestBuild(p), 40);
+		debounceTimer = setTimeout(() => requestBuild(), 40);
 		clearTimeout(urlTimer);
 		urlTimer = setTimeout(() => {
-			const qs = serializeParams(p).toString();
+			const qs = serializeAll($mode, $params, $baseplateParams).toString();
 			history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
 		}, 250);
-	});
+	}
+	const unsubP = params.subscribe(() => scheduleBuildAndSync());
+	const unsubBp = baseplateParams.subscribe(() => scheduleBuildAndSync());
+	const unsubMode = mode.subscribe(() => scheduleBuildAndSync());
 
-	onDestroy(unsubscribe);
+	onDestroy(() => {
+		unsubP();
+		unsubBp();
+		unsubMode();
+	});
 </script>
 
 <svelte:head>
