@@ -33,7 +33,7 @@
 	});
 
 	let copied = $state(false);
-	let copyTimer: ReturnType<typeof setTimeout>;
+	let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
 	type NumKey = 'width' | 'length' | 'height' | 'wallThickness' | 'dividersX' | 'dividersY';
 

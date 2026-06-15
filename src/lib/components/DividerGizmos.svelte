@@ -1,4 +1,5 @@
 <script lang="ts">
+	import { browser } from '$app/environment';
 	import { T, useThrelte } from '@threlte/core';
 	import { interactivity, HTML, type IntersectionEvent } from '@threlte/extras';
 	import {
@@ -24,7 +25,9 @@
 	// Rendered INSIDE the Z-up→Y-up group, so all positions here are model coords.
 	let { onDraggingChange }: { onDraggingChange: (active: boolean) => void } = $props();
 
-	interactivity();
+	// Pointer interactivity touches window/document; only wire it in the browser
+	// so server-side rendering can't trip over it.
+	if (browser) interactivity();
 	const { camera, renderer, invalidate } = useThrelte();
 
 	// Handles float just above the rim; the drag plane sits at the same height so
