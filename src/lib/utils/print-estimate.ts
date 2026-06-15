@@ -27,13 +27,16 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	const innerL = bodyL - 2 * p.wallThickness;
 
 	const lipProfileHeight =
-		p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? 2.15 : 0;
+		p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
 	const lipProtrusion =
 		p.stackingLip === 'standard' ? STACKING_LIP_PROTRUSION : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
 
 	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
-	// Walls fill the nominal height; the lip protrudes above it.
+	// Walls fill the nominal height; the lip protrudes above it. When the wall
+	// collapses (e.g. height=1) the CAD builders emit base + floor only — no lip.
 	const wallHeight = Math.max(0, heightMm - wallBottom);
+	const hasLip = lipProfileHeight > 0 && wallHeight > 0;
+	const effectiveProtrusion = hasLip ? lipProtrusion : 0;
 
 	// Base profile (approximate as 60% fill of bounding box)
 	let volumeMm3 = bodyW * bodyL * BASE_PROFILE_HEIGHT * 0.6;
@@ -45,7 +48,7 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	volumeMm3 += (bodyW * bodyL - innerW * innerL) * wallHeight;
 
 	// Stacking lip (approximate as a shell over its protrusion above the walls)
-	if (lipProfileHeight > 0) {
+	if (hasLip) {
 		const lipInnerW = bodyW - 2 * 2.95;
 		const lipInnerL = bodyL - 2 * 2.95;
 		volumeMm3 += (bodyW * bodyL - lipInnerW * lipInnerL) * lipProtrusion;
@@ -63,7 +66,7 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	const volumeCm3 = volumeMm3 / 1000;
 	const filamentGrams = volumeCm3 * PLA_DENSITY;
 	const filamentMeters = volumeMm3 / FILAMENT_CROSS_SECTION / 1000;
-	const layers = (heightMm + lipProtrusion) / 0.2;
+	const layers = (heightMm + effectiveProtrusion) / 0.2;
 	const printTimeMinutes = Math.round(volumeCm3 * 8 + layers * 0.5);
 
 	return {

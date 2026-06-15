@@ -394,7 +394,7 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 	// 3. Lip + wall dimensions. Walls fill the full nominal height; the stacking
 	// lip protrudes above it (gridfinity-rebuilt convention), so a lipped bin's
 	// total height is units×7 + lipProtrusion.
-	const lipProfileHeight = p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? 2.15 : 0;
+	const lipProfileHeight = p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
 	const lipProtrusion = p.stackingLip === 'standard' ? STACKING_LIP_PROTRUSION : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
 	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
 	const wallHeight = h - wallBottom;

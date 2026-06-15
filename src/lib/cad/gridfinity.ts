@@ -538,7 +538,7 @@ export function buildBin(p: BinParams): Solid {
 		p.stackingLip === 'standard'
 			? BASE_PROFILE_HEIGHT
 			: p.stackingLip === 'reduced'
-				? 2.15
+				? REDUCED_LIP_PROTRUSION
 				: 0;
 	const lipProtrusion =
 		p.stackingLip === 'standard'
