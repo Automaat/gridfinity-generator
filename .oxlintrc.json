@@ -1,0 +1,40 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["typescript", "unicorn", "import", "promise", "oxc"],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn"
+  },
+  "rules": {
+    // False positives for this Worker/Svelte/Vite architecture — their autofixes
+    // would break code, so they stay off (see CLAUDE.md "Strictness Config"):
+    // Web Worker postMessage's 2nd arg is the transfer list, not an origin.
+    "unicorn/require-post-message-target-origin": "off",
+    // CSS side-effect imports (`import '../app.css'`) are intentional.
+    "import/no-unassigned-import": "off",
+    // `export {}` is the canonical module marker in app.d.ts.
+    "unicorn/require-module-specifiers": "off",
+
+    // Type-aware rules (active only under `npm run lint:types`, harmless otherwise):
+    // replicad/OCCT expose a fluent API returning broad base types (Shape/Sketch),
+    // so narrowing casts (`as Solid`/`as Sketch`) are unavoidable, not unsafe.
+    "typescript/no-unsafe-type-assertion": "off",
+    // The single-use generic K in encode/decodeField deliberately links a param key
+    // to its codec type; collapsing it would lose that compile-time guarantee.
+    "typescript/no-unnecessary-type-parameters": "off"
+  },
+  "overrides": [
+    {
+      // Vitest-specific checks for test files: catch committed `.only`, skipped
+      // tests, duplicate titles, and malformed expect() chains.
+      "files": ["**/*.test.ts"],
+      "plugins": ["vitest"],
+      "rules": {
+        "vitest/no-focused-tests": "error",
+        "vitest/no-disabled-tests": "warn",
+        "vitest/no-identical-title": "error",
+        "vitest/valid-expect": "error"
+      }
+    }
+  ]
+}

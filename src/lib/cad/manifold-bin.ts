@@ -90,11 +90,11 @@ function box(w: number, l: number, h: number, cx: number, cy: number, zBase: num
 function ensureCCW(pts: [number, number][]): [number, number][] {
 	let area = 0;
 	for (let i = 0; i < pts.length; i++) {
-		const [x1, y1] = pts[i];
-		const [x2, y2] = pts[(i + 1) % pts.length];
+		const [x1, y1] = pts[i]!;
+		const [x2, y2] = pts[(i + 1) % pts.length]!;
 		area += x1 * y2 - x2 * y1;
 	}
-	return area < 0 ? pts.slice().reverse() : pts;
+	return area < 0 ? pts.toReversed() : pts;
 }
 
 // A prism whose cross-section lies in a world plane, extruded along world X or Y.
@@ -130,7 +130,7 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Man
 	const { Manifold } = oc();
 	const unitBody = GRID_UNIT - TOLERANCE;
 	const holeOffset = unitBody / 2 - HOLE_DISTANCE_FROM_EDGE;
-	const offsets = [
+	const offsets: [number, number][] = [
 		[holeOffset, holeOffset], [-holeOffset, holeOffset],
 		[holeOffset, -holeOffset], [-holeOffset, -holeOffset]
 	];
@@ -148,7 +148,7 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Man
 					parts.push(Manifold.cylinder(SCREW_HOLE_DEPTH, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, circleSegments));
 				}
 				if (parts.length === 0) continue;
-				const cutter = (parts.length === 1 ? parts[0] : Manifold.union(parts));
+				const cutter = (parts.length === 1 ? parts[0]! : Manifold.union(parts));
 				cutters.push(cutter.translate([cx + ox, cy + oy, 0]));
 			}
 		}
@@ -168,9 +168,9 @@ function buildStackingLip(bodyW: number, bodyL: number, topZ: number, lipHeight:
 			{ z: topZ + 2.6, w: bodyW - 2 * LIP_OFFSET_MID, l: bodyL - 2 * LIP_OFFSET_MID, r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID) },
 			{ z: topZ + BASE_PROFILE_HEIGHT, w: bodyW, l: bodyL, r: CORNER_FILLET_RADIUS }
 		];
-		const c1 = chamfer(lv[0].w, lv[0].l, lv[0].r, lv[0].z, lv[1].w, lv[1].l, lv[1].r, lv[1].z);
-		const c2 = roundedPrism(lv[1].w, lv[1].l, lv[1].r, lv[2].z - lv[1].z, lv[1].z);
-		const c3 = chamfer(lv[2].w, lv[2].l, lv[2].r, lv[2].z, lv[3].w, lv[3].l, lv[3].r, lv[3].z);
+		const c1 = chamfer(lv[0]!.w, lv[0]!.l, lv[0]!.r, lv[0]!.z, lv[1]!.w, lv[1]!.l, lv[1]!.r, lv[1]!.z);
+		const c2 = roundedPrism(lv[1]!.w, lv[1]!.l, lv[1]!.r, lv[2]!.z - lv[1]!.z, lv[1]!.z);
+		const c3 = chamfer(lv[2]!.w, lv[2]!.l, lv[2]!.r, lv[2]!.z, lv[3]!.w, lv[3]!.l, lv[3]!.r, lv[3]!.z);
 		return outer.subtract(Manifold.union([c1, c2, c3]));
 	}
 	const bottomR = Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID);
@@ -247,7 +247,7 @@ function buildDividers(
 		walls.push(wall.translate([0, yPos, 0]));
 	}
 	if (walls.length === 0) return null;
-	return walls.length === 1 ? walls[0] : Manifold.union(walls);
+	return walls.length === 1 ? walls[0]! : Manifold.union(walls);
 }
 
 function buildLabelTabs(
@@ -261,8 +261,8 @@ function buildLabelTabs(
 	const frontY = innerL / 2;
 	const tabs: Manifold[] = [];
 	for (let i = 0; i < edges.length - 1; i++) {
-		const cx = (edges[i] + edges[i + 1]) / 2;
-		const tabW = edges[i + 1] - edges[i] - (i > 0 ? p.wallThickness : 0);
+		const cx = (edges[i]! + edges[i + 1]!) / 2;
+		const tabW = edges[i + 1]! - edges[i]! - (i > 0 ? p.wallThickness : 0);
 		if (tabW < 1) continue; // compartment too narrow for a usable tab
 		// Right-triangle ledge in the Y-Z plane, extruded along X by the tab width.
 		const tri: [number, number][] = [
@@ -271,7 +271,7 @@ function buildLabelTabs(
 		tabs.push(prismAlongX(tri, tabW).translate([cx - tabW / 2, 0, 0]));
 	}
 	if (tabs.length === 0) return null;
-	return tabs.length === 1 ? tabs[0] : Manifold.union(tabs);
+	return tabs.length === 1 ? tabs[0]! : Manifold.union(tabs);
 }
 
 function buildSingleScoop(
@@ -303,10 +303,10 @@ function buildScoops(
 	const scoops: Manifold[] = [];
 	for (let ix = 0; ix < xEdges.length - 1; ix++) {
 		for (let iy = 0; iy < yEdges.length - 1; iy++) {
-			const xStart = xEdges[ix];
-			const yStart = yEdges[iy];
-			const compartmentW = xEdges[ix + 1] - xEdges[ix];
-			const compartmentL = yEdges[iy + 1] - yEdges[iy];
+			const xStart = xEdges[ix]!;
+			const yStart = yEdges[iy]!;
+			const compartmentW = xEdges[ix + 1]! - xEdges[ix]!;
+			const compartmentL = yEdges[iy + 1]! - yEdges[iy]!;
 			for (const wall of p.scoopWalls) {
 				switch (wall) {
 					case 'back':
@@ -326,7 +326,7 @@ function buildScoops(
 		}
 	}
 	if (scoops.length === 0) return null;
-	return scoops.length === 1 ? scoops[0] : Manifold.union(scoops);
+	return scoops.length === 1 ? scoops[0]! : Manifold.union(scoops);
 }
 
 function buildWallCut(

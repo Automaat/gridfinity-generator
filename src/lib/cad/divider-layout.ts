@@ -26,7 +26,7 @@ export function resolveFractions(count: number, fractions?: number[] | null): nu
 	const n = Math.max(0, Math.round(count));
 	if (n === 0) return [];
 	if (fractions && fractions.length === n) {
-		return fractions.map((f) => clamp(f, 0, 1)).sort((a, b) => a - b);
+		return fractions.map((f) => clamp(f, 0, 1)).toSorted((a, b) => a - b);
 	}
 	return Array.from({ length: n }, (_, i) => (i + 1) / (n + 1));
 }
@@ -57,7 +57,7 @@ export function redistributeGaps(
 	result[k] = clamp(value, minGap, inner - (n - 1) * minGap);
 	let pool = inner - result[k];
 	let active = result.map((_, i) => i).filter((i) => i !== k);
-	const weight = (i: number) => Math.max(gaps[i], 1e-6);
+	const weight = (i: number) => Math.max(gaps[i]!, 1e-6);
 	// Water-fill: allocate proportionally, but freeze any compartment that would
 	// fall below minGap and re-share the remainder among the rest.
 	while (active.length > 0) {

@@ -46,7 +46,7 @@ function postMesh(vertices: Float32Array, triangles: Uint32Array, normals: Float
 	);
 }
 
-self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
+self.addEventListener('message', async (e: MessageEvent<WorkerRequest>) => {
 	const msg = e.data;
 	try {
 		await ready;
@@ -68,7 +68,8 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 		const { code, message } = classifyError(err);
 		self.postMessage({ type: 'error', code, message, requestType: msg.type } satisfies WorkerResponse);
 	}
-};
+});
 
-// signal ready after the manifold engine loads (small WASM; OCCT stays lazy)
-ready.then(() => self.postMessage({ type: 'ready' } satisfies WorkerResponse));
+// signal ready after the manifold engine loads (small WASM; OCCT stays lazy).
+// Fire-and-forget: if init rejects, the first op awaiting `ready` surfaces it.
+void ready.then(() => self.postMessage({ type: 'ready' } satisfies WorkerResponse));

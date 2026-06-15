@@ -65,7 +65,7 @@
 	);
 
 	function applyPreset(idx: number) {
-		if (idx >= 0 && idx < presets.length) params.set({ ...presets[idx].params });
+		if (idx >= 0 && idx < presets.length) params.set({ ...presets[idx]!.params });
 	}
 	function reset() {
 		params.set({ ...defaultParams });

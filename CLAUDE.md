@@ -126,6 +126,19 @@ Before committing:
 - [ ] For geometry changes: verify dimensions match Gridfinity spec
 - [ ] `reference-parity.test.ts` passes — cross-checks exported STL bbox/volume against committed gridfinity-rebuilt reference (refresh fixtures via `scripts/refresh-reference-fixtures.mjs`)
 
+CI runs `lint` → `check` → tests → build → e2e (`.github/workflows/ci.yml`). Lint fails on any warning (`--max-warnings 0`).
+
+### Strictness Config
+
+- **TS:** `tsconfig.json` enables full `strict` plus `noUncheckedIndexedAccess`, `noImplicitOverride`, `noFallthroughCasesInSwitch`, `noImplicitReturns`, `noUnusedLocals`, `noUnusedParameters`, `exactOptionalPropertyTypes`. In tight mesh/geometry loops over typed arrays, indexed reads are `T|undefined` — read once into a local `const x = arr[i]!` (provably in-bounds by loop construction); never add `@ts-ignore`.
+- **oxlint** (`.oxlintrc.json`, JSONC — comments allowed): `correctness`=error, `suspicious`=warn, plugins `typescript/unicorn/import/promise/oxc`. Test files get a `vitest` override (`no-focused-tests`, `no-disabled-tests`, `no-identical-title`, `valid-expect`) so a committed `.only` fails CI. Rules disabled as false positives for this architecture — do NOT re-enable or "fix" their sites:
+  - `unicorn/require-post-message-target-origin` — Web Worker `postMessage`'s 2nd arg is the transfer list, not an origin; the autofix corrupts transferables.
+  - `import/no-unassigned-import` — CSS side-effect imports (`import '../app.css'`) are intentional.
+  - `unicorn/require-module-specifiers` — `export {}` is the canonical module marker in `app.d.ts`; its autofix produces invalid syntax.
+  - `typescript/no-unsafe-type-assertion` — replicad/OCCT's fluent API returns broad base types; `as Solid`/`as Sketch` narrowing casts are unavoidable (type-aware only).
+  - `typescript/no-unnecessary-type-parameters` — the single-use generic in `encode/decodeField` deliberately links a param key to its codec type (type-aware only).
+- **Type-aware lint** (`npm run lint:types`): `oxlint --type-aware` via `oxlint-tsgolint` (TS7 engine). Catches `no-floating-promises`, `no-misused-promises`, etc. Alpha — kept out of CI for now; run locally. Errors fail; it currently emits ~11 advisory `no-unnecessary-type-assertion` warnings on replicad casts (TS7 disagrees with the TS6 `check` gate — don't remove the casts, they keep `npm run check` green).
+
 ## Deployment Constraints
 
 - **Static only:** No server-side code. Everything runs client-side (WASM + Worker)

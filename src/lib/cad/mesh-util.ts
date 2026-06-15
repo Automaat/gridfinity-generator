@@ -26,16 +26,16 @@ export function manifoldToMesh(
 	const tri = geo.triVerts;
 	const nv = vp.length / np;
 	const nTri = tri.length / 3;
-	const px = (i: number) => vp[i * np];
-	const py = (i: number) => vp[i * np + 1];
-	const pz = (i: number) => vp[i * np + 2];
+	const px = (i: number) => vp[i * np]!;
+	const py = (i: number) => vp[i * np + 1]!;
+	const pz = (i: number) => vp[i * np + 2]!;
 
 	// Per-face normals (shared by normal-averaging and edge detection).
 	const fnx = new Float32Array(nTri);
 	const fny = new Float32Array(nTri);
 	const fnz = new Float32Array(nTri);
 	for (let f = 0; f < nTri; f++) {
-		const a = tri[3 * f], b = tri[3 * f + 1], c = tri[3 * f + 2];
+		const a = tri[3 * f]!, b = tri[3 * f + 1]!, c = tri[3 * f + 2]!;
 		const ux = px(b) - px(a), uy = py(b) - py(a), uz = pz(b) - pz(a);
 		const vx = px(c) - px(a), vy = py(c) - py(a), vz = pz(c) - pz(a);
 		const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -47,12 +47,15 @@ export function manifoldToMesh(
 
 	// Vertex → adjacent faces, in CSR form (offsets + flat adjacency array).
 	const offsets = new Uint32Array(nv + 1);
-	for (let t = 0; t < tri.length; t++) offsets[tri[t] + 1]++;
-	for (let i = 0; i < nv; i++) offsets[i + 1] += offsets[i];
+	for (let t = 0; t < tri.length; t++) offsets[tri[t]! + 1]!++;
+	for (let i = 0; i < nv; i++) offsets[i + 1]! += offsets[i]!;
 	const adj = new Uint32Array(tri.length);
 	const cursor = offsets.slice(0, nv);
 	for (let f = 0; f < nTri; f++) {
-		for (let k = 0; k < 3; k++) adj[cursor[tri[3 * f + k]]++] = f;
+		for (let k = 0; k < 3; k++) {
+			const v = tri[3 * f + k]!;
+			adj[cursor[v]!++] = f;
+		}
 	}
 
 	const cosSharp = Math.cos((sharpAngleDeg * Math.PI) / 180);
@@ -60,16 +63,17 @@ export function manifoldToMesh(
 	const normals = new Float32Array(nTri * 9);
 	const triangles = new Uint32Array(nTri * 3);
 	for (let f = 0; f < nTri; f++) {
-		const fx = fnx[f], fy = fny[f], fz = fnz[f];
+		const fx = fnx[f]!, fy = fny[f]!, fz = fnz[f]!;
 		for (let k = 0; k < 3; k++) {
-			const v = tri[3 * f + k];
+			const v = tri[3 * f + k]!;
 			let nx = 0, ny = 0, nz = 0;
-			for (let j = offsets[v]; j < offsets[v + 1]; j++) {
-				const g = adj[j];
-				if (fx * fnx[g] + fy * fny[g] + fz * fnz[g] > cosSharp) {
-					nx += fnx[g];
-					ny += fny[g];
-					nz += fnz[g];
+			for (let j = offsets[v]!; j < offsets[v + 1]!; j++) {
+				const g = adj[j]!;
+				const gx = fnx[g]!, gy = fny[g]!, gz = fnz[g]!;
+				if (fx * gx + fy * gy + fz * gz > cosSharp) {
+					nx += gx;
+					ny += gy;
+					nz += gz;
 				}
 			}
 			const len = Math.hypot(nx, ny, nz) || 1;
@@ -101,10 +105,10 @@ export function manifoldToStlBlob(solid: Manifold): Blob {
 	dv.setUint32(80, nTri, true);
 	let o = 84;
 	for (let f = 0; f < nTri; f++) {
-		const a = tri[3 * f] * np, b = tri[3 * f + 1] * np, c = tri[3 * f + 2] * np;
-		const ax = vp[a], ay = vp[a + 1], az = vp[a + 2];
-		const bx = vp[b], by = vp[b + 1], bz = vp[b + 2];
-		const cx = vp[c], cy = vp[c + 1], cz = vp[c + 2];
+		const a = tri[3 * f]! * np, b = tri[3 * f + 1]! * np, c = tri[3 * f + 2]! * np;
+		const ax = vp[a]!, ay = vp[a + 1]!, az = vp[a + 2]!;
+		const bx = vp[b]!, by = vp[b + 1]!, bz = vp[b + 2]!;
+		const cx = vp[c]!, cy = vp[c + 1]!, cz = vp[c + 2]!;
 		const ux = bx - ax, uy = by - ay, uz = bz - az;
 		const vx = cx - ax, vy = cy - ay, vz = cz - az;
 		let nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
@@ -137,12 +141,12 @@ function computeFeatureEdges(
 			firstFace.set(key, f);
 			return;
 		}
-		if (fnx[prev] * fnx[f] + fny[prev] * fny[f] + fnz[prev] * fnz[f] < cosThresh) {
+		if (fnx[prev]! * fnx[f]! + fny[prev]! * fny[f]! + fnz[prev]! * fnz[f]! < cosThresh) {
 			segs.push(px(lo), py(lo), pz(lo), px(hi), py(hi), pz(hi));
 		}
 	};
 	for (let f = 0; f < nTri; f++) {
-		const a = tri[3 * f], b = tri[3 * f + 1], c = tri[3 * f + 2];
+		const a = tri[3 * f]!, b = tri[3 * f + 1]!, c = tri[3 * f + 2]!;
 		visit(a, b, f);
 		visit(b, c, f);
 		visit(c, a, f);

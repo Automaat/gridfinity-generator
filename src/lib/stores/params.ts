@@ -21,8 +21,8 @@ export interface BinParams {
 	// Per-divider positions as fractions (0..1) across the interior, measured from
 	// the low wall. Optional: absent or length≠count means even spacing (the
 	// default until a divider is dragged in the 3D view).
-	dividerPosX?: number[];
-	dividerPosY?: number[];
+	dividerPosX?: number[] | undefined;
+	dividerPosY?: number[] | undefined;
 }
 
 export const defaultParams: BinParams = {
@@ -130,7 +130,7 @@ const CODECS: Codecs = {
 	scoopWalls: {
 		key: 'sw',
 		encode: (v) => v.map((w) => WALL_TO_CHAR[w]).join(''),
-		decode: (raw) => [...raw].map((c) => CHAR_TO_WALL[c]).filter(Boolean)
+		decode: (raw) => Array.from(raw, (c) => CHAR_TO_WALL[c]).filter((w): w is NonNullable<typeof w> => w !== undefined)
 	},
 	scoopRadius: { ...num(0, 20), key: 'sr' },
 	wallCut: { ...bool, key: 'wc' },
