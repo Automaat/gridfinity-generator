@@ -1,16 +1,21 @@
-import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
-import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
-import { setOC } from 'replicad';
-import { buildBin } from './gridfinity';
+import manifoldModule from 'manifold-3d';
+import manifoldWasm from 'manifold-3d/manifold.wasm?url';
+import { buildBinManifold, setBinManifold } from './manifold-bin';
+import { manifoldToMesh, manifoldToStlBlob } from './mesh-util';
 import type { BinParams } from '$lib/stores/params';
 import { classifyError, validateParams, type WorkerErrorCode } from './worker-errors';
 
+// Preview and STL export both run on the manifold engine (small WASM, eager).
+// STL is rebuilt at a finer tessellation than the preview. OpenCascade is
+// dynamic-imported only for STEP (which needs a BRep), so the interactive path
+// and the common STL export never download the ~4.6MB kernel.
+const STL_SEGMENTS = 64;
 let initialized = false;
-
 async function init() {
 	if (initialized) return;
-	const OC = await opencascade({ locateFile: () => opencascadeWasm });
-	setOC(OC as Parameters<typeof setOC>[0]);
+	const m = await manifoldModule({ locateFile: () => manifoldWasm });
+	m.setup();
+	setBinManifold(m);
 	initialized = true;
 }
 
@@ -34,30 +39,30 @@ export type WorkerResponse =
 	| { type: 'error'; code: WorkerErrorCode; message: string; requestType: WorkerRequest['type'] }
 	| { type: 'ready' };
 
+function postMesh(vertices: Float32Array, triangles: Uint32Array, normals: Float32Array, edges: Float32Array) {
+	self.postMessage(
+		{ type: 'mesh', vertices, triangles, normals, edges } satisfies WorkerResponse,
+		{ transfer: [vertices.buffer, triangles.buffer, normals.buffer, edges.buffer] }
+	);
+}
+
 self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 	const msg = e.data;
 	try {
 		await ready;
 		validateParams(msg.params);
-		const shape = buildBin(msg.params);
 
 		if (msg.type === 'build') {
-			const mesh = shape.mesh({ tolerance: 0.1, angularTolerance: 0.3 });
-			const edgeData = shape.meshEdges({ tolerance: 0.1, angularTolerance: 0.3 });
-			const vertices = new Float32Array(mesh.vertices);
-			const triangles = new Uint32Array(mesh.triangles);
-			const normals = new Float32Array(mesh.normals);
-			const edges = new Float32Array(edgeData.lines);
-			self.postMessage(
-				{ type: 'mesh', vertices, triangles, normals, edges } satisfies WorkerResponse,
-				{ transfer: [vertices.buffer, triangles.buffer, normals.buffer, edges.buffer] }
-			);
+			const solid = buildBinManifold(msg.params);
+			const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
+			postMesh(vertices, triangles, normals, edges);
 		} else if (msg.type === 'exportSTEP') {
-			const blob = shape.blobSTEP();
-			self.postMessage({ type: 'exportSTEP', blob } satisfies WorkerResponse);
+			const { buildOcctBin } = await import('./occt');
+			const shape = await buildOcctBin(msg.params);
+			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP() } satisfies WorkerResponse);
 		} else if (msg.type === 'exportSTL') {
-			const blob = shape.blobSTL({ binary: true });
-			self.postMessage({ type: 'exportSTL', blob } satisfies WorkerResponse);
+			const solid = buildBinManifold(msg.params, { segments: STL_SEGMENTS });
+			self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid) } satisfies WorkerResponse);
 		}
 	} catch (err) {
 		const { code, message } = classifyError(err);
@@ -65,5 +70,5 @@ self.onmessage = async (e: MessageEvent<WorkerRequest>) => {
 	}
 };
 
-// signal ready after WASM loads
+// signal ready after the manifold engine loads (small WASM; OCCT stays lazy)
 ready.then(() => self.postMessage({ type: 'ready' } satisfies WorkerResponse));

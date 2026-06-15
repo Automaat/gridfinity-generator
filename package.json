@@ -14,7 +14,8 @@
 		"test": "vitest run",
 		"test:watch": "vitest",
 		"test:coverage": "vitest run --coverage",
-		"test:e2e": "playwright test"
+		"test:e2e": "playwright test",
+		"gen:default-mesh": "node --experimental-strip-types scripts/gen-default-mesh.mjs"
 	},
 	"devDependencies": {
 		"@playwright/test": "^1.59.0",
@@ -22,6 +23,7 @@
 		"@sveltejs/kit": "^2.50.2",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/vite": "^4.2.2",
+		"@types/node": "^24.13.2",
 		"@vitest/coverage-v8": "^4.1.2",
 		"oxlint": "^1.58.0",
 		"svelte": "^5.54.0",
@@ -35,6 +37,7 @@
 		"@threlte/core": "^8.5.5",
 		"@threlte/extras": "^9.14.1",
 		"@types/three": "^0.184.0",
+		"manifold-3d": "^3.5.1",
 		"replicad": "^0.23.0",
 		"replicad-opencascadejs": "^0.23.0",
 		"three": "^0.184.0"
