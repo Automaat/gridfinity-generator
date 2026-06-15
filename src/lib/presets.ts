@@ -157,7 +157,7 @@ export const baseplatePresets: BaseplatePreset[] = [
 		params: {
 			drawerWidth: 552, drawerDepth: 360, alignX: 'center', alignY: 'center',
 			style: 'magnet', screwHoles: false, bedWidth: 220, bedDepth: 220,
-			splitAlgorithm: 'ideal', dovetails: true, exportLayout: 'zip'
+			splitAlgorithm: 'ideal', connector: 'dovetail', exportLayout: 'zip'
 		}
 	},
 	{
@@ -166,7 +166,7 @@ export const baseplatePresets: BaseplatePreset[] = [
 		params: {
 			drawerWidth: 252, drawerDepth: 210, alignX: 'center', alignY: 'center',
 			style: 'simple', screwHoles: false, bedWidth: 256, bedDepth: 256,
-			splitAlgorithm: 'ideal', dovetails: true, exportLayout: 'zip'
+			splitAlgorithm: 'ideal', connector: 'dovetail', exportLayout: 'zip'
 		}
 	}
 ];

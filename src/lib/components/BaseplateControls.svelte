@@ -192,14 +192,21 @@
 				<option value="incremental">Packed (max per tile)</option>
 			</select>
 		</label>
-		<label class="relative flex cursor-pointer items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/40 px-3 py-2.5 transition hover:border-zinc-700 has-[:checked]:border-blue-500/40 has-[:checked]:bg-blue-500/10 {layout.multiTile ? '' : 'opacity-50'}">
-			<input type="checkbox" bind:checked={$baseplateParams.dovetails} disabled={!layout.multiTile} class="peer absolute inset-0 cursor-pointer opacity-0 disabled:cursor-not-allowed" aria-label="Dovetail connectors" />
-			<span class="text-sm text-zinc-200">Dovetail connectors</span>
-			<span class="relative h-5 w-9 shrink-0 rounded-full bg-zinc-600 transition-colors peer-checked:bg-blue-500">
-				<span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all peer-checked:left-4"></span>
-			</span>
-		</label>
-		{#if !layout.multiTile}
+		{#if layout.multiTile}
+			<label class="block">
+				<span class={lbl}>Connector</span>
+				<select bind:value={$baseplateParams.connector} class={selectInput} style:background-image={chevron}>
+					<option value="dovetail">Dovetail (snap-fit)</option>
+					<option value="screw">Screw-together (M3)</option>
+					<option value="none">None (flush)</option>
+				</select>
+			</label>
+			{#if $baseplateParams.connector === 'screw'}
+				<p class="text-xs text-zinc-500">Bolt tiles edge-to-edge with M3 screws through the seam walls.</p>
+			{:else if $baseplateParams.connector === 'none'}
+				<p class="text-xs text-zinc-500">Tiles butt together — held by the drawer (or glue).</p>
+			{/if}
+		{:else}
 			<p class="text-xs text-zinc-500">Fits the bed in one piece — no connectors needed.</p>
 		{/if}
 	</section>

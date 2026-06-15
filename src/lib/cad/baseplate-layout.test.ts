@@ -6,11 +6,12 @@ function makeBp(overrides: Partial<BaseplateParams> = {}): BaseplateParams {
 	return {
 		drawerWidth: 252, drawerDepth: 210, alignX: 'center', alignY: 'center',
 		style: 'simple', screwHoles: false, bedWidth: 256, bedDepth: 256,
-		splitAlgorithm: 'ideal', dovetails: true, exportLayout: 'zip', ...overrides
+		splitAlgorithm: 'ideal', connector: 'dovetail', exportLayout: 'zip', ...overrides
 	};
 }
 
-const dtKey = (d: { x: number; y: number; axis: string }) => `${d.axis}:${d.x.toFixed(3)}:${d.y.toFixed(3)}`;
+const seamKey = (s: { axis: string; pos: number; min: number; max: number }) =>
+	`${s.axis}:${s.pos.toFixed(3)}:${s.min.toFixed(3)}:${s.max.toFixed(3)}`;
 const firstCellX = (l: ReturnType<typeof planBaseplate>) => Math.min(...l.tiles.flatMap((t) => t.cells.map((c) => c.x)));
 
 describe('tileSpans', () => {
@@ -56,14 +57,19 @@ describe('planBaseplate', () => {
 		expect(l.skirt).toEqual({ x: 0, y: 0 });
 	});
 
-	it('fits in one bed -> single tile, no dovetails', () => {
+	it('fits in one bed -> single tile, no seams', () => {
 		const l = planBaseplate(makeBp({ drawerWidth: 252, drawerDepth: 210, bedWidth: 256, bedDepth: 256 }));
 		expect(l.tilesX).toBe(1);
 		expect(l.tilesY).toBe(1);
 		expect(l.multiTile).toBe(false);
 		expect(l.tiles).toHaveLength(1);
-		expect(l.tiles[0]!.males).toHaveLength(0);
-		expect(l.tiles[0]!.females).toHaveLength(0);
+		expect(l.tiles[0]!.seams).toHaveLength(0);
+	});
+
+	it('omits seams when the connector is none', () => {
+		const l = planBaseplate(makeBp({ drawerWidth: 8 * PITCH, drawerDepth: 6 * PITCH, bedWidth: 180, bedDepth: 180, connector: 'none' }));
+		expect(l.tilesX * l.tilesY).toBeGreaterThan(1);
+		expect(l.tiles.flatMap((t) => t.seams)).toHaveLength(0);
 	});
 
 	it('splits a large drawer into a tile grid', () => {
@@ -93,13 +99,21 @@ describe('planBaseplate', () => {
 		expect(total).toBe(l.cols * l.rows);
 	});
 
-	it('pairs every male tab with a matching female on the neighbor', () => {
+	it('shares every seam between exactly two tiles, one male one female', () => {
 		const l = planBaseplate(makeBp({ drawerWidth: 8 * PITCH, drawerDepth: 6 * PITCH, bedWidth: 180, bedDepth: 180 }));
-		const males = l.tiles.flatMap((t) => t.males);
-		const females = l.tiles.flatMap((t) => t.females);
-		expect(males.length).toBeGreaterThan(0);
-		expect(males.length).toBe(females.length);
-		expect(new Set(males.map(dtKey))).toEqual(new Set(females.map(dtKey)));
+		const seams = l.tiles.flatMap((t) => t.seams);
+		expect(seams.length).toBeGreaterThan(0);
+		const groups = new Map<string, typeof seams>();
+		for (const s of seams) {
+			const g = groups.get(seamKey(s)) ?? [];
+			g.push(s);
+			groups.set(seamKey(s), g);
+		}
+		for (const g of groups.values()) {
+			expect(g).toHaveLength(2);
+			expect(g.filter((s) => s.male)).toHaveLength(1);
+			expect(g.map((s) => s.bodyDir).toSorted()).toEqual([-1, 1]);
+		}
 	});
 
 	it('distributes skirt by alignment', () => {

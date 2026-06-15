@@ -8,14 +8,11 @@
 import type { Manifold } from 'manifold-3d';
 import type { BaseplateParams } from '$lib/stores/params';
 import {
-	oc, roundedPrism, unitBase, setSegments,
+	oc, roundedPrism, box, unitBase, setSegments,
 	BASE_PROFILE_HEIGHT, MAGNET_HOLE_DIAMETER, MAGNET_HOLE_DEPTH,
 	SCREW_HOLE_DIAMETER, HOLE_DISTANCE_FROM_EDGE
 } from './manifold-bin';
-import {
-	planBaseplate, PITCH, DT_DEPTH, DT_NECK, DT_TIP, DT_ANCHOR, DT_CLEARANCE,
-	type BaseplateTile, type Dovetail
-} from './baseplate-layout';
+import { planBaseplate, PITCH, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
 
 const PREVIEW_SEGMENTS = 32;
 const EXPORT_SEGMENTS = 64;
@@ -29,9 +26,24 @@ const MAGNET_SKIN = 0.8;
 const THICKNESS_SIMPLE = SOCKET_DEPTH + SIMPLE_FLOOR; // 6.0
 const THICKNESS_MAGNET = SOCKET_DEPTH + MAGNET_HOLE_DEPTH + MAGNET_SKIN; // 7.95
 
+// In-plane dovetail snap-tab (jigsaw style): a trapezoid through the full plate
+// thickness, narrow at the seam mouth and wider at the tip so a pressed joint
+// locks. Kept small/subtle. One tab per shared cell.
+const DT_DEPTH = 4; // mm the tail reaches past the seam
+const DT_NECK = 5; // mm tab width at the seam mouth
+const DT_TIP = 8; // mm tab width at the tip (must exceed neck to lock)
+const DT_ANCHOR = 1.5; // mm the tab roots back into its own tile body
+const DT_CLEARANCE = 0.15; // mm added to the female pocket per side
+
+// Screw-together (gridfinity-rebuilt style): a solid wall along each seam edge
+// with a horizontal M3 clearance hole per shared cell; bolt adjacent tiles.
+const SCREW_WALL = 6; // mm the solid rail reaches into the tile body
+const SCREW_CLEAR_R = 1.7; // M3 clearance hole radius
+const SCREW_BOLT_LEN = SCREW_WALL + 0.4; // hole length (overshoots the seam face)
+
 // Gap between spread-out tiles in the single combined STL — must clear the male
-// tabs, which protrude DT_DEPTH past the footprint.
-const COMBINED_GAP = DT_DEPTH + 6;
+// tabs / rails, which protrude past the footprint.
+const COMBINED_GAP = SCREW_WALL + 8;
 
 // Skeletonized cell: each cell floor is opened through the plate (the canonical
 // gridfinity-rebuilt baseplate look — an airy frame, far less filament than a
@@ -64,36 +76,50 @@ function ensureCCW(pts: [number, number][]): [number, number][] {
 	return area < 0 ? pts.toReversed() : pts;
 }
 
-// One dovetail tab through the full plate thickness. Male = a protruding tail
-// rooted in this tile; female = the matching socket (clearance-enlarged) cut
-// into the receiving tile. The tab narrows at the seam mouth and widens at the
-// tip, so a pressed joint locks.
-function dovetailPrism(d: Dovetail, tile: BaseplateTile, thickness: number, female: boolean): Manifold {
+// One dovetail tab at `along` on a seam, through the full plate thickness. Male =
+// a protruding tail rooted in this tile; female = the matching pocket (clearance-
+// enlarged) cut into the abutting tile. Narrow at the mouth, wider at the tip.
+function dovetailTab(seam: Seam, along: number, thickness: number, female: boolean): Manifold {
 	const { Manifold, CrossSection } = oc();
 	const c = female ? DT_CLEARANCE : 0;
 	const neck = DT_NECK / 2 + c;
 	const tip = DT_TIP / 2 + c;
 	const depth = DT_DEPTH + c;
-	const seam = d.axis === 'x' ? d.x : d.y;
-	const along = d.axis === 'x' ? d.y : d.x;
-	const tilePerp = d.axis === 'x' ? tile.cx : tile.cy;
-	// Global direction from the seam toward the female tile (where the tail goes).
-	const dir = female ? Math.sign(tilePerp - seam) : Math.sign(seam - tilePerp);
+	// Male tail extends away from the body (-bodyDir); female pocket into it (+bodyDir).
+	const dir = female ? seam.bodyDir : -seam.bodyDir;
 	const anchor = female ? 0 : DT_ANCHOR; // female mouth sits flush on the seam
-	const pNeck = seam - dir * anchor;
-	const pTip = seam + dir * depth;
-	// Polygon in (perp, along) space, then mapped to (x, y) per seam axis.
+	const pNeck = seam.pos - dir * anchor;
+	const pTip = seam.pos + dir * depth;
 	const poly: [number, number][] = [
 		[pNeck, along - neck],
 		[pNeck, along + neck],
 		[pTip, along + tip],
 		[pTip, along - tip]
 	];
-	const ptsXY: [number, number][] = d.axis === 'x' ? poly : poly.map(([p, q]) => [q, p]);
+	const ptsXY: [number, number][] = seam.axis === 'x' ? poly : poly.map(([p, q]) => [q, p]);
 	const cs = new CrossSection(ensureCCW(ptsXY));
-	// Female cuts slightly past both faces to avoid coplanar artifacts.
 	const h = female ? thickness + 0.2 : thickness;
 	return Manifold.extrude(cs, h).translate([0, 0, female ? -0.1 : 0]);
+}
+
+// Solid wall along a seam edge — material to bolt through (screw-together style).
+function screwRail(seam: Seam, thickness: number): Manifold {
+	const len = seam.max - seam.min;
+	const mid = (seam.min + seam.max) / 2;
+	const into = seam.pos + (seam.bodyDir * SCREW_WALL) / 2; // rail center, inside the body
+	return seam.axis === 'x'
+		? box(SCREW_WALL, len, thickness, into, mid, 0)
+		: box(len, SCREW_WALL, thickness, mid, into, 0);
+}
+
+// Horizontal M3 clearance hole through a seam rail, at mid-height.
+function screwHole(seam: Seam, along: number, thickness: number, segments: number): Manifold {
+	const { Manifold } = oc();
+	const cyl = Manifold.cylinder(SCREW_BOLT_LEN, SCREW_CLEAR_R, SCREW_CLEAR_R, segments);
+	const aligned = seam.axis === 'x' ? cyl.rotate([0, 90, 0]) : cyl.rotate([-90, 0, 0]); // spans +x / +y over [0, len]
+	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - SCREW_BOLT_LEN + 0.2;
+	const z = thickness / 2;
+	return seam.axis === 'x' ? aligned.translate([start, along, z]) : aligned.translate([along, start, z]);
 }
 
 // Unique corner positions (magnet/screw sites) across the tile's cells — corners
@@ -160,14 +186,25 @@ function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, 
 		if (cutters.length > 0) solid = solid.subtract(Manifold.union(cutters));
 	}
 
-	// Dovetails last so the male tabs stay solid through the full thickness.
-	if (tile.males.length > 0) {
-		const tabs = tile.males.map((d) => dovetailPrism(d, tile, thickness, false));
-		solid = solid.add(tabs.length === 1 ? tabs[0]! : Manifold.union(tabs));
-	}
-	if (tile.females.length > 0) {
-		const pockets = tile.females.map((d) => dovetailPrism(d, tile, thickness, true));
-		solid = solid.subtract(pockets.length === 1 ? pockets[0]! : Manifold.union(pockets));
+	// Tile connectors, last, so they stay solid through the full thickness.
+	if (bp.connector === 'dovetail') {
+		const adds: Manifold[] = [];
+		const cuts: Manifold[] = [];
+		for (const seam of tile.seams) {
+			for (const along of seamCellCenters(seam)) {
+				if (seam.male) adds.push(dovetailTab(seam, along, thickness, false));
+				else cuts.push(dovetailTab(seam, along, thickness, true));
+			}
+		}
+		if (adds.length > 0) solid = solid.add(Manifold.union(adds));
+		if (cuts.length > 0) solid = solid.subtract(Manifold.union(cuts));
+	} else if (bp.connector === 'screw') {
+		if (tile.seams.length > 0) solid = solid.add(Manifold.union(tile.seams.map((s) => screwRail(s, thickness))));
+		const holes: Manifold[] = [];
+		for (const seam of tile.seams) {
+			for (const along of seamCellCenters(seam)) holes.push(screwHole(seam, along, thickness, segments));
+		}
+		if (holes.length > 0) solid = solid.subtract(Manifold.union(holes));
 	}
 	return solid;
 }

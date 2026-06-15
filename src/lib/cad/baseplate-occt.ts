@@ -6,10 +6,7 @@ import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import { buildUnitBase } from './gridfinity';
 import type { BaseplateParams } from '$lib/stores/params';
-import {
-	planBaseplate, PITCH, DT_DEPTH, DT_NECK, DT_TIP, DT_ANCHOR, DT_CLEARANCE,
-	type BaseplateTile, type Dovetail
-} from './baseplate-layout';
+import { planBaseplate, PITCH, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
 
 // Mirror baseplate-manifold.ts constants.
 const SOCKET_DEPTH = 4.75;
@@ -30,6 +27,15 @@ const CORNER_OFFSETS: [number, number][] = [
 	[HOLE_INSET, -HOLE_INSET],
 	[-HOLE_INSET, -HOLE_INSET]
 ];
+// Connectors (mirror baseplate-manifold.ts).
+const DT_DEPTH = 4;
+const DT_NECK = 5;
+const DT_TIP = 8;
+const DT_ANCHOR = 1.5;
+const DT_CLEARANCE = 0.15;
+const SCREW_WALL = 6;
+const SCREW_CLEAR_R = 1.7;
+const SCREW_BOLT_LEN = SCREW_WALL + 0.4;
 
 function cellCorners(tile: BaseplateTile): [number, number][] {
 	const seen = new Set<string>();
@@ -64,30 +70,47 @@ function tileThickness(bp: BaseplateParams): number {
 	return bp.style === 'magnet' ? THICKNESS_MAGNET : THICKNESS_SIMPLE;
 }
 
-function dovetailSolid(d: Dovetail, tile: BaseplateTile, thickness: number, female: boolean): Solid {
+function dovetailTabSolid(seam: Seam, along: number, thickness: number, female: boolean): Solid {
 	const c = female ? DT_CLEARANCE : 0;
 	const neck = DT_NECK / 2 + c;
 	const tip = DT_TIP / 2 + c;
 	const depth = DT_DEPTH + c;
-	const seam = d.axis === 'x' ? d.x : d.y;
-	const along = d.axis === 'x' ? d.y : d.x;
-	const tilePerp = d.axis === 'x' ? tile.cx : tile.cy;
-	const dir = female ? Math.sign(tilePerp - seam) : Math.sign(seam - tilePerp);
+	const dir = female ? seam.bodyDir : -seam.bodyDir;
 	const anchor = female ? 0 : DT_ANCHOR;
-	const pNeck = seam - dir * anchor;
-	const pTip = seam + dir * depth;
+	const pNeck = seam.pos - dir * anchor;
+	const pTip = seam.pos + dir * depth;
 	const poly: [number, number][] = [
 		[pNeck, along - neck],
 		[pNeck, along + neck],
 		[pTip, along + tip],
 		[pTip, along - tip]
 	];
-	const ptsXY: [number, number][] = d.axis === 'x' ? poly : poly.map(([p, q]) => [q, p]);
+	const ptsXY: [number, number][] = seam.axis === 'x' ? poly : poly.map(([p, q]) => [q, p]);
 	let dw = draw(ptsXY[0]);
 	for (let i = 1; i < ptsXY.length; i++) dw = dw.lineTo(ptsXY[i]!);
 	const z0 = female ? -0.1 : 0;
 	const h = female ? thickness + 0.2 : thickness;
 	return (dw.close().sketchOnPlane('XY', z0) as Sketch).extrude(h) as Solid;
+}
+
+function screwRailSolid(seam: Seam, thickness: number): Solid {
+	const len = seam.max - seam.min;
+	const mid = (seam.min + seam.max) / 2;
+	const into = seam.pos + (seam.bodyDir * SCREW_WALL) / 2;
+	const w = seam.axis === 'x' ? SCREW_WALL : len;
+	const l = seam.axis === 'x' ? len : SCREW_WALL;
+	const cx = seam.axis === 'x' ? into : mid;
+	const cy = seam.axis === 'x' ? mid : into;
+	return (drawRoundedRectangle(w, l, 0).sketchOnPlane('XY') as Sketch).extrude(thickness).translate(cx, cy, 0) as Solid;
+}
+
+function screwHoleSolid(seam: Seam, along: number, thickness: number): Solid {
+	const z = thickness / 2;
+	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - SCREW_BOLT_LEN + 0.2;
+	// Horizontal M3 clearance hole: sketch on the plane normal to the seam, extrude through the rail.
+	return seam.axis === 'x'
+		? ((drawCircle(SCREW_CLEAR_R).sketchOnPlane('YZ', start) as Sketch).extrude(SCREW_BOLT_LEN).translate(0, along, z) as Solid)
+		: ((drawCircle(SCREW_CLEAR_R).sketchOnPlane('XZ', start) as Sketch).extrude(SCREW_BOLT_LEN).translate(along, 0, z) as Solid);
 }
 
 function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: number, foot: Solid): Solid {
@@ -133,13 +156,26 @@ function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: num
 		if (cutters.length > 0) solid = solid.cut(makeCompound(cutters) as Solid) as Solid;
 	}
 
-	if (tile.males.length > 0) {
-		const tabs = tile.males.map((d) => dovetailSolid(d, tile, thickness, false));
-		solid = solid.fuse(makeCompound(tabs) as Solid) as Solid;
-	}
-	if (tile.females.length > 0) {
-		const pockets = tile.females.map((d) => dovetailSolid(d, tile, thickness, true));
-		solid = solid.cut(makeCompound(pockets) as Solid) as Solid;
+	if (bp.connector === 'dovetail') {
+		const adds: Solid[] = [];
+		const cuts: Solid[] = [];
+		for (const seam of tile.seams) {
+			for (const along of seamCellCenters(seam)) {
+				if (seam.male) adds.push(dovetailTabSolid(seam, along, thickness, false));
+				else cuts.push(dovetailTabSolid(seam, along, thickness, true));
+			}
+		}
+		if (adds.length > 0) solid = solid.fuse(makeCompound(adds) as Solid) as Solid;
+		if (cuts.length > 0) solid = solid.cut(makeCompound(cuts) as Solid) as Solid;
+	} else if (bp.connector === 'screw') {
+		if (tile.seams.length > 0) {
+			solid = solid.fuse(makeCompound(tile.seams.map((s) => screwRailSolid(s, thickness))) as Solid) as Solid;
+		}
+		const holes: Solid[] = [];
+		for (const seam of tile.seams) {
+			for (const along of seamCellCenters(seam)) holes.push(screwHoleSolid(seam, along, thickness));
+		}
+		if (holes.length > 0) solid = solid.cut(makeCompound(holes) as Solid) as Solid;
 	}
 	return solid;
 }

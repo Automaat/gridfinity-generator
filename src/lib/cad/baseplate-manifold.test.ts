@@ -16,7 +16,7 @@ function makeBp(overrides: Partial<BaseplateParams> = {}): BaseplateParams {
 	return {
 		drawerWidth: 252, drawerDepth: 210, alignX: 'center', alignY: 'center',
 		style: 'simple', screwHoles: false, bedWidth: 256, bedDepth: 256,
-		splitAlgorithm: 'ideal', dovetails: true, exportLayout: 'zip', ...overrides
+		splitAlgorithm: 'ideal', connector: 'dovetail', exportLayout: 'zip', ...overrides
 	};
 }
 

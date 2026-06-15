@@ -10,26 +10,23 @@ import type { Align, BaseplateParams } from '$lib/stores/params';
 
 export const PITCH = 42;
 
-// In-plane dovetail snap-tab (jigsaw style): a trapezoid through the full plate
-// thickness, narrow at the seam mouth and wider at the tip so a pressed-together
-// joint resists pulling apart (PLA flexes on assembly). One tab per cell of seam.
-export const DT_DEPTH = 8; // mm the tail reaches past the seam
-export const DT_NECK = 8; // mm tab width at the seam mouth
-export const DT_TIP = 12; // mm tab width at the tip (must exceed neck to lock)
-export const DT_ANCHOR = 2; // mm the tab roots back into its own tile body
-export const DT_CLEARANCE = 0.15; // mm added to the female socket per side
-
 export interface Span {
 	start: number; // first cell index (inclusive)
 	count: number; // number of cells
 }
 
-// A dovetail tab shared by two tiles: male on one, female on the other. `axis`
-// is the seam normal — 'x' = vertical seam (tab reaches along ±x), 'y' = horizontal.
-export interface Dovetail {
-	x: number;
-	y: number;
+// A seam shared by two adjacent tiles. The geometry builder turns each seam into
+// the chosen connector (dovetail snap-tabs or screw-together bolt holes). `axis`
+// is the seam normal — 'x' = vertical seam, 'y' = horizontal. `bodyDir` points
+// from the seam into THIS tile's body; `male` marks the lead tile (dovetail tail
+// / bolt-head side), so the abutting tile is its complement.
+export interface Seam {
 	axis: 'x' | 'y';
+	pos: number; // seam coordinate (assembled mm)
+	min: number; // span start along the seam
+	max: number; // span end along the seam
+	bodyDir: number; // +1 / -1
+	male: boolean;
 }
 
 export interface BaseplateTile {
@@ -42,8 +39,14 @@ export interface BaseplateTile {
 	cx: number; // center (assembled mm)
 	cy: number;
 	cells: { x: number; y: number }[]; // socket centers this tile owns
-	males: Dovetail[]; // tabs that protrude from this tile
-	females: Dovetail[]; // sockets cut into this tile
+	seams: Seam[]; // shared edges that carry a connector
+}
+
+// Connector positions along a seam: one per shared cell, at the cell centers.
+export function seamCellCenters(seam: Seam): number[] {
+	const out: number[] = [];
+	for (let c = seam.min + PITCH / 2; c < seam.max; c += PITCH) out.push(c);
+	return out;
 }
 
 export interface BaseplateLayout {
@@ -138,25 +141,22 @@ export function planBaseplate(bp: BaseplateParams): BaseplateLayout {
 				col: tc, row: tr,
 				x0: xLow, y0: yLow, w: xHigh - xLow, l: yHigh - yLow,
 				cx: (xLow + xHigh) / 2, cy: (yLow + yHigh) / 2,
-				cells, males: [], females: []
+				cells, seams: []
 			};
 		}
 	}
 
-	if (bp.dovetails) {
-		// Vertical seams: male on the left (lower-index) tile, one tab per shared cell row.
+	if (bp.connector !== 'none') {
+		// Vertical seams: male on the left (lower-index) tile.
 		for (let tc = 0; tc < tilesX - 1; tc++) {
 			const cs = colSpans[tc]!;
 			const seamX = edgeX(cs.start + cs.count);
 			for (let tr = 0; tr < tilesY; tr++) {
 				const rs = rowSpans[tr]!;
-				const a = grid[tc]![tr]!;
-				const b = grid[tc + 1]![tr]!;
-				for (let j = rs.start; j < rs.start + rs.count; j++) {
-					const dt: Dovetail = { x: seamX, y: edgeY(j) + PITCH / 2, axis: 'x' };
-					a.males.push(dt);
-					b.females.push(dt);
-				}
+				const min = edgeY(rs.start);
+				const max = edgeY(rs.start + rs.count);
+				grid[tc]![tr]!.seams.push({ axis: 'x', pos: seamX, min, max, bodyDir: -1, male: true });
+				grid[tc + 1]![tr]!.seams.push({ axis: 'x', pos: seamX, min, max, bodyDir: 1, male: false });
 			}
 		}
 		// Horizontal seams: male on the bottom (lower-index) tile.
@@ -165,13 +165,10 @@ export function planBaseplate(bp: BaseplateParams): BaseplateLayout {
 			const seamY = edgeY(rs.start + rs.count);
 			for (let tc = 0; tc < tilesX; tc++) {
 				const cs = colSpans[tc]!;
-				const a = grid[tc]![tr]!;
-				const b = grid[tc]![tr + 1]!;
-				for (let i = cs.start; i < cs.start + cs.count; i++) {
-					const dt: Dovetail = { x: edgeX(i) + PITCH / 2, y: seamY, axis: 'y' };
-					a.males.push(dt);
-					b.females.push(dt);
-				}
+				const min = edgeX(cs.start);
+				const max = edgeX(cs.start + cs.count);
+				grid[tc]![tr]!.seams.push({ axis: 'y', pos: seamY, min, max, bodyDir: -1, male: true });
+				grid[tc]![tr + 1]!.seams.push({ axis: 'y', pos: seamY, min, max, bodyDir: 1, male: false });
 			}
 		}
 	}

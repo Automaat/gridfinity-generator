@@ -201,7 +201,7 @@ export interface BaseplateParams {
 	bedWidth: number; // mm — printer bed size, the split target
 	bedDepth: number;
 	splitAlgorithm: 'ideal' | 'incremental';
-	dovetails: boolean; // seam connectors (no-op when a single tile)
+	connector: 'none' | 'dovetail' | 'screw'; // how split tiles join (no-op when a single tile)
 	exportLayout: 'zip' | 'combined'; // multi-tile STL delivery
 }
 
@@ -215,7 +215,7 @@ export const defaultBaseplate: BaseplateParams = {
 	bedWidth: 220,
 	bedDepth: 220,
 	splitAlgorithm: 'ideal',
-	dovetails: true,
+	connector: 'dovetail',
 	exportLayout: 'zip'
 };
 
@@ -231,10 +231,12 @@ const ALIGN_TO_CHAR = { low: 'l', center: 'c', high: 'h' } as const;
 const STYLE_TO_CHAR = { simple: 's', magnet: 'm' } as const;
 const ALGO_TO_CHAR = { ideal: 'i', incremental: 'n' } as const;
 const LAYOUT_TO_CHAR = { zip: 'z', combined: 'c' } as const;
+const CONNECTOR_TO_CHAR = { none: 'n', dovetail: 'd', screw: 's' } as const;
 const CHAR_TO_ALIGN = invert(ALIGN_TO_CHAR);
 const CHAR_TO_STYLE = invert(STYLE_TO_CHAR);
 const CHAR_TO_ALGO = invert(ALGO_TO_CHAR);
 const CHAR_TO_LAYOUT = invert(LAYOUT_TO_CHAR);
+const CHAR_TO_CONNECTOR = invert(CONNECTOR_TO_CHAR);
 
 type BpCodec<K extends keyof BaseplateParams> = {
 	key: string;
@@ -255,7 +257,7 @@ const BP_CODECS: BpCodecs = {
 	bedWidth: { ...num(42, 1000, true), key: 'bw' },
 	bedDepth: { ...num(42, 1000, true), key: 'bd' },
 	splitAlgorithm: { key: 'sa', encode: (v) => ALGO_TO_CHAR[v], decode: (raw, def) => CHAR_TO_ALGO[raw] ?? def },
-	dovetails: { ...bool, key: 'dt' },
+	connector: { key: 'cn', encode: (v) => CONNECTOR_TO_CHAR[v], decode: (raw, def) => CHAR_TO_CONNECTOR[raw] ?? def },
 	exportLayout: { key: 'el', encode: (v) => LAYOUT_TO_CHAR[v], decode: (raw, def) => CHAR_TO_LAYOUT[raw] ?? def }
 };
 
