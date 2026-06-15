@@ -5,6 +5,9 @@ const HEIGHT_UNIT = 7;
 const TOLERANCE = 0.5;
 const BASE_PROFILE_HEIGHT = 4.75;
 const FLOOR_THICKNESS = 2.25;
+// Standard lip protrudes above units×7 (gridfinity-rebuilt); reduced is our variant.
+const STACKING_LIP_PROTRUSION = 3.551;
+const REDUCED_LIP_PROTRUSION = 2.15;
 const PLA_DENSITY = 1.24; // g/cm³
 const FILAMENT_DIAMETER = 1.75; // mm
 const FILAMENT_CROSS_SECTION = Math.PI * (FILAMENT_DIAMETER / 2) ** 2; // mm²
@@ -23,11 +26,14 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	const innerW = bodyW - 2 * p.wallThickness;
 	const innerL = bodyL - 2 * p.wallThickness;
 
-	const lipHeight =
+	const lipProfileHeight =
 		p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? 2.15 : 0;
+	const lipProtrusion =
+		p.stackingLip === 'standard' ? STACKING_LIP_PROTRUSION : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
 
 	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
-	const wallHeight = Math.max(0, heightMm - wallBottom - lipHeight);
+	// Walls fill the nominal height; the lip protrudes above it.
+	const wallHeight = Math.max(0, heightMm - wallBottom);
 
 	// Base profile (approximate as 60% fill of bounding box)
 	let volumeMm3 = bodyW * bodyL * BASE_PROFILE_HEIGHT * 0.6;
@@ -38,11 +44,11 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	// Walls (hollow shell)
 	volumeMm3 += (bodyW * bodyL - innerW * innerL) * wallHeight;
 
-	// Stacking lip (approximate as shell)
-	if (lipHeight > 0) {
+	// Stacking lip (approximate as a shell over its protrusion above the walls)
+	if (lipProfileHeight > 0) {
 		const lipInnerW = bodyW - 2 * 2.95;
 		const lipInnerL = bodyL - 2 * 2.95;
-		volumeMm3 += (bodyW * bodyL - lipInnerW * lipInnerL) * lipHeight;
+		volumeMm3 += (bodyW * bodyL - lipInnerW * lipInnerL) * lipProtrusion;
 	}
 
 	// Dividers
@@ -57,7 +63,7 @@ export function estimatePrint(p: BinParams): PrintEstimate {
 	const volumeCm3 = volumeMm3 / 1000;
 	const filamentGrams = volumeCm3 * PLA_DENSITY;
 	const filamentMeters = volumeMm3 / FILAMENT_CROSS_SECTION / 1000;
-	const layers = heightMm / 0.2;
+	const layers = (heightMm + lipProtrusion) / 0.2;
 	const printTimeMinutes = Math.round(volumeCm3 * 8 + layers * 0.5);
 
 	return {

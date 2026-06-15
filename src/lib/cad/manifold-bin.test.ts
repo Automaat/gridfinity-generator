@@ -32,7 +32,7 @@ describe('buildBinManifold', () => {
 		const s = buildBinManifold(makeParams({ width: 2, length: 1, height: 3, stackingLip: 'standard' }));
 		expect(span(s, 0)).toBeCloseTo(2 * 42 - 0.5, 1); // width 83.5mm
 		expect(span(s, 1)).toBeCloseTo(42 - 0.5, 1); // length 41.5mm
-		expect(span(s, 2)).toBeCloseTo(3 * 7, 1); // height 21mm
+		expect(span(s, 2)).toBeCloseTo(3 * 7 + 3.551, 1); // 24.55mm — lip protrudes above units×7
 		expect(s.volume()).toBeGreaterThan(0);
 	});
 
@@ -48,14 +48,14 @@ describe('buildBinManifold', () => {
 		expect(holes).toBeLessThan(solid);
 	});
 
-	it('lip style changes geometry but not the fixed overall height', () => {
+	it('stacking lip protrudes above the nominal height (reduced is shorter)', () => {
 		const none = buildBinManifold(makeParams({ height: 4, stackingLip: 'none' }));
 		const std = buildBinManifold(makeParams({ height: 4, stackingLip: 'standard' }));
 		const reduced = buildBinManifold(makeParams({ height: 4, stackingLip: 'reduced' }));
-		// p.height fixes the overall height regardless of lip style
+		// no lip ends at the nominal units×7; the lip adds protrusion on top
 		expect(span(none, 2)).toBeCloseTo(28, 1);
-		expect(span(std, 2)).toBeCloseTo(28, 1);
-		expect(span(reduced, 2)).toBeCloseTo(28, 1);
+		expect(span(std, 2)).toBeCloseTo(28 + 3.551, 1); // 31.55mm — matches gridfinity-rebuilt
+		expect(span(reduced, 2)).toBeCloseTo(28 + 2.15, 1); // 30.15mm — our reduced variant
 		// each lip profile is distinct geometry
 		expect(Math.abs(std.volume() - none.volume())).toBeGreaterThan(1);
 		expect(Math.abs(std.volume() - reduced.volume())).toBeGreaterThan(1);
@@ -68,7 +68,7 @@ describe('buildBinManifold', () => {
 	});
 
 	it('returns base-only solid when wall height collapses', () => {
-		// height=1 (7mm) with standard lip ⇒ wallHeight negative ⇒ base + floor only
+		// height=1 (7mm): walls fill 7-7=0 ⇒ wallHeight collapses ⇒ base + floor only (no lip)
 		const s = buildBinManifold(makeParams({ height: 1, stackingLip: 'standard' }));
 		expect(s.volume()).toBeGreaterThan(0);
 		expect(span(s, 2)).toBeLessThanOrEqual(7 + 0.01);

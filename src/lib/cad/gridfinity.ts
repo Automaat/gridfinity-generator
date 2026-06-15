@@ -36,6 +36,13 @@ const LIP_OFFSET_BOTTOM = 2.95; // at lip bottom: body shrinks by 2.95 per side
 const LIP_OFFSET_MID = 0.8; // at mid levels: body shrinks by 0.8 per side
 // at lip top: offset 0 (flush with body)
 
+// The standard stacking lip protrudes above the nominal units×7 height — a
+// 6-unit lipped bin is 45.55mm, not 42mm (gridfinity-rebuilt convention). 3.551
+// is the canonical STACKING_LIP_HEIGHT less its wall-overlap support, measured
+// from the reference STLs. The reduced lip sits flush on the rim (our variant).
+const STACKING_LIP_PROTRUSION = 3.551;
+const REDUCED_LIP_PROTRUSION = 2.15;
+
 // Label tab dimensions
 const LABEL_TAB_HEIGHT = 14;
 const LABEL_TAB_DEPTH = 4.5;
@@ -449,12 +456,12 @@ function buildWallCut(
 	bodyL: number,
 	wallBottom: number,
 	wallHeight: number,
-	lipHeight: number
+	lipProtrusion: number
 ): Solid {
 	// Diagonal planar cut: walls/dividers stay full height on one side and
 	// slope down to `wallCutLowFraction` of wall height on the opposite side.
 	const margin = 1; // overshoot footprint so outer walls cut cleanly through
-	const topMostZ = wallBottom + wallHeight + lipHeight;
+	const topMostZ = wallBottom + wallHeight + lipProtrusion;
 	const ceilingZ = topMostZ + 5;
 	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
 
@@ -524,16 +531,24 @@ export function buildBin(p: BinParams): Solid {
 		}
 	}
 
-	// 3. Compute lip height and wall dimensions
-	const lipHeight =
+	// 3. Lip + wall dimensions. Walls fill the full nominal height; the stacking
+	// lip protrudes above it (gridfinity-rebuilt convention), so a lipped bin's
+	// total height is units×7 + lipProtrusion.
+	const lipProfileHeight =
 		p.stackingLip === 'standard'
 			? BASE_PROFILE_HEIGHT
 			: p.stackingLip === 'reduced'
 				? 2.15
 				: 0;
+	const lipProtrusion =
+		p.stackingLip === 'standard'
+			? STACKING_LIP_PROTRUSION
+			: p.stackingLip === 'reduced'
+				? REDUCED_LIP_PROTRUSION
+				: 0;
 
 	const wallBottom = BASE_PROFILE_HEIGHT + floorThickness;
-	const wallHeight = h - wallBottom - lipHeight;
+	const wallHeight = h - wallBottom;
 
 	if (wallHeight <= 0) return bin;
 
@@ -569,16 +584,16 @@ export function buildBin(p: BinParams): Solid {
 		if (tabs) bin = bin.fuse(tabs) as Solid;
 	}
 
-	// 7. Stacking lip
-	if (lipHeight > 0) {
-		const lipTopZ = wallBottom + wallHeight;
-		const lip = buildStackingLip(bodyW, bodyL, lipTopZ, lipHeight);
+	// 7. Stacking lip — protrudes above the wall; its base overlaps the rim as a support.
+	if (lipProfileHeight > 0) {
+		const lipBaseZ = h + lipProtrusion - lipProfileHeight;
+		const lip = buildStackingLip(bodyW, bodyL, lipBaseZ, lipProfileHeight);
 		bin = bin.fuse(lip) as Solid;
 	}
 
 	// 8. Diagonal wall cut (slope walls/dividers down toward one side)
 	if (p.wallCut) {
-		const cut = buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipHeight);
+		const cut = buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipProtrusion);
 		bin = bin.cut(cut) as Solid;
 	}
 

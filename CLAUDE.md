@@ -99,6 +99,7 @@ From [gridfinity-rebuilt-openscad](https://github.com/kennetek/gridfinity-rebuil
 - Height unit: 7mm
 - Base profile: 4-level lofted platform (0→0.8→2.6→4.75mm)
 - Corner radius: 3.75mm outer
+- Stacking lip: protrudes above nominal — total Z = units×7 + 3.551mm (lip sits on top, not absorbed)
 - Magnet holes: 6.5mm dia x 2.4mm deep at grid corners
 - Screw holes: 3mm dia x 6mm deep
 - Hole offset: 8mm from each edge
@@ -111,7 +112,7 @@ When modifying geometry, cross-reference constants at top of `gridfinity.ts` aga
 - **Loft vs extrude:** Use `loft({ ruled: true })` for chamfer sections, plain `extrude()` for constant cross-sections. Mixing them up produces wrong profiles.
 - **Boolean order matters:** `fuse` before `cut` — cutting from unfused parts can leave geometry artifacts
 - **Coordinate system:** Origin is at center of grid footprint. Multi-unit grids offset by `((units - 1) * 42) / 2`
-- **Stacking lip:** Female cavity mirrors base profile inverted. The lip offset constants (`LIP_OFFSET_BOTTOM=2.95`, `LIP_OFFSET_MID=0.8`) must match base profile exactly or bins won't stack.
+- **Stacking lip:** Female cavity mirrors base profile inverted. The lip offset constants (`LIP_OFFSET_BOTTOM=2.95`, `LIP_OFFSET_MID=0.8`) must match base profile exactly or bins won't stack. The lip **protrudes above** `height×7` (`STACKING_LIP_PROTRUSION=3.551`): a lipped bin's total Z is `units×7 + 3.551`. Wall fills the nominal height; the lip base overlaps the rim ~1.2mm as support. Both geometry paths (`manifold-bin.ts` STL + `gridfinity.ts` STEP) must change together.
 - **Zero-size sketches:** `drawRoundedRectangle` with radius=0 works but produces sharp corners — use it intentionally for divider walls
 
 ## Quality Gates
@@ -123,6 +124,7 @@ Before committing:
 - [ ] `npm run lint` — oxlint clean
 - [ ] Visual check in browser — 3D preview renders without artifacts
 - [ ] For geometry changes: verify dimensions match Gridfinity spec
+- [ ] `reference-parity.test.ts` passes — cross-checks exported STL bbox/volume against committed gridfinity-rebuilt reference (refresh fixtures via `scripts/refresh-reference-fixtures.mjs`)
 
 ## Deployment Constraints
 
