@@ -130,8 +130,9 @@
 		params.set(urlParams);
 		spawnWorker();
 		// Paint the precomputed default bin immediately so the first visit shows a
-		// real model while the ~4.6MB WASM still loads. Only valid for the default
-		// view — any URL params mean a different bin, so let the worker build it.
+		// real model while the worker starts up (loads the manifold WASM and runs
+		// the first build). Only valid for the default view — any URL params mean a
+		// different bin, so let the worker build it.
 		if (serializeParams(urlParams).toString() === '') {
 			loadDefaultMesh();
 		}

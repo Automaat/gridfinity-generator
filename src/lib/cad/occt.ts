@@ -1,7 +1,7 @@
-// Lazy OpenCascade path. Importing this module pulls in the ~4.6 MB (gzip) WASM,
-// so the worker dynamic-imports it only when needed: STEP/STL export, and preview
-// of features not yet ported to the manifold engine. The manifold preview path
-// never touches this, so the common case never downloads OpenCascade.
+// Lazy OpenCascade path, used only for STEP export — the one output that needs a
+// BRep kernel. Importing this module pulls in the ~4.6 MB (gzip) WASM, so the
+// worker dynamic-imports it on demand. Preview and STL export both run on the
+// manifold engine, so the common path never downloads OpenCascade.
 import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import { setOC, type Solid } from 'replicad';

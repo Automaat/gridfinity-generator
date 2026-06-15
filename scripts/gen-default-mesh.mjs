@@ -4,6 +4,9 @@
 // tessellation exactly (seamless swap).
 //
 // Run after changing defaultParams or the base geometry: `npm run gen:default-mesh`.
+// Imports the .ts source directly, so it needs Node's TS type stripping (Node
+// >=22.18; the repo pins 24 via mise). The npm script passes
+// --experimental-strip-types so it also works on 22.18-23.5.
 import { writeFileSync } from 'node:fs';
 import path from 'node:path';
 
