@@ -144,10 +144,14 @@ function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, 
 	});
 	if (openings.length > 0) solid = solid.subtract(openings.length === 1 ? openings[0]! : Manifold.union(openings));
 
-	// Magnet pockets (+ optional M3 through-holes) drilled into the corner pads from below.
+	// Magnet pockets open upward from the cavity floor (socketZ) so the magnet faces
+	// the bin's foot magnet — the gridfinity convention. A thin floor stays below it.
+	// Optional M3 holes pass all the way through for mounting the plate down.
 	if (magnet) {
 		const cutters = cellCorners(tile).map(([x, y]) => {
-			const parts: Manifold[] = [Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, segments)];
+			const parts: Manifold[] = [
+				Manifold.cylinder(MAGNET_HOLE_DEPTH + 0.1, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, segments).translate([0, 0, socketZ - MAGNET_HOLE_DEPTH])
+			];
 			if (bp.screwHoles) {
 				parts.push(Manifold.cylinder(thickness + 0.2, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, segments).translate([0, 0, -0.1]));
 			}

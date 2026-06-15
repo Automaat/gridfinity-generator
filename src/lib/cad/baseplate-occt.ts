@@ -117,9 +117,10 @@ function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: num
 	solid = solid.cut(makeCompound(openings) as Solid) as Solid;
 
 	if (magnet) {
+		// Pockets open upward from the cavity floor (socketZ) toward the bin magnets.
 		const cutters = cellCorners(tile).map(([x, y]) => {
-			let cutter = (drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch)
-				.extrude(MAGNET_HOLE_DEPTH)
+			let cutter = (drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY', socketZ - MAGNET_HOLE_DEPTH) as Sketch)
+				.extrude(MAGNET_HOLE_DEPTH + 0.1)
 				.translate(x, y, 0) as Solid;
 			if (bp.screwHoles) {
 				const screw = (drawCircle(SCREW_HOLE_DIAMETER / 2).sketchOnPlane('XY', -0.1) as Sketch)
