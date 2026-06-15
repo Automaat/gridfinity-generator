@@ -85,3 +85,32 @@ describe('buildBaseplateCombined', () => {
 		expect(span(s, 0)).toBeGreaterThan(8 * PITCH);
 	});
 });
+
+describe('connectors', () => {
+	const multi = (connector: BaseplateParams['connector']) =>
+		makeBp({ drawerWidth: 8 * PITCH, drawerDepth: 6 * PITCH, bedWidth: 180, bedDepth: 180, connector });
+
+	it('builds, tiles, and combines every connector type', () => {
+		for (const c of ['none', 'filament', 'dovetail', 'screw'] as const) {
+			const bp = multi(c);
+			expect(buildBaseplateAssembled(bp).volume()).toBeGreaterThan(0);
+			expect(buildBaseplateTiles(bp).length).toBeGreaterThan(1);
+			expect(buildBaseplateCombined(bp).volume()).toBeGreaterThan(0);
+		}
+	});
+
+	it('screw rails add material; filament holes remove it (vs no connector)', () => {
+		const none = buildBaseplateAssembled(multi('none')).volume();
+		const screw = buildBaseplateAssembled(multi('screw')).volume();
+		const filament = buildBaseplateAssembled(multi('filament')).volume();
+		expect(screw).toBeGreaterThan(none); // seam rails
+		expect(filament).toBeLessThan(none); // dowel holes
+	});
+
+	it('keeps the filament seam clean — no rib widening past the footprint', () => {
+		// filament adds no material, so the assembled plate matches the drawer bbox
+		const s = buildBaseplateAssembled(multi('filament'));
+		expect(span(s, 0)).toBeCloseTo(8 * PITCH, 0);
+		expect(span(s, 1)).toBeCloseTo(6 * PITCH, 0);
+	});
+});
