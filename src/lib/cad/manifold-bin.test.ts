@@ -1,7 +1,10 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { BinParams } from '$lib/stores/params';
+import type { ManifoldToplevel } from 'manifold-3d';
 import { buildBinManifold, setBinManifold } from './manifold-bin';
 import { manifoldToMesh, manifoldToStlBlob } from './mesh-util';
+
+let M: ManifoldToplevel;
 
 // Unlike the OCCT path (which mocks replicad), the manifold engine is exercised
 // against the real WASM — mocking a CSG kernel would verify nothing. manifold
@@ -11,6 +14,7 @@ beforeAll(async () => {
 	const mani = await Module();
 	mani.setup();
 	setBinManifold(mani);
+	M = mani;
 }, 30000);
 
 function makeParams(overrides: Partial<BinParams> = {}): BinParams {
@@ -65,6 +69,19 @@ describe('buildBinManifold', () => {
 		const plain = buildBinManifold(makeParams({ width: 3, length: 2, height: 5 })).volume();
 		const divided = buildBinManifold(makeParams({ width: 3, length: 2, height: 5, dividersX: 2, dividersY: 1 })).volume();
 		expect(divided).toBeGreaterThan(plain);
+	});
+
+	it('custom divider positions relocate the wall without changing volume', () => {
+		const base = { width: 4, length: 2, height: 5, dividersX: 1 } as const;
+		const even = buildBinManifold(makeParams(base)); // divider centered at x=0
+		const moved = buildBinManifold(makeParams({ ...base, dividerPosX: [0.2] })); // shifted to x≈-49.5
+		// Same wall count/length — moving it adds/removes no material.
+		expect(Math.abs(moved.volume() - even.volume())).toBeLessThan(1);
+		// A thin slab at a given x captures the divider wall only where it sits.
+		const slab = (s: ReturnType<typeof buildBinManifold>, x: number) =>
+			s.intersect(M.Manifold.cube([4, 200, 200], true).translate([x, 0, 0])).volume();
+		expect(slab(even, 0)).toBeGreaterThan(slab(even, -49.5)); // even wall is at center
+		expect(slab(moved, -49.5)).toBeGreaterThan(slab(moved, 0)); // moved wall is off-center
 	});
 
 	it('returns base-only solid when wall height collapses', () => {

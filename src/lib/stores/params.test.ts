@@ -203,6 +203,28 @@ describe('URL serialization', () => {
 		expect(result.scoopWalls).toEqual(['back', 'front', 'left', 'right']);
 	});
 
+	it('round-trips divider positions', () => {
+		const p: BinParams = {
+			...defaultParams,
+			dividersX: 2,
+			dividerPosX: [0.25, 0.6],
+			dividersY: 1,
+			dividerPosY: [0.4]
+		};
+		const sp = serializeParams(p);
+		expect(sp.get('px')).toBe('250.600');
+		expect(sp.get('py')).toBe('400');
+		const result = deserializeParams(sp);
+		expect(result.dividerPosX).toEqual([0.25, 0.6]);
+		expect(result.dividerPosY).toEqual([0.4]);
+	});
+
+	it('omits divider positions when unset', () => {
+		const sp = serializeParams({ ...defaultParams, dividersX: 2 });
+		expect(sp.has('px')).toBe(false);
+		expect(sp.has('py')).toBe(false);
+	});
+
 	it('round-trips wall cut params', () => {
 		const p: BinParams = {
 			...defaultParams,

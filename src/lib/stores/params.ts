@@ -18,6 +18,11 @@ export interface BinParams {
 	wallCutSide: 'back' | 'front' | 'left' | 'right';
 	wallCutLowFraction: number;
 	wallCutRun: number;
+	// Per-divider positions as fractions (0..1) across the interior, measured from
+	// the low wall. Optional: absent or length≠count means even spacing (the
+	// default until a divider is dragged in the 3D view).
+	dividerPosX?: number[];
+	dividerPosY?: number[];
 }
 
 export const defaultParams: BinParams = {
@@ -88,7 +93,23 @@ const bool: Omit<Codec<'magnetHoles'>, 'key'> = {
 	decode: (raw) => raw === '1'
 };
 
-type Codecs = { [K in keyof BinParams]: Codec<K> };
+// Divider position arrays: each fraction encoded as an integer 0..1000, joined by
+// '.', e.g. [0.25, 0.6] -> "250.600". Compact and URL-safe.
+function fracsEncode(v: number[] | undefined): string {
+	return (v ?? []).map((f) => Math.round(clamp(f, 0, 1) * 1000)).join('.');
+}
+function fracsDecode(raw: string): number[] {
+	return raw
+		? raw
+				.split('.')
+				.map((s) => clamp(parseInt(s, 10) / 1000, 0, 1))
+				.filter((x) => !Number.isNaN(x))
+		: [];
+}
+
+// -? strips the optional modifier so every param (incl. the optional position
+// arrays) is guaranteed a codec — keeps CODECS[param] non-undefined.
+type Codecs = { [K in keyof BinParams]-?: Codec<K> };
 
 const CODECS: Codecs = {
 	width: { ...num(1, 6, true), key: 'w' },
@@ -119,7 +140,9 @@ const CODECS: Codecs = {
 		decode: (raw, def) => CHAR_TO_WALL[raw] ?? def
 	},
 	wallCutLowFraction: { ...num(0, 0.95), key: 'wcf' },
-	wallCutRun: { ...num(0.1, 1), key: 'wcr' }
+	wallCutRun: { ...num(0.1, 1), key: 'wcr' },
+	dividerPosX: { key: 'px', encode: fracsEncode, decode: (raw) => fracsDecode(raw) },
+	dividerPosY: { key: 'py', encode: fracsEncode, decode: (raw) => fracsDecode(raw) }
 };
 
 const PARAM_KEYS = Object.keys(CODECS) as (keyof BinParams)[];
@@ -128,11 +151,15 @@ const PARAM_KEYS = Object.keys(CODECS) as (keyof BinParams)[];
 // Inside a single type parameter K, `CODECS[param]` is `Codec<K>`, so encode's
 // argument and decode's result line up with `BinParams[K]` — no casts needed.
 function encodeField<K extends keyof BinParams>(p: BinParams, param: K): string {
-	return CODECS[param].encode(p[param]);
+	// Indexing the mapped type with a generic key widens to a union of codecs;
+	// re-narrow to Codec<K> so encode's argument lines up with BinParams[K].
+	const codec = CODECS[param] as unknown as Codec<K>;
+	return codec.encode(p[param]);
 }
 
 function decodeField<K extends keyof BinParams>(p: BinParams, param: K, raw: string): void {
-	p[param] = CODECS[param].decode(raw, defaultParams[param]);
+	const codec = CODECS[param] as unknown as Codec<K>;
+	p[param] = codec.decode(raw, defaultParams[param]);
 }
 
 export function serializeParams(p: BinParams): URLSearchParams {

@@ -11,9 +11,9 @@ test.describe('page load', () => {
 		await expect(page.getByRole('heading', { name: 'Gridfinity Generator' })).toBeVisible();
 	});
 
-	test('shows parameters heading', async ({ page }) => {
+	test('shows size heading', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByRole('heading', { name: 'Parameters' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Size' })).toBeVisible();
 	});
 });
 
@@ -73,6 +73,8 @@ test.describe('controls panel', () => {
 	test('renders stacking lip dropdown with standard selected', async ({ page }) => {
 		await page.goto('/');
 
+		// Stacking lip lives in the collapsible Advanced section.
+		await page.locator('summary').click();
 		const select = page.getByLabel('Stacking lip');
 		await expect(select).toHaveValue('standard');
 	});
@@ -80,6 +82,7 @@ test.describe('controls panel', () => {
 	test('can change stacking lip option', async ({ page }) => {
 		await page.goto('/');
 
+		await page.locator('summary').click();
 		const select = page.getByLabel('Stacking lip');
 		await select.selectOption('reduced');
 		await expect(select).toHaveValue('reduced');
@@ -91,6 +94,7 @@ test.describe('controls panel', () => {
 	test('renders divider inputs at zero', async ({ page }) => {
 		await page.goto('/');
 
+		await page.locator('summary').click();
 		await expect(page.getByText('Dividers X')).toBeVisible();
 		await expect(page.getByText('Dividers Y')).toBeVisible();
 	});
