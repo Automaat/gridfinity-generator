@@ -20,10 +20,16 @@ const MAGNET_HOLE_DEPTH = 2.4;
 const SCREW_HOLE_DIAMETER = 3;
 const HOLE_DISTANCE_FROM_EDGE = 8;
 // Skeletonization (mirror baseplate-manifold.ts).
-const SKEL_OPENING = 30;
-const SKEL_CORNER_R = 5;
+const SKEL_OPENING = 33;
+const SKEL_CORNER_R = 7;
 const MAGNET_BOSS_R = MAGNET_HOLE_DIAMETER / 2 + 2;
 const HOLE_INSET = PITCH / 2 - HOLE_DISTANCE_FROM_EDGE;
+const CORNER_OFFSETS: [number, number][] = [
+	[HOLE_INSET, HOLE_INSET],
+	[-HOLE_INSET, HOLE_INSET],
+	[HOLE_INSET, -HOLE_INSET],
+	[-HOLE_INSET, -HOLE_INSET]
+];
 
 function cellCorners(tile: BaseplateTile): [number, number][] {
 	const seen = new Set<string>();
@@ -93,23 +99,25 @@ function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: num
 	const sockets = tile.cells.map((cell) => foot.clone().translate(cell.x, cell.y, socketZ) as Solid);
 	solid = solid.cut(makeCompound(sockets) as Solid) as Solid;
 
-	// Skeletonize: open each cell through the floor.
-	const skel = tile.cells.map(
-		(cell) =>
-			(drawRoundedRectangle(SKEL_OPENING, SKEL_OPENING, SKEL_CORNER_R).sketchOnPlane('XY', -0.2) as Sketch)
-				.extrude(thickness + 0.4)
-				.translate(cell.x, cell.y, 0) as Solid
-	);
-	solid = solid.cut(makeCompound(skel) as Solid) as Solid;
+	// Skeletonize, preserving magnet corner pads (cut the pads out of each opening
+	// tool so they survive full-height and integrate with the frame).
+	const magnet = bp.style === 'magnet';
+	const openings = tile.cells.map((cell) => {
+		let op = (drawRoundedRectangle(SKEL_OPENING, SKEL_OPENING, SKEL_CORNER_R).sketchOnPlane('XY', -0.2) as Sketch)
+			.extrude(thickness + 0.4)
+			.translate(cell.x, cell.y, 0) as Solid;
+		if (magnet) {
+			const pads = CORNER_OFFSETS.map(
+				([ox, oy]) => (drawCircle(MAGNET_BOSS_R).sketchOnPlane('XY', -0.1) as Sketch).extrude(thickness + 0.6).translate(cell.x + ox, cell.y + oy, 0) as Solid
+			);
+			op = op.cut(makeCompound(pads) as Solid) as Solid;
+		}
+		return op;
+	});
+	solid = solid.cut(makeCompound(openings) as Solid) as Solid;
 
-	if (bp.style === 'magnet') {
-		const corners = cellCorners(tile);
-		const bossH = thickness - SOCKET_DEPTH + 0.6;
-		const bosses = corners.map(
-			([x, y]) => (drawCircle(MAGNET_BOSS_R).sketchOnPlane('XY') as Sketch).extrude(bossH).translate(x, y, 0) as Solid
-		);
-		solid = solid.fuse(makeCompound(bosses) as Solid) as Solid;
-		const cutters = corners.map(([x, y]) => {
+	if (magnet) {
+		const cutters = cellCorners(tile).map(([x, y]) => {
 			let cutter = (drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch)
 				.extrude(MAGNET_HOLE_DEPTH)
 				.translate(x, y, 0) as Solid;

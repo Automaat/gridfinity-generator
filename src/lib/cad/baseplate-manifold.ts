@@ -37,10 +37,16 @@ const COMBINED_GAP = DT_DEPTH + 6;
 // gridfinity-rebuilt baseplate look — an airy frame, far less filament than a
 // solid slab). The opening leaves a rim around the receiving profile; the magnet
 // style adds scalloped corner bosses that bulge into the opening to hold magnets.
-const SKEL_OPENING = 30; // rounded-square through-cut side (mm)
-const SKEL_CORNER_R = 5;
-const MAGNET_BOSS_R = MAGNET_HOLE_DIAMETER / 2 + 2; // 5.25mm boss around the pocket
+const SKEL_OPENING = 33; // rounded-square through-cut side (mm)
+const SKEL_CORNER_R = 7;
+const MAGNET_BOSS_R = MAGNET_HOLE_DIAMETER / 2 + 2; // 5.25mm pad around the pocket
 const HOLE_INSET = PITCH / 2 - HOLE_DISTANCE_FROM_EDGE; // 13mm from the cell center
+const CORNER_OFFSETS: [number, number][] = [
+	[HOLE_INSET, HOLE_INSET],
+	[-HOLE_INSET, HOLE_INSET],
+	[HOLE_INSET, -HOLE_INSET],
+	[-HOLE_INSET, -HOLE_INSET]
+];
 
 function tileThickness(bp: BaseplateParams): number {
 	return bp.style === 'magnet' ? THICKNESS_MAGNET : THICKNESS_SIMPLE;
@@ -121,22 +127,26 @@ function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, 
 	const sockets = tile.cells.map((cell) => unitBase().translate([cell.x, cell.y, socketZ]));
 	if (sockets.length > 0) solid = solid.subtract(sockets.length === 1 ? sockets[0]! : Manifold.union(sockets));
 
-	// Skeletonize: open each cell through the floor, leaving a frame around the profile.
-	const skel = tile.cells.map((cell) =>
-		roundedPrism(SKEL_OPENING, SKEL_OPENING, SKEL_CORNER_R, thickness + 0.4, -0.2).translate([cell.x, cell.y, 0])
-	);
-	if (skel.length > 0) solid = solid.subtract(skel.length === 1 ? skel[0]! : Manifold.union(skel));
+	// Skeletonize: open each cell through the floor, leaving a frame around the
+	// receiving profile. For the magnet style the four corner pads are preserved
+	// (subtracted from the opening tool) so they stay full-height and integrated
+	// with the frame — the scalloped magnet corners of a gridfinity baseplate.
+	const magnet = bp.style === 'magnet';
+	const openings = tile.cells.map((cell) => {
+		let op = roundedPrism(SKEL_OPENING, SKEL_OPENING, SKEL_CORNER_R, thickness + 0.4, -0.2).translate([cell.x, cell.y, 0]);
+		if (magnet) {
+			const pads = CORNER_OFFSETS.map(([ox, oy]) =>
+				Manifold.cylinder(thickness + 0.6, MAGNET_BOSS_R, MAGNET_BOSS_R, segments).translate([cell.x + ox, cell.y + oy, -0.1])
+			);
+			op = op.subtract(Manifold.union(pads));
+		}
+		return op;
+	});
+	if (openings.length > 0) solid = solid.subtract(openings.length === 1 ? openings[0]! : Manifold.union(openings));
 
-	if (bp.style === 'magnet') {
-		const corners = cellCorners(tile);
-		// Scalloped corner bosses (restore floor under the magnet, bulge into the opening).
-		const bossH = thickness - SOCKET_DEPTH + 0.6;
-		const bosses = corners.map(([x, y]) =>
-			Manifold.cylinder(bossH, MAGNET_BOSS_R, MAGNET_BOSS_R, segments).translate([x, y, 0])
-		);
-		if (bosses.length > 0) solid = solid.add(Manifold.union(bosses));
-		// Magnet pockets (+ optional M3 through-holes) drilled into the bosses from below.
-		const cutters = corners.map(([x, y]) => {
+	// Magnet pockets (+ optional M3 through-holes) drilled into the corner pads from below.
+	if (magnet) {
+		const cutters = cellCorners(tile).map(([x, y]) => {
 			const parts: Manifold[] = [Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, segments)];
 			if (bp.screwHoles) {
 				parts.push(Manifold.cylinder(thickness + 0.2, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, segments).translate([0, 0, -0.1]));
