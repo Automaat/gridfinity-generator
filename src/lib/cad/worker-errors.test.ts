@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { classifyError, validateParams, InvalidParamsError } from './worker-errors';
-import { defaultParams } from '$lib/stores/params';
+import { classifyError, validateParams, validateBaseplate, InvalidParamsError } from './worker-errors';
+import { defaultParams, defaultBaseplate } from '$lib/stores/params';
 
 describe('validateParams', () => {
 	it('accepts default params', () => {
@@ -31,6 +31,28 @@ describe('validateParams', () => {
 	it('rejects negative or non-finite scoop radius', () => {
 		expect(() => validateParams({ ...defaultParams, scoopRadius: -1 })).toThrow(InvalidParamsError);
 		expect(() => validateParams({ ...defaultParams, scoopRadius: NaN })).toThrow(InvalidParamsError);
+	});
+});
+
+describe('validateBaseplate', () => {
+	it('accepts default baseplate params', () => {
+		expect(() => validateBaseplate(defaultBaseplate)).not.toThrow();
+	});
+
+	it('rejects non-finite or sub-cell drawer dimensions', () => {
+		expect(() => validateBaseplate({ ...defaultBaseplate, drawerWidth: NaN })).toThrow(InvalidParamsError);
+		expect(() => validateBaseplate({ ...defaultBaseplate, drawerDepth: 30 })).toThrow(InvalidParamsError);
+	});
+
+	it('rejects a bed smaller than one cell', () => {
+		expect(() => validateBaseplate({ ...defaultBaseplate, bedWidth: 30 })).toThrow(InvalidParamsError);
+	});
+
+	it('rejects a bed too small for one tile once skirt is added', () => {
+		// drawer 43mm -> 1mm skirt; a 42mm bed cannot hold the 43mm edge tile
+		expect(() => validateBaseplate({ ...defaultBaseplate, drawerWidth: 43, bedWidth: 42 })).toThrow(InvalidParamsError);
+		// same drawer with a bed that clears the skirt is fine
+		expect(() => validateBaseplate({ ...defaultBaseplate, drawerWidth: 43, bedWidth: 43 })).not.toThrow();
 	});
 });
 

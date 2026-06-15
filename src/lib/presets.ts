@@ -12,6 +12,26 @@ export interface BaseplatePreset {
 	params: BaseplateParams;
 }
 
+// Build-plate sizes (mm) for common printers — selecting one fills bed W×D in the
+// baseplate tiler. Usable area; trim a few mm for clips/skirt if your slicer warns.
+export interface PrinterBed {
+	name: string;
+	w: number;
+	d: number;
+}
+
+export const printerBeds: PrinterBed[] = [
+	{ name: 'Bambu Lab H2D', w: 350, d: 320 },
+	{ name: 'Bambu Lab X1 / P1 / A1', w: 256, d: 256 },
+	{ name: 'Bambu Lab A1 mini', w: 180, d: 180 },
+	{ name: 'Prusa MK4 / MK3S', w: 250, d: 210 },
+	{ name: 'Prusa XL', w: 360, d: 360 },
+	{ name: 'Prusa Mini+', w: 180, d: 180 },
+	{ name: 'Creality Ender 3 / K1', w: 220, d: 220 },
+	{ name: 'Creality K1 Max', w: 300, d: 300 },
+	{ name: 'Voron 2.4 (350)', w: 350, d: 350 }
+];
+
 export const presets: Preset[] = [
 	{
 		name: 'Small Parts',

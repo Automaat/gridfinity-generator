@@ -1,6 +1,6 @@
 <script lang="ts">
-	import { baseplateParams } from '$lib/stores/params';
-	import { baseplatePresets } from '$lib/presets';
+	import { baseplateParams, type BaseplateParams } from '$lib/stores/params';
+	import { baseplatePresets, printerBeds } from '$lib/presets';
 	import { planBaseplate } from '$lib/cad/baseplate-layout';
 
 	interface Props {
@@ -25,9 +25,21 @@
 		baseplateParams.update((p) => ({ ...p, [key]: clamp(Math.round(v), min, max) }));
 	}
 
+	// Compare by sorted keys: store updates spread `{ ...p, [key]: v }`, which
+	// reorders keys, so plain JSON.stringify would miss a value-identical preset.
+	const canonical = (p: BaseplateParams): string =>
+		JSON.stringify(Object.entries(p).toSorted(([a], [b]) => a.localeCompare(b)));
 	let selectedPreset = $derived(
-		baseplatePresets.findIndex((p) => JSON.stringify(p.params) === JSON.stringify($baseplateParams))
+		baseplatePresets.findIndex((p) => canonical(p.params) === canonical($baseplateParams))
 	);
+
+	let selectedPrinter = $derived(
+		printerBeds.findIndex((b) => b.w === $baseplateParams.bedWidth && b.d === $baseplateParams.bedDepth)
+	);
+	function applyPrinter(value: string) {
+		const bed = printerBeds[Number(value)];
+		if (bed) baseplateParams.update((p) => ({ ...p, bedWidth: bed.w, bedDepth: bed.d }));
+	}
 	function applyPreset(idx: number) {
 		const preset = baseplatePresets[idx];
 		if (preset) baseplateParams.set({ ...preset.params });
@@ -156,6 +168,19 @@
 	<!-- Tiling -->
 	<section class="flex flex-col gap-3">
 		<h2 class={section}>Printer bed & tiling</h2>
+		<label class="block">
+			<span class={lbl}>Printer</span>
+			<select
+				onchange={(e) => applyPrinter(e.currentTarget.value)}
+				class={selectInput}
+				style:background-image={chevron}
+			>
+				<option value="" selected={selectedPrinter === -1}>Custom</option>
+				{#each printerBeds as bed, i}
+					<option value={i} selected={i === selectedPrinter}>{bed.name} ({bed.w}×{bed.d})</option>
+				{/each}
+			</select>
+		</label>
 		<div class="grid grid-cols-2 gap-3">
 			{@render numField('bedWidth', 'Bed width', 42, 1000, 5)}
 			{@render numField('bedDepth', 'Bed depth', 42, 1000, 5)}

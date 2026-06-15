@@ -42,6 +42,13 @@ export function validateBaseplate(bp: BaseplateParams): void {
 	if (!Number.isFinite(bp.bedWidth) || !Number.isFinite(bp.bedDepth) || bp.bedWidth < 42 || bp.bedDepth < 42) {
 		throw new InvalidParamsError('Printer bed must be at least 42mm on each side');
 	}
+	// An edge tile carries one cell plus the leftover skirt; if the bed can't hold
+	// that, planBaseplate would still emit an unprintable tile. Reject it up front.
+	const skirtX = bp.drawerWidth - Math.floor(bp.drawerWidth / 42) * 42;
+	const skirtY = bp.drawerDepth - Math.floor(bp.drawerDepth / 42) * 42;
+	if (bp.bedWidth < 42 + skirtX || bp.bedDepth < 42 + skirtY) {
+		throw new InvalidParamsError('Printer bed is too small to fit one tile with the drawer padding — increase the bed size or adjust the drawer dimensions');
+	}
 }
 
 // OpenCascade/WASM surface failures as plain Errors; classify them so the UI can
