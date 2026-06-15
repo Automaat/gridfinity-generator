@@ -28,7 +28,7 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 
 const span = (s: ReturnType<typeof buildBinManifold>, axis: number) => {
 	const bb = s.boundingBox();
-	return bb.max[axis] - bb.min[axis];
+	return bb.max[axis]! - bb.min[axis]!;
 };
 
 describe('buildBinManifold', () => {

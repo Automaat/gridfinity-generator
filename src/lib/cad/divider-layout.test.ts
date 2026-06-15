@@ -58,7 +58,7 @@ describe('compartmentEdges', () => {
 	it('gap widths reproduce even spacing', () => {
 		const inner = 90;
 		const edges = compartmentEdges(dividerCoords(2, undefined, inner), inner);
-		const gaps = edges.slice(1).map((e, i) => e - edges[i]);
+		const gaps = edges.slice(1).map((e, i) => e - edges[i]!);
 		expect(gaps).toEqual([30, 30, 30]);
 	});
 });

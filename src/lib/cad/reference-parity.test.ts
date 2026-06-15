@@ -33,15 +33,24 @@ function measureStl(buf: ArrayBuffer): { size: [number, number, number]; volume:
 			o += 12;
 			tri.push(p);
 			for (let a = 0; a < 3; a++) {
-				if (p[a] < min[a]) min[a] = p[a];
-				if (p[a] > max[a]) max[a] = p[a];
+				const v = p[a]!;
+				if (v < min[a]!) min[a] = v;
+				if (v > max[a]!) max[a] = v;
 			}
 		}
 		o += 2; // attribute byte count
-		const [a, b, c] = tri;
-		vol6 += a[0] * (b[1] * c[2] - b[2] * c[1]) - a[1] * (b[0] * c[2] - b[2] * c[0]) + a[2] * (b[0] * c[1] - b[1] * c[0]);
+		const a = tri[0]!;
+		const b = tri[1]!;
+		const c = tri[2]!;
+		vol6 +=
+			a[0]! * (b[1]! * c[2]! - b[2]! * c[1]!) -
+			a[1]! * (b[0]! * c[2]! - b[2]! * c[0]!) +
+			a[2]! * (b[0]! * c[1]! - b[1]! * c[0]!);
 	}
-	return { size: [max[0] - min[0], max[1] - min[1], max[2] - min[2]], volume: Math.abs(vol6) / 6 };
+	return {
+		size: [max[0]! - min[0]!, max[1]! - min[1]!, max[2]! - min[2]!],
+		volume: Math.abs(vol6) / 6
+	};
 }
 
 const fullParams = (bp: unknown): BinParams => ({ ...defaultParams, ...(bp as Partial<BinParams>) });
@@ -61,7 +70,9 @@ describe('reference parity (gridfinity-rebuilt)', () => {
 		it(`${fx.id} export matches reference dimensions`, async () => {
 			const solid = buildBinManifold(fullParams(fx.binParams), { segments: 64 });
 			const { size, volume } = measureStl(await manifoldToStlBlob(solid).arrayBuffer());
-			const [rx, ry, rz] = fx.reference.size;
+			const rx = fx.reference.size[0]!;
+			const ry = fx.reference.size[1]!;
+			const rz = fx.reference.size[2]!;
 			expect(Math.abs(size[0] - rx), `width: ${size[0]} vs ${rx}`).toBeLessThanOrEqual(BBOX_TOL);
 			expect(Math.abs(size[1] - ry), `length: ${size[1]} vs ${ry}`).toBeLessThanOrEqual(BBOX_TOL);
 			expect(Math.abs(size[2] - rz), `height: ${size[2]} vs ${rz}`).toBeLessThanOrEqual(BBOX_TOL);

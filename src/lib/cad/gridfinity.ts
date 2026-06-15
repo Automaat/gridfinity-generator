@@ -64,7 +64,7 @@ function buildUnitBase(): Solid {
 	];
 
 	function sketchAt(idx: number): Sketch {
-		const l = levels[idx];
+		const l = levels[idx]!;
 		return drawRoundedRectangle(l.size, l.size, l.r).sketchOnPlane('XY', l.z) as Sketch;
 	}
 
@@ -72,12 +72,14 @@ function buildUnitBase(): Solid {
 	const chamfer1 = sketchAt(0).loftWith(sketchAt(1), { ruled: true }) as Solid;
 
 	// Extrude section 2: z=0.8 → z=2.6 (vertical walls, constant size)
+	const l1 = levels[1]!;
+	const l2 = levels[2]!;
 	const vertical = (
-		drawRoundedRectangle(levels[1].size, levels[1].size, levels[1].r).sketchOnPlane(
+		drawRoundedRectangle(l1.size, l1.size, l1.r).sketchOnPlane(
 			'XY',
-			levels[1].z
+			l1.z
 		) as Sketch
-	).extrude(levels[2].z - levels[1].z) as Solid;
+	).extrude(l2.z - l1.z) as Solid;
 
 	// Loft section 3: z=2.6 → z=4.75 (top 45° chamfer)
 	const chamfer2 = sketchAt(2).loftWith(sketchAt(3), { ruled: true }) as Solid;
@@ -108,7 +110,7 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Sol
 			const cx = x * GRID_UNIT - gridOffsetX;
 			const cy = y * GRID_UNIT - gridOffsetY;
 
-			for (const [ox, oy] of offsets) {
+			for (const [ox, oy] of offsets as [number, number][]) {
 				let cutter: Solid | null = null;
 				if (p.magnetHoles) {
 					const magnet = (
@@ -179,19 +181,21 @@ function buildStackingLip(
 		];
 
 		function cavitySketchAt(idx: number): Sketch {
-			const l = cavityLevels[idx];
+			const l = cavityLevels[idx]!;
 			return drawRoundedRectangle(l.w, l.l, l.r).sketchOnPlane('XY', l.z) as Sketch;
 		}
 
 		// Build cavity as 3 sections matching base profile construction
 		const c1 = cavitySketchAt(0).loftWith(cavitySketchAt(1), { ruled: true }) as Solid;
+		const cl1 = cavityLevels[1]!;
+		const cl2 = cavityLevels[2]!;
 		const c2 = (
 			drawRoundedRectangle(
-				cavityLevels[1].w,
-				cavityLevels[1].l,
-				cavityLevels[1].r
-			).sketchOnPlane('XY', cavityLevels[1].z) as Sketch
-		).extrude(cavityLevels[2].z - cavityLevels[1].z) as Solid;
+				cl1.w,
+				cl1.l,
+				cl1.r
+			).sketchOnPlane('XY', cl1.z) as Sketch
+		).extrude(cl2.z - cl1.z) as Solid;
 		const c3 = cavitySketchAt(2).loftWith(cavitySketchAt(3), { ruled: true }) as Solid;
 
 		const cavity = c1.fuse(c2).fuse(c3) as Solid;
@@ -333,8 +337,10 @@ function buildLabelTabs(
 	let tabs: Solid | null = null;
 
 	for (let i = 0; i < edges.length - 1; i++) {
-		const cx = (edges[i] + edges[i + 1]) / 2;
-		const tabW = edges[i + 1] - edges[i] - (i > 0 ? p.wallThickness : 0);
+		const e0 = edges[i]!;
+		const e1 = edges[i + 1]!;
+		const cx = (e0 + e1) / 2;
+		const tabW = e1 - e0 - (i > 0 ? p.wallThickness : 0);
 		if (tabW < 1) continue; // compartment too narrow for a usable tab
 
 		// Triangle cross-section in YZ plane: right triangle
@@ -409,10 +415,10 @@ function buildScoops(
 
 	for (let ix = 0; ix < xEdges.length - 1; ix++) {
 		for (let iy = 0; iy < yEdges.length - 1; iy++) {
-			const xStart = xEdges[ix];
-			const yStart = yEdges[iy];
-			const compartmentW = xEdges[ix + 1] - xEdges[ix];
-			const compartmentL = yEdges[iy + 1] - yEdges[iy];
+			const xStart = xEdges[ix]!;
+			const yStart = yEdges[iy]!;
+			const compartmentW = xEdges[ix + 1]! - xStart;
+			const compartmentL = yEdges[iy + 1]! - yStart;
 
 			for (const wall of p.scoopWalls) {
 				let ramp: Solid;

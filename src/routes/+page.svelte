@@ -78,7 +78,7 @@
 		buildInFlight = false;
 		pendingBuild = null;
 		worker = new Worker(new URL('$lib/cad/worker.ts', import.meta.url), { type: 'module' });
-		worker.onmessage = (e: MessageEvent<WorkerResponse>) => {
+		worker.addEventListener('message', (e: MessageEvent<WorkerResponse>) => {
 			const msg = e.data;
 			if (msg.type === 'ready') {
 				workerReady = true;
@@ -110,7 +110,7 @@
 				console.error(`Worker error [${msg.code}] on ${msg.requestType}:`, msg.message);
 				setError(msg.code, msg.message);
 			}
-		};
+		});
 	}
 
 	// A wedged worker never replies, so the timer terminates and respawns it; the

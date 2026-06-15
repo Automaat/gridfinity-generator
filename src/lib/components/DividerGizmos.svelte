@@ -77,9 +77,9 @@
 		return axis === 'x' ? hit.x : -hit.z; // model y = -world z
 	}
 
-	function startDrag(axis: 'x' | 'y', index: number, grabModel: number, ev: PointerEvent) {
+	function startDrag(axis: 'x' | 'y', index: number, grabModel: number, _ev: PointerEvent) {
 		const coords = axis === 'x' ? xs : ys;
-		dragging = { axis, index, offset: coords[index] - grabModel };
+		dragging = { axis, index, offset: coords[index]! - grabModel };
 		window.addEventListener('pointermove', onMove);
 		window.addEventListener('pointerup', onUp, { once: true });
 	}
@@ -98,8 +98,8 @@
 		).slice();
 		// Keep a wall-plus-margin between neighbours so dividers never collide/reorder.
 		const minGap = ($params.wallThickness + 1) / inner;
-		const lo = index > 0 ? cur[index - 1] + minGap : minGap;
-		const hi = index < cur.length - 1 ? cur[index + 1] - minGap : 1 - minGap;
+		const lo = index > 0 ? cur[index - 1]! + minGap : minGap;
+		const hi = index < cur.length - 1 ? cur[index + 1]! - minGap : 1 - minGap;
 		cur[index] = clamp(frac, lo, Math.max(lo, hi));
 		params.update((p) => (axis === 'x' ? { ...p, dividerPosX: cur } : { ...p, dividerPosY: cur }));
 		invalidate();
@@ -133,8 +133,8 @@
 	function dimGeometry(edges: number[], axis: 'x' | 'y'): BufferGeometry {
 		const z = box.topZ + DIM_Z;
 		const pts: number[] = [];
-		const a = edges[0];
-		const b = edges[edges.length - 1];
+		const a = edges[0]!;
+		const b = edges[edges.length - 1]!;
 		if (axis === 'x') {
 			const y = box.innerL / 2 + DIM_OFFSET;
 			pts.push(a, y, z, b, y, z);
@@ -173,12 +173,12 @@
 		if (count < 1) return false;
 		const coords = dividerCoords(count, axis === 'x' ? $params.dividerPosX : $params.dividerPosY, inner);
 		const edges = compartmentEdges(coords, inner);
-		const gaps = edges.slice(1).map((e, i) => e - edges[i]);
+		const gaps = edges.slice(1).map((e, i) => e - edges[i]!);
 		const next = redistributeGaps(gaps, index, value, inner, $params.wallThickness + 1);
 		let cum = 0;
 		const fracs: number[] = [];
 		for (let i = 0; i < next.length - 1; i++) {
-			cum += next[i];
+			cum += next[i]!;
 			fracs.push(clamp(cum / inner, 0, 1));
 		}
 		params.update((p) => (axis === 'x' ? { ...p, dividerPosX: fracs } : { ...p, dividerPosY: fracs }));
@@ -274,13 +274,13 @@
 	{#if dimXGeo}
 		<T.LineSegments geometry={dimXGeo} material={dimMaterial} />
 		{#each xEdges.slice(1) as b, k (k)}
-			{@render dimLabel('x', k, b - xEdges[k], [(xEdges[k] + b) / 2, box.innerL / 2 + DIM_OFFSET, box.topZ + DIM_Z])}
+			{@render dimLabel('x', k, b - xEdges[k]!, [(xEdges[k]! + b) / 2, box.innerL / 2 + DIM_OFFSET, box.topZ + DIM_Z])}
 		{/each}
 	{/if}
 	{#if dimYGeo}
 		<T.LineSegments geometry={dimYGeo} material={dimMaterial} />
 		{#each yEdges.slice(1) as b, k (k)}
-			{@render dimLabel('y', k, b - yEdges[k], [box.innerW / 2 + DIM_OFFSET, (yEdges[k] + b) / 2, box.topZ + DIM_Z])}
+			{@render dimLabel('y', k, b - yEdges[k]!, [box.innerW / 2 + DIM_OFFSET, (yEdges[k]! + b) / 2, box.topZ + DIM_Z])}
 		{/each}
 	{/if}
 {/if}
