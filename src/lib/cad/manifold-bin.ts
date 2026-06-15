@@ -6,6 +6,7 @@
 // harness). Constants below MUST match gridfinity.ts.
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
+import { dividerCoords, compartmentEdges } from './divider-layout';
 
 const GRID_UNIT = 42;
 const HEIGHT_UNIT = 7;
@@ -235,23 +236,15 @@ function buildDividers(
 ): Manifold | null {
 	const { Manifold } = oc();
 	const walls: Manifold[] = [];
-	if (p.dividersX > 0) {
-		const spacing = innerW / (p.dividersX + 1);
-		for (let i = 1; i <= p.dividersX; i++) {
-			const xPos = -innerW / 2 + i * spacing;
-			let wall = roundedPrism(p.wallThickness, innerL, 0, wallHeight, wallBottom);
-			if (p.lightweightDividers) wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'X', wallBottom);
-			walls.push(wall.translate([xPos, 0, 0]));
-		}
+	for (const xPos of dividerCoords(p.dividersX, p.dividerPosX, innerW)) {
+		let wall = roundedPrism(p.wallThickness, innerL, 0, wallHeight, wallBottom);
+		if (p.lightweightDividers) wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'X', wallBottom);
+		walls.push(wall.translate([xPos, 0, 0]));
 	}
-	if (p.dividersY > 0) {
-		const spacing = innerL / (p.dividersY + 1);
-		for (let i = 1; i <= p.dividersY; i++) {
-			const yPos = -innerL / 2 + i * spacing;
-			let wall = roundedPrism(innerW, p.wallThickness, 0, wallHeight, wallBottom);
-			if (p.lightweightDividers) wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'Y', wallBottom);
-			walls.push(wall.translate([0, yPos, 0]));
-		}
+	for (const yPos of dividerCoords(p.dividersY, p.dividerPosY, innerL)) {
+		let wall = roundedPrism(innerW, p.wallThickness, 0, wallHeight, wallBottom);
+		if (p.lightweightDividers) wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'Y', wallBottom);
+		walls.push(wall.translate([0, yPos, 0]));
 	}
 	if (walls.length === 0) return null;
 	return walls.length === 1 ? walls[0] : Manifold.union(walls);
@@ -264,13 +257,13 @@ function buildLabelTabs(
 	const topZ = wallBottom + wallHeight;
 	const tabHeight = Math.min(LABEL_TAB_HEIGHT, wallHeight);
 	const tabDepth = Math.min(LABEL_TAB_DEPTH, innerL - 1);
-	const numCompartments = p.dividersX + 1;
-	const compartmentW = innerW / numCompartments;
+	const edges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
 	const frontY = innerL / 2;
 	const tabs: Manifold[] = [];
-	for (let i = 0; i < numCompartments; i++) {
-		const cx = -innerW / 2 + compartmentW / 2 + i * compartmentW;
-		const tabW = compartmentW - (i > 0 ? p.wallThickness : 0);
+	for (let i = 0; i < edges.length - 1; i++) {
+		const cx = (edges[i] + edges[i + 1]) / 2;
+		const tabW = edges[i + 1] - edges[i] - (i > 0 ? p.wallThickness : 0);
+		if (tabW < 1) continue; // compartment too narrow for a usable tab
 		// Right-triangle ledge in the Y-Z plane, extruded along X by the tab width.
 		const tri: [number, number][] = [
 			[frontY, topZ], [frontY - tabDepth, topZ], [frontY, topZ - tabHeight]
@@ -302,18 +295,18 @@ function buildScoops(
 	p: BinParams, innerW: number, innerL: number, wallBottom: number, wallHeight: number
 ): Manifold | null {
 	const { Manifold } = oc();
-	const numX = p.dividersX + 1;
-	const numY = p.dividersY + 1;
-	const compartmentW = innerW / numX;
-	const compartmentL = innerL / numY;
+	const xEdges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
+	const yEdges = compartmentEdges(dividerCoords(p.dividersY, p.dividerPosY, innerL), innerL);
 	const R = p.scoopRadius > 0 ? Math.min(p.scoopRadius, wallHeight) : wallHeight / 2;
 	if (R < 2) return null;
 
 	const scoops: Manifold[] = [];
-	for (let ix = 0; ix < numX; ix++) {
-		for (let iy = 0; iy < numY; iy++) {
-			const xStart = -innerW / 2 + ix * compartmentW;
-			const yStart = -innerL / 2 + iy * compartmentL;
+	for (let ix = 0; ix < xEdges.length - 1; ix++) {
+		for (let iy = 0; iy < yEdges.length - 1; iy++) {
+			const xStart = xEdges[ix];
+			const yStart = yEdges[iy];
+			const compartmentW = xEdges[ix + 1] - xEdges[ix];
+			const compartmentL = yEdges[iy + 1] - yEdges[iy];
 			for (const wall of p.scoopWalls) {
 				switch (wall) {
 					case 'back':

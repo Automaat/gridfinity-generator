@@ -8,6 +8,7 @@ import {
 	type Sketch
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
+import { dividerCoords, compartmentEdges } from './divider-layout';
 
 // Gridfinity spec (from kennetek/gridfinity-rebuilt-openscad)
 const GRID_UNIT = 42;
@@ -288,42 +289,28 @@ function buildDividers(
 ): Solid | null {
 	let dividers: Solid | null = null;
 
-	// X dividers: walls parallel to Y axis, evenly spaced across inner width
-	if (p.dividersX > 0) {
-		const spacing = innerW / (p.dividersX + 1);
-		for (let i = 1; i <= p.dividersX; i++) {
-			const xPos = -innerW / 2 + i * spacing;
-			let wall = (
-				drawRoundedRectangle(p.wallThickness, innerL, 0).sketchOnPlane(
-					'XY',
-					wallBottom
-				) as Sketch
-			).extrude(wallHeight) as Solid;
-			if (p.lightweightDividers) {
-				wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'YZ', wallBottom);
-			}
-			const positioned = wall.translate(xPos, 0, 0) as Solid;
-			dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
+	// X dividers: walls parallel to Y axis, at each resolved position across width
+	for (const xPos of dividerCoords(p.dividersX, p.dividerPosX, innerW)) {
+		let wall = (
+			drawRoundedRectangle(p.wallThickness, innerL, 0).sketchOnPlane('XY', wallBottom) as Sketch
+		).extrude(wallHeight) as Solid;
+		if (p.lightweightDividers) {
+			wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'YZ', wallBottom);
 		}
+		const positioned = wall.translate(xPos, 0, 0) as Solid;
+		dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
 	}
 
-	// Y dividers: walls parallel to X axis, evenly spaced across inner length
-	if (p.dividersY > 0) {
-		const spacing = innerL / (p.dividersY + 1);
-		for (let i = 1; i <= p.dividersY; i++) {
-			const yPos = -innerL / 2 + i * spacing;
-			let wall = (
-				drawRoundedRectangle(innerW, p.wallThickness, 0).sketchOnPlane(
-					'XY',
-					wallBottom
-				) as Sketch
-			).extrude(wallHeight) as Solid;
-			if (p.lightweightDividers) {
-				wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'XZ', wallBottom);
-			}
-			const positioned = wall.translate(0, yPos, 0) as Solid;
-			dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
+	// Y dividers: walls parallel to X axis, at each resolved position across length
+	for (const yPos of dividerCoords(p.dividersY, p.dividerPosY, innerL)) {
+		let wall = (
+			drawRoundedRectangle(innerW, p.wallThickness, 0).sketchOnPlane('XY', wallBottom) as Sketch
+		).extrude(wallHeight) as Solid;
+		if (p.lightweightDividers) {
+			wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'XZ', wallBottom);
 		}
+		const positioned = wall.translate(0, yPos, 0) as Solid;
+		dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
 	}
 
 	return dividers;
@@ -339,15 +326,16 @@ function buildLabelTabs(
 	const topZ = wallBottom + wallHeight;
 	const tabHeight = Math.min(LABEL_TAB_HEIGHT, wallHeight);
 	const tabDepth = Math.min(LABEL_TAB_DEPTH, innerL - 1);
-	const numCompartments = p.dividersX + 1;
-	const compartmentW = innerW / numCompartments;
+	// One tab per compartment, spanning between consecutive walls/dividers.
+	const edges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
 	const frontY = innerL / 2; // front face (+Y side)
 
 	let tabs: Solid | null = null;
 
-	for (let i = 0; i < numCompartments; i++) {
-		const cx = -innerW / 2 + compartmentW / 2 + i * compartmentW;
-		const tabW = compartmentW - (i > 0 ? p.wallThickness : 0);
+	for (let i = 0; i < edges.length - 1; i++) {
+		const cx = (edges[i] + edges[i + 1]) / 2;
+		const tabW = edges[i + 1] - edges[i] - (i > 0 ? p.wallThickness : 0);
+		if (tabW < 1) continue; // compartment too narrow for a usable tab
 
 		// Triangle cross-section in YZ plane: right triangle
 		// top-front corner → top-back (inward) → bottom-front → close
@@ -410,10 +398,8 @@ function buildScoops(
 	wallBottom: number,
 	wallHeight: number
 ): Solid | null {
-	const numX = p.dividersX + 1;
-	const numY = p.dividersY + 1;
-	const compartmentW = innerW / numX;
-	const compartmentL = innerL / numY;
+	const xEdges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
+	const yEdges = compartmentEdges(dividerCoords(p.dividersY, p.dividerPosY, innerL), innerL);
 
 	const autoR = wallHeight / 2;
 	const R = p.scoopRadius > 0 ? Math.min(p.scoopRadius, wallHeight) : autoR;
@@ -421,10 +407,12 @@ function buildScoops(
 
 	let scoops: Solid | null = null;
 
-	for (let ix = 0; ix < numX; ix++) {
-		for (let iy = 0; iy < numY; iy++) {
-			const xStart = -innerW / 2 + ix * compartmentW;
-			const yStart = -innerL / 2 + iy * compartmentL;
+	for (let ix = 0; ix < xEdges.length - 1; ix++) {
+		for (let iy = 0; iy < yEdges.length - 1; iy++) {
+			const xStart = xEdges[ix];
+			const yStart = yEdges[iy];
+			const compartmentW = xEdges[ix + 1] - xEdges[ix];
+			const compartmentL = yEdges[iy + 1] - yEdges[iy];
 
 			for (const wall of p.scoopWalls) {
 				let ramp: Solid;
