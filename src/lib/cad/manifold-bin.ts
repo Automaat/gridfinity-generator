@@ -8,16 +8,16 @@ import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import { dividerCoords, compartmentEdges } from './divider-layout';
 
-const GRID_UNIT = 42;
+export const GRID_UNIT = 42;
 const HEIGHT_UNIT = 7;
-const TOLERANCE = 0.5;
-const BASE_PROFILE_HEIGHT = 4.75;
-const CORNER_FILLET_RADIUS = 3.75;
-const MAGNET_HOLE_DIAMETER = 6.5;
-const MAGNET_HOLE_DEPTH = 2.4;
-const SCREW_HOLE_DIAMETER = 3;
-const SCREW_HOLE_DEPTH = 6;
-const HOLE_DISTANCE_FROM_EDGE = 8;
+export const TOLERANCE = 0.5;
+export const BASE_PROFILE_HEIGHT = 4.75;
+export const CORNER_FILLET_RADIUS = 3.75;
+export const MAGNET_HOLE_DIAMETER = 6.5;
+export const MAGNET_HOLE_DEPTH = 2.4;
+export const SCREW_HOLE_DIAMETER = 3;
+export const SCREW_HOLE_DEPTH = 6;
+export const HOLE_DISTANCE_FROM_EDGE = 8;
 const LIP_OFFSET_BOTTOM = 2.95;
 const LIP_OFFSET_MID = 0.8;
 // The standard stacking lip protrudes above the nominal units×7 height — a
@@ -43,9 +43,15 @@ let M: ManifoldToplevel | null = null;
 export function setBinManifold(m: ManifoldToplevel): void {
 	M = m;
 }
-function oc(): ManifoldToplevel {
+export function oc(): ManifoldToplevel {
 	if (!M) throw new Error('manifold engine not initialized — call setBinManifold first');
 	return M;
+}
+
+// Tessellation count for circles/arcs is shared module state (read by roundedRectCS,
+// cylinders, etc). The baseplate builder sets it the same way the bin builder does.
+export function setSegments(n: number): void {
+	circleSegments = n;
 }
 
 function bodySize(units: number): number {
@@ -63,7 +69,7 @@ function roundedRectCS(w: number, l: number, r: number) {
 }
 
 // Rounded-rectangle prism, base resting at z.
-function roundedPrism(w: number, l: number, r: number, height: number, z: number): Manifold {
+export function roundedPrism(w: number, l: number, r: number, height: number, z: number): Manifold {
 	return oc().Manifold.extrude(roundedRectCS(w, l, r), height).translate([0, 0, z]);
 }
 
@@ -81,7 +87,7 @@ function chamfer(
 }
 
 // Axis-aligned box centered in X/Y at (cx, cy), bottom resting at zBase.
-function box(w: number, l: number, h: number, cx: number, cy: number, zBase: number): Manifold {
+export function box(w: number, l: number, h: number, cx: number, cy: number, zBase: number): Manifold {
 	return oc().Manifold.cube([w, l, h]).translate([cx - w / 2, cy - l / 2, zBase]);
 }
 
@@ -117,7 +123,7 @@ function cylinderAlongY(radius: number, length: number): Manifold {
 	return oc().Manifold.cylinder(length, radius, radius, circleSegments).rotate([-90, 0, 0]);
 }
 
-function unitBase(): Manifold {
+export function unitBase(): Manifold {
 	const ub = GRID_UNIT - TOLERANCE; // 41.5
 	// levels: (z0,35.6,0.8)(z0.8,37.2,1.6)(z2.6,37.2,1.6)(z4.75,41.5,3.75)
 	const c1 = chamfer(35.6, 35.6, 0.8, 0, 37.2, 37.2, 1.6, 0.8);

@@ -180,3 +180,130 @@ export function deserializeParams(search: URLSearchParams): BinParams {
 	}
 	return p;
 }
+
+// ---------------------------------------------------------------------------
+// Baseplate (drawer-insert) generator — a second top-level mode. A baseplate is
+// the grid bins drop into; it auto-splits into printer-bed-sized tiles joined by
+// dovetails, in magnet or simple (no-hole) styles. Kept structurally separate
+// from BinParams so the bin flow is untouched.
+// ---------------------------------------------------------------------------
+
+export type AppMode = 'bin' | 'baseplate';
+export type Align = 'low' | 'center' | 'high';
+
+export interface BaseplateParams {
+	drawerWidth: number; // mm — interior drawer width to fill
+	drawerDepth: number; // mm — interior drawer depth to fill
+	alignX: Align; // how leftover (skirt) margin is distributed in X
+	alignY: Align;
+	style: 'simple' | 'magnet'; // magnet => corner magnet pockets
+	screwHoles: boolean; // extra M3 pockets (magnet style only)
+	bedWidth: number; // mm — printer bed size, the split target
+	bedDepth: number;
+	splitAlgorithm: 'ideal' | 'incremental';
+	dovetails: boolean; // seam connectors (no-op when a single tile)
+	exportLayout: 'zip' | 'combined'; // multi-tile STL delivery
+}
+
+export const defaultBaseplate: BaseplateParams = {
+	drawerWidth: 336,
+	drawerDepth: 252,
+	alignX: 'center',
+	alignY: 'center',
+	style: 'magnet',
+	screwHoles: false,
+	bedWidth: 220,
+	bedDepth: 220,
+	splitAlgorithm: 'ideal',
+	dovetails: true,
+	exportLayout: 'zip'
+};
+
+export const mode = writable<AppMode>('bin');
+export const baseplateParams = writable<BaseplateParams>({ ...defaultBaseplate });
+
+export const baseplateGrid = derived(baseplateParams, ($b) => ({
+	cols: Math.max(1, Math.floor($b.drawerWidth / 42)),
+	rows: Math.max(1, Math.floor($b.drawerDepth / 42))
+}));
+
+const ALIGN_TO_CHAR = { low: 'l', center: 'c', high: 'h' } as const;
+const STYLE_TO_CHAR = { simple: 's', magnet: 'm' } as const;
+const ALGO_TO_CHAR = { ideal: 'i', incremental: 'n' } as const;
+const LAYOUT_TO_CHAR = { zip: 'z', combined: 'c' } as const;
+const CHAR_TO_ALIGN = invert(ALIGN_TO_CHAR);
+const CHAR_TO_STYLE = invert(STYLE_TO_CHAR);
+const CHAR_TO_ALGO = invert(ALGO_TO_CHAR);
+const CHAR_TO_LAYOUT = invert(LAYOUT_TO_CHAR);
+
+type BpCodec<K extends keyof BaseplateParams> = {
+	key: string;
+	encode: (value: BaseplateParams[K]) => string;
+	decode: (raw: string, def: BaseplateParams[K]) => BaseplateParams[K];
+};
+type BpCodecs = { [K in keyof BaseplateParams]-?: BpCodec<K> };
+
+// Baseplate URL keys are chosen to never collide with the bin keys above, so a
+// single URLSearchParams can hold either set unambiguously.
+const BP_CODECS: BpCodecs = {
+	drawerWidth: { ...num(42, 2000, true), key: 'dw' },
+	drawerDepth: { ...num(42, 2000, true), key: 'dd' },
+	alignX: { key: 'ax', encode: (v) => ALIGN_TO_CHAR[v], decode: (raw, def) => CHAR_TO_ALIGN[raw] ?? def },
+	alignY: { key: 'ay', encode: (v) => ALIGN_TO_CHAR[v], decode: (raw, def) => CHAR_TO_ALIGN[raw] ?? def },
+	style: { key: 'st', encode: (v) => STYLE_TO_CHAR[v], decode: (raw, def) => CHAR_TO_STYLE[raw] ?? def },
+	screwHoles: { ...bool, key: 'bsh' },
+	bedWidth: { ...num(42, 1000, true), key: 'bw' },
+	bedDepth: { ...num(42, 1000, true), key: 'bd' },
+	splitAlgorithm: { key: 'sa', encode: (v) => ALGO_TO_CHAR[v], decode: (raw, def) => CHAR_TO_ALGO[raw] ?? def },
+	dovetails: { ...bool, key: 'dt' },
+	exportLayout: { key: 'el', encode: (v) => LAYOUT_TO_CHAR[v], decode: (raw, def) => CHAR_TO_LAYOUT[raw] ?? def }
+};
+
+const BP_KEYS = Object.keys(BP_CODECS) as (keyof BaseplateParams)[];
+
+function bpEncode<K extends keyof BaseplateParams>(p: BaseplateParams, param: K): string {
+	const codec = BP_CODECS[param] as unknown as BpCodec<K>;
+	return codec.encode(p[param]);
+}
+function bpDecode<K extends keyof BaseplateParams>(p: BaseplateParams, param: K, raw: string): void {
+	const codec = BP_CODECS[param] as unknown as BpCodec<K>;
+	p[param] = codec.decode(raw, defaultBaseplate[param]);
+}
+
+function serializeBaseplate(p: BaseplateParams): URLSearchParams {
+	const sp = new URLSearchParams();
+	for (const param of BP_KEYS) {
+		if (p[param] === defaultBaseplate[param]) continue;
+		sp.set(BP_CODECS[param].key, bpEncode(p, param));
+	}
+	return sp;
+}
+
+function deserializeBaseplate(search: URLSearchParams): BaseplateParams {
+	const p = { ...defaultBaseplate };
+	for (const param of BP_KEYS) {
+		const raw = search.get(BP_CODECS[param].key);
+		if (raw === null) continue;
+		bpDecode(p, param, raw);
+	}
+	return p;
+}
+
+// Combined (de)serialization: a single `m` marker selects the active mode; only
+// that mode's params are written, so existing bin-only URLs stay byte-identical.
+export function serializeAll(m: AppMode, bin: BinParams, bp: BaseplateParams): URLSearchParams {
+	if (m === 'baseplate') {
+		const sp = serializeBaseplate(bp);
+		sp.set('m', 'bp');
+		return sp;
+	}
+	return serializeParams(bin);
+}
+
+export function deserializeAll(search: URLSearchParams): { mode: AppMode; bin: BinParams; baseplate: BaseplateParams } {
+	return {
+		mode: search.get('m') === 'bp' ? 'baseplate' : 'bin',
+		bin: deserializeParams(search),
+		baseplate: deserializeBaseplate(search)
+	};
+}

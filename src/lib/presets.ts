@@ -1,9 +1,15 @@
-import type { BinParams } from '$lib/stores/params';
+import type { BinParams, BaseplateParams } from '$lib/stores/params';
 
 export interface Preset {
 	name: string;
 	description: string;
 	params: BinParams;
+}
+
+export interface BaseplatePreset {
+	name: string;
+	description: string;
+	params: BaseplateParams;
 }
 
 export const presets: Preset[] = [
@@ -120,6 +126,27 @@ export const presets: Preset[] = [
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
 			wallCutRun: 1
+		}
+	}
+];
+
+export const baseplatePresets: BaseplatePreset[] = [
+	{
+		name: 'IKEA Alex drawer',
+		description: 'Magnetic baseplate for an Alex drawer (~552×360mm), split for a 220mm bed',
+		params: {
+			drawerWidth: 552, drawerDepth: 360, alignX: 'center', alignY: 'center',
+			style: 'magnet', screwHoles: false, bedWidth: 220, bedDepth: 220,
+			splitAlgorithm: 'ideal', dovetails: true, exportLayout: 'zip'
+		}
+	},
+	{
+		name: 'Small drawer (simple)',
+		description: 'Single-piece no-magnet grid, fits a 256mm bed',
+		params: {
+			drawerWidth: 252, drawerDepth: 210, alignX: 'center', alignY: 'center',
+			style: 'simple', screwHoles: false, bedWidth: 256, bedDepth: 256,
+			splitAlgorithm: 'ideal', dovetails: true, exportLayout: 'zip'
 		}
 	}
 ];

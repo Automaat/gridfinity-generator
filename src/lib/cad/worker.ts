@@ -1,9 +1,11 @@
 import manifoldModule from 'manifold-3d';
 import manifoldWasm from 'manifold-3d/manifold.wasm?url';
+import { zipSync } from 'fflate';
 import { buildBinManifold, setBinManifold } from './manifold-bin';
-import { manifoldToMesh, manifoldToStlBlob } from './mesh-util';
-import type { BinParams } from '$lib/stores/params';
-import { classifyError, validateParams, type WorkerErrorCode } from './worker-errors';
+import { buildBaseplateAssembled, buildBaseplateTiles, buildBaseplateCombined } from './baseplate-manifold';
+import { manifoldToMesh, manifoldToStlBlob, manifoldToStlBytes } from './mesh-util';
+import type { BinParams, BaseplateParams } from '$lib/stores/params';
+import { classifyError, validateParams, validateBaseplate, type WorkerErrorCode } from './worker-errors';
 
 // Preview and STL export both run on the manifold engine (small WASM, eager).
 // STL is rebuilt at a finer tessellation than the preview. OpenCascade is
@@ -24,7 +26,10 @@ const ready = init();
 export type WorkerRequest =
 	| { type: 'build'; params: BinParams }
 	| { type: 'exportSTEP'; params: BinParams }
-	| { type: 'exportSTL'; params: BinParams };
+	| { type: 'exportSTL'; params: BinParams }
+	| { type: 'buildBaseplate'; params: BaseplateParams }
+	| { type: 'exportBaseplateSTL'; params: BaseplateParams }
+	| { type: 'exportBaseplateSTEP'; params: BaseplateParams };
 
 export type WorkerResponse =
 	| {
@@ -34,8 +39,8 @@ export type WorkerResponse =
 			normals: Float32Array;
 			edges: Float32Array;
 		}
-	| { type: 'exportSTEP'; blob: Blob }
-	| { type: 'exportSTL'; blob: Blob }
+	| { type: 'exportSTEP'; blob: Blob; filename: string }
+	| { type: 'exportSTL'; blob: Blob; filename: string }
 	| { type: 'error'; code: WorkerErrorCode; message: string; requestType: WorkerRequest['type'] }
 	| { type: 'ready' };
 
@@ -50,19 +55,43 @@ self.addEventListener('message', async (e: MessageEvent<WorkerRequest>) => {
 	const msg = e.data;
 	try {
 		await ready;
-		validateParams(msg.params);
 
 		if (msg.type === 'build') {
+			validateParams(msg.params);
 			const solid = buildBinManifold(msg.params);
 			const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
 			postMesh(vertices, triangles, normals, edges);
 		} else if (msg.type === 'exportSTEP') {
+			validateParams(msg.params);
 			const { buildOcctBin } = await import('./occt');
 			const shape = await buildOcctBin(msg.params);
-			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP() } satisfies WorkerResponse);
+			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP(), filename: 'bin.step' } satisfies WorkerResponse);
 		} else if (msg.type === 'exportSTL') {
+			validateParams(msg.params);
 			const solid = buildBinManifold(msg.params, { segments: STL_SEGMENTS });
-			self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid) } satisfies WorkerResponse);
+			self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid), filename: 'bin.stl' } satisfies WorkerResponse);
+		} else if (msg.type === 'buildBaseplate') {
+			validateBaseplate(msg.params);
+			const solid = buildBaseplateAssembled(msg.params);
+			const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
+			postMesh(vertices, triangles, normals, edges);
+		} else if (msg.type === 'exportBaseplateSTL') {
+			validateBaseplate(msg.params);
+			if (msg.params.exportLayout === 'zip') {
+				const tiles = buildBaseplateTiles(msg.params, { segments: STL_SEGMENTS });
+				const files: Record<string, Uint8Array> = {};
+				for (const t of tiles) files[t.name] = manifoldToStlBytes(t.solid);
+				const zipped = zipSync(files);
+				self.postMessage({ type: 'exportSTL', blob: new Blob([zipped], { type: 'application/zip' }), filename: 'baseplate.zip' } satisfies WorkerResponse);
+			} else {
+				const solid = buildBaseplateCombined(msg.params, { segments: STL_SEGMENTS });
+				self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid), filename: 'baseplate.stl' } satisfies WorkerResponse);
+			}
+		} else if (msg.type === 'exportBaseplateSTEP') {
+			validateBaseplate(msg.params);
+			const { buildOcctBaseplate } = await import('./baseplate-occt');
+			const shape = await buildOcctBaseplate(msg.params);
+			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP(), filename: 'baseplate.step' } satisfies WorkerResponse);
 		}
 	} catch (err) {
 		const { code, message } = classifyError(err);

@@ -39,6 +39,7 @@
 		"@threlte/core": "^8.5.5",
 		"@threlte/extras": "^9.14.1",
 		"@types/three": "^0.184.0",
+		"fflate": "^0.8.3",
 		"manifold-3d": "^3.5.1",
 		"replicad": "^0.23.0",
 		"replicad-opencascadejs": "^0.23.0",

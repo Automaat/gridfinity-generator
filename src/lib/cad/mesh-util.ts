@@ -95,6 +95,15 @@ export function manifoldToMesh(
 // Binary STL straight from a manifold solid — no replicad/OCCT. manifold output
 // is always a watertight 2-manifold, so the STL is valid by construction.
 export function manifoldToStlBlob(solid: Manifold): Blob {
+	return new Blob([stlArrayBuffer(solid)], { type: 'model/stl' });
+}
+
+// Raw binary-STL bytes, for callers that bundle several tiles into a ZIP.
+export function manifoldToStlBytes(solid: Manifold): Uint8Array {
+	return new Uint8Array(stlArrayBuffer(solid));
+}
+
+function stlArrayBuffer(solid: Manifold): ArrayBuffer {
 	const mesh = solid.getMesh();
 	const np = mesh.numProp;
 	const vp = mesh.vertProperties;
@@ -120,7 +129,7 @@ export function manifoldToStlBlob(solid: Manifold): Blob {
 		dv.setFloat32(o + 36, cx, true); dv.setFloat32(o + 40, cy, true); dv.setFloat32(o + 44, cz, true);
 		o += 50; // 12 floats (48) + 2-byte attribute
 	}
-	return new Blob([buf], { type: 'model/stl' });
+	return buf;
 }
 
 function computeFeatureEdges(
