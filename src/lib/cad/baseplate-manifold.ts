@@ -35,18 +35,17 @@ const DT_TIP = 8; // mm tab width at the tip (must exceed neck to lock)
 const DT_ANCHOR = 1.5; // mm the tab roots back into its own tile body
 const DT_CLEARANCE = 0.15; // mm added to the female pocket per side
 
-// Side-pin connectors: a solid wall along each seam edge with one horizontal hole
-// per shared cell. `screw` = M3 bolt clearance; `filament` = a 1.75mm filament
-// scrap pushed through both tiles as a dowel pin (no hardware). Holes sit at
-// mid-height, below the receiving profile, so the grid surface is untouched.
-const SCREW_WALL = 6; // mm rail reaches into the tile body
+// Tile-seam connectors via horizontal holes, one per shared cell.
+//  - `filament`: a 1.75mm filament scrap pushed in as a dowel. The hole sits LOW,
+//    in the solid floor that already exists between cells, so NO rib is added and
+//    the grid surface stays clean (just gridfinity cells).
+//  - `screw`: an M3 bolt needs more meat, so it keeps a solid seam rail with the
+//    hole at mid-height (gridfinity-rebuilt screw-together — has visible walls).
+const SCREW_WALL = 6; // screw-together rail depth into the body
 const SCREW_R = 1.7; // M3 clearance radius
-const FIL_WALL = 4;
-const FIL_R = 0.9; // 1.8mm — snug on 1.75mm filament
-
-function pinParams(connector: BaseplateParams['connector']): { wall: number; r: number } {
-	return connector === 'screw' ? { wall: SCREW_WALL, r: SCREW_R } : { wall: FIL_WALL, r: FIL_R };
-}
+const FIL_DEPTH = 5; // filament pin reach into each tile
+const FIL_R = 0.9; // 1.8mm, snug on 1.75mm filament
+const FIL_Z = 1.6; // filament hole height — low, hidden in the seam floor (no rib)
 
 // Gap between spread-out tiles in the single combined STL — must clear the male
 // tabs / rails, which protrude past the footprint.
@@ -117,13 +116,12 @@ function pinRail(seam: Seam, thickness: number, wall: number): Manifold {
 	return seam.axis === 'x' ? box(wall, len, thickness, into, mid, 0) : box(len, wall, thickness, mid, into, 0);
 }
 
-// Horizontal hole through a seam rail at mid-height, from the seam face into the body.
-function pinHole(seam: Seam, along: number, thickness: number, wall: number, r: number, segments: number): Manifold {
-	const len = wall + 0.4;
+// Horizontal hole into the tile from the seam face, at height z, reaching `depth`.
+function pinHole(seam: Seam, along: number, depth: number, r: number, z: number, segments: number): Manifold {
+	const len = depth + 0.4;
 	const cyl = oc().Manifold.cylinder(len, r, r, segments);
 	const aligned = seam.axis === 'x' ? cyl.rotate([0, 90, 0]) : cyl.rotate([-90, 0, 0]); // spans +x / +y over [0, len]
 	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - len + 0.2;
-	const z = thickness / 2;
 	return seam.axis === 'x' ? aligned.translate([start, along, z]) : aligned.translate([along, start, z]);
 }
 
@@ -203,12 +201,18 @@ function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, 
 		}
 		if (adds.length > 0) solid = solid.add(Manifold.union(adds));
 		if (cuts.length > 0) solid = solid.subtract(Manifold.union(cuts));
-	} else if (bp.connector === 'screw' || bp.connector === 'filament') {
-		const { wall, r } = pinParams(bp.connector);
-		if (tile.seams.length > 0) solid = solid.add(Manifold.union(tile.seams.map((s) => pinRail(s, thickness, wall))));
+	} else if (bp.connector === 'filament') {
+		// No rib — small dowel holes hidden low in the existing seam floor.
 		const holes: Manifold[] = [];
 		for (const seam of tile.seams) {
-			for (const along of seamCellCenters(seam)) holes.push(pinHole(seam, along, thickness, wall, r, segments));
+			for (const along of seamCellCenters(seam)) holes.push(pinHole(seam, along, FIL_DEPTH, FIL_R, FIL_Z, segments));
+		}
+		if (holes.length > 0) solid = solid.subtract(Manifold.union(holes));
+	} else if (bp.connector === 'screw') {
+		if (tile.seams.length > 0) solid = solid.add(Manifold.union(tile.seams.map((s) => pinRail(s, thickness, SCREW_WALL))));
+		const holes: Manifold[] = [];
+		for (const seam of tile.seams) {
+			for (const along of seamCellCenters(seam)) holes.push(pinHole(seam, along, SCREW_WALL, SCREW_R, thickness / 2, segments));
 		}
 		if (holes.length > 0) solid = solid.subtract(Manifold.union(holes));
 	}
