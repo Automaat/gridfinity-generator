@@ -257,7 +257,7 @@ describe('buildBin', () => {
 	});
 
 	it('returns early when wallHeight is zero or negative', () => {
-		// With height=1, stackingLip='standard': wallHeight = 7 - 7 - 4.75 = negative
+		// height=1: walls fill 7-7=0 ⇒ wallHeight collapses ⇒ early return (base only, no lip)
 		const result = buildBin(makeParams({ height: 1, stackingLip: 'standard' }));
 		expect(result).toBeDefined();
 	});

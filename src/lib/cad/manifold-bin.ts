@@ -19,6 +19,12 @@ const SCREW_HOLE_DEPTH = 6;
 const HOLE_DISTANCE_FROM_EDGE = 8;
 const LIP_OFFSET_BOTTOM = 2.95;
 const LIP_OFFSET_MID = 0.8;
+// The standard stacking lip protrudes above the nominal units×7 height — a
+// 6-unit lipped bin is 45.55mm, not 42mm (gridfinity-rebuilt convention). 3.551
+// is the canonical STACKING_LIP_HEIGHT less its wall-overlap support, measured
+// from the reference STLs. The reduced lip sits flush on the rim (our variant).
+const STACKING_LIP_PROTRUSION = 3.551;
+const REDUCED_LIP_PROTRUSION = 2.15;
 const FLOOR_THICKNESS = 2.25;
 const LABEL_TAB_HEIGHT = 14;
 const LABEL_TAB_DEPTH = 4.5;
@@ -331,10 +337,10 @@ function buildScoops(
 }
 
 function buildWallCut(
-	p: BinParams, bodyW: number, bodyL: number, wallBottom: number, wallHeight: number, lipHeight: number
+	p: BinParams, bodyW: number, bodyL: number, wallBottom: number, wallHeight: number, lipProtrusion: number
 ): Manifold {
 	const margin = 1;
-	const topMostZ = wallBottom + wallHeight + lipHeight;
+	const topMostZ = wallBottom + wallHeight + lipProtrusion;
 	const ceilingZ = topMostZ + 5;
 	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
 	const axis: 'X' | 'Y' = p.wallCutSide === 'front' || p.wallCutSide === 'back' ? 'Y' : 'X';
@@ -385,10 +391,13 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 		if (holes) bin = bin.subtract(holes);
 	}
 
-	// 3. Lip + wall dimensions
-	const lipHeight = p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? 2.15 : 0;
+	// 3. Lip + wall dimensions. Walls fill the full nominal height; the stacking
+	// lip protrudes above it (gridfinity-rebuilt convention), so a lipped bin's
+	// total height is units×7 + lipProtrusion.
+	const lipProfileHeight = p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
+	const lipProtrusion = p.stackingLip === 'standard' ? STACKING_LIP_PROTRUSION : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
 	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
-	const wallHeight = h - wallBottom - lipHeight;
+	const wallHeight = h - wallBottom;
 
 	if (wallHeight <= 0) return bin;
 
@@ -417,14 +426,14 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 		if (tabs) bin = bin.add(tabs);
 	}
 
-	// 7. Stacking lip
-	if (lipHeight > 0) {
-		bin = bin.add(buildStackingLip(bodyW, bodyL, wallBottom + wallHeight, lipHeight));
+	// 7. Stacking lip — protrudes above the wall; its base overlaps the rim as a support.
+	if (lipProfileHeight > 0) {
+		bin = bin.add(buildStackingLip(bodyW, bodyL, h + lipProtrusion - lipProfileHeight, lipProfileHeight));
 	}
 
 	// 8. Diagonal wall cut
 	if (p.wallCut) {
-		bin = bin.subtract(buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipHeight));
+		bin = bin.subtract(buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipProtrusion));
 	}
 
 	return bin;

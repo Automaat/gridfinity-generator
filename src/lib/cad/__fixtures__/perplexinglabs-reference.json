@@ -1,0 +1,159 @@
+{
+  "$comment": "Reference dimensions from gridfinity.perplexinglabs.com (canonical kennetek/gridfinity-rebuilt-openscad). Regenerate with scripts/refresh-reference-fixtures.mjs. Do not edit by hand.",
+  "source": "https://gridfinity.perplexinglabs.com/gen/gridfinity-rebuilt/0/0/stl",
+  "fixtures": [
+    {
+      "id": "1x1x3-lip",
+      "binParams": {
+        "width": 1,
+        "length": 1,
+        "height": 3,
+        "stackingLip": "standard"
+      },
+      "reference": {
+        "hash": "6dc0370ed40dc94a061a4fb3f97bec7788ad65a5.stl",
+        "size": [
+          41.5,
+          41.5,
+          24.551
+        ],
+        "volume": 14921.2,
+        "triangles": 5618
+      }
+    },
+    {
+      "id": "1x1x3-nolip",
+      "binParams": {
+        "width": 1,
+        "length": 1,
+        "height": 3,
+        "stackingLip": "none"
+      },
+      "reference": {
+        "hash": "7c98b39977e14a73e0e2647e1913a723b6f43214.stl",
+        "size": [
+          41.5,
+          41.5,
+          21
+        ],
+        "volume": 13529,
+        "triangles": 3634
+      }
+    },
+    {
+      "id": "1x1x6-lip",
+      "binParams": {
+        "width": 1,
+        "length": 1,
+        "height": 6,
+        "stackingLip": "standard"
+      },
+      "reference": {
+        "hash": "aa927be6bd39b7e26d301404716ca48ca4b8d495.stl",
+        "size": [
+          41.5,
+          41.5,
+          45.551
+        ],
+        "volume": 18883.1,
+        "triangles": 5618
+      }
+    },
+    {
+      "id": "1x1x6-nolip",
+      "binParams": {
+        "width": 1,
+        "length": 1,
+        "height": 6,
+        "stackingLip": "none"
+      },
+      "reference": {
+        "hash": "62aade981f9fabbeac4a3247ae2f817509c3d232.stl",
+        "size": [
+          41.5,
+          41.5,
+          42
+        ],
+        "volume": 17491.2,
+        "triangles": 3634
+      }
+    },
+    {
+      "id": "2x1x4-lip",
+      "binParams": {
+        "width": 2,
+        "length": 1,
+        "height": 4,
+        "stackingLip": "standard"
+      },
+      "reference": {
+        "hash": "fa56c199281bb111a8630ad96138da9836ce9cad.stl",
+        "size": [
+          83.5,
+          41.5,
+          31.551
+        ],
+        "volume": 29982.9,
+        "triangles": 6388
+      }
+    },
+    {
+      "id": "2x3x6-lip",
+      "binParams": {
+        "width": 2,
+        "length": 3,
+        "height": 6,
+        "stackingLip": "standard"
+      },
+      "reference": {
+        "hash": "ded357e7a9707ffda1816c4daa043bdbaf2d4a7f.stl",
+        "size": [
+          83.5,
+          125.5,
+          45.551
+        ],
+        "volume": 85862.9,
+        "triangles": 9396
+      }
+    },
+    {
+      "id": "3x2x5-lip",
+      "binParams": {
+        "width": 3,
+        "length": 2,
+        "height": 5,
+        "stackingLip": "standard"
+      },
+      "reference": {
+        "hash": "3f6a730e68376e4f45328a14ee96dc6d4abc09e0.stl",
+        "size": [
+          125.5,
+          83.5,
+          38.551
+        ],
+        "volume": 82410.8,
+        "triangles": 9396
+      }
+    },
+    {
+      "id": "1x1x6-magnets",
+      "binParams": {
+        "width": 1,
+        "length": 1,
+        "height": 6,
+        "stackingLip": "standard",
+        "magnetHoles": true
+      },
+      "reference": {
+        "hash": "6b1cac5392e634d38b96e453c7ea9d4aeefe10e7.stl",
+        "size": [
+          41.5,
+          41.5,
+          45.551
+        ],
+        "volume": 18481.2,
+        "triangles": 6570
+      }
+    }
+  ]
+}
