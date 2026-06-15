@@ -37,6 +37,7 @@
 		printerBeds.findIndex((b) => b.w === $baseplateParams.bedWidth && b.d === $baseplateParams.bedDepth)
 	);
 	function applyPrinter(value: string) {
+		if (value === '') return; // "Custom" — keep the current bed size
 		const bed = printerBeds[Number(value)];
 		if (bed) baseplateParams.update((p) => ({ ...p, bedWidth: bed.w, bedDepth: bed.d }));
 	}
