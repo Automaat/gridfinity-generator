@@ -41,6 +41,15 @@ export interface RectProfileLevel {
 	r: number;
 }
 
+export type ProfilePair<TLevel> = readonly [TLevel, TLevel];
+export type FourLevelProfile<TLevel> = readonly [TLevel, TLevel, TLevel, TLevel];
+
+export interface ProfileSections<TLevel> {
+	lowerChamfer: ProfilePair<TLevel>;
+	vertical: ProfilePair<TLevel>;
+	upperChamfer: ProfilePair<TLevel>;
+}
+
 export function bodySize(units: number): number {
 	return units * GRID_UNIT - TOLERANCE;
 }
@@ -61,12 +70,20 @@ export function innerFillet(wallThickness: number): number {
 	return Math.max(0.2, CORNER_FILLET_RADIUS - wallThickness);
 }
 
-export const BASE_PROFILE_LEVELS: readonly SquareProfileLevel[] = [
+export const BASE_PROFILE_LEVELS: FourLevelProfile<SquareProfileLevel> = [
 	{ z: 0, size: 35.6, r: 0.8 },
 	{ z: 0.8, size: 37.2, r: 1.6 },
 	{ z: 2.6, size: 37.2, r: 1.6 },
 	{ z: BASE_PROFILE_HEIGHT, size: bodySize(1), r: BASE_TOP_RADIUS }
 ];
+
+export function profileSections<TLevel>(levels: FourLevelProfile<TLevel>): ProfileSections<TLevel> {
+	return {
+		lowerChamfer: [levels[0], levels[1]],
+		vertical: [levels[1], levels[2]],
+		upperChamfer: [levels[2], levels[3]]
+	};
+}
 
 export function lipProfileHeight(lip: StackingLip): number {
 	if (lip === 'standard') return BASE_PROFILE_HEIGHT;
@@ -80,7 +97,7 @@ export function lipProtrusion(lip: StackingLip): number {
 	return 0;
 }
 
-export function standardLipCavityLevels(bodyW: number, bodyL: number, topZ: number): readonly RectProfileLevel[] {
+export function standardLipCavityLevels(bodyW: number, bodyL: number, topZ: number): FourLevelProfile<RectProfileLevel> {
 	return [
 		{
 			z: topZ,

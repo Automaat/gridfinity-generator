@@ -31,31 +31,36 @@ import {
 	isOuterGridCorner,
 	lipProfileHeight,
 	lipProtrusion,
+	profileSections,
 	reducedLipCavityLevels,
-	standardLipCavityLevels
+	standardLipCavityLevels,
+	type RectProfileLevel,
+	type SquareProfileLevel
 } from './gridfinity-spec';
 
-function baseProfileSketchAt(idx: number): Sketch {
-	const l = BASE_PROFILE_LEVELS[idx]!;
+function squareProfileSketch(level: SquareProfileLevel): Sketch {
+	const l = level;
 	return drawRoundedRectangle(l.size, l.size, l.r).sketchOnPlane('XY', l.z) as Sketch;
 }
 
+function rectProfileSketch(level: RectProfileLevel): Sketch {
+	return drawRoundedRectangle(level.w, level.l, level.r).sketchOnPlane('XY', level.z) as Sketch;
+}
+
 export function buildUnitBase(): Solid {
+	const sections = profileSections(BASE_PROFILE_LEVELS);
+	const [lowerStart, lowerEnd] = sections.lowerChamfer;
+	const [verticalStart, verticalEnd] = sections.vertical;
+	const [upperStart, upperEnd] = sections.upperChamfer;
+
 	// Loft section 1: z=0 → z=0.8 (bottom 45° chamfer)
-	const chamfer1 = baseProfileSketchAt(0).loftWith(baseProfileSketchAt(1), { ruled: true }) as Solid;
+	const chamfer1 = squareProfileSketch(lowerStart).loftWith(squareProfileSketch(lowerEnd), { ruled: true }) as Solid;
 
 	// Extrude section 2: z=0.8 → z=2.6 (vertical walls, constant size)
-	const l1 = BASE_PROFILE_LEVELS[1]!;
-	const l2 = BASE_PROFILE_LEVELS[2]!;
-	const vertical = (
-		drawRoundedRectangle(l1.size, l1.size, l1.r).sketchOnPlane(
-			'XY',
-			l1.z
-		) as Sketch
-	).extrude(l2.z - l1.z) as Solid;
+	const vertical = squareProfileSketch(verticalStart).extrude(verticalEnd.z - verticalStart.z) as Solid;
 
 	// Loft section 3: z=2.6 → z=4.75 (top 45° chamfer)
-	const chamfer2 = baseProfileSketchAt(2).loftWith(baseProfileSketchAt(3), { ruled: true }) as Solid;
+	const chamfer2 = squareProfileSketch(upperStart).loftWith(squareProfileSketch(upperEnd), { ruled: true }) as Solid;
 
 	return chamfer1.fuse(vertical).fuse(chamfer2) as Solid;
 }
@@ -121,33 +126,23 @@ function buildStackingLip(
 
 	if (lipHeight >= BASE_PROFILE_HEIGHT) {
 		// Standard full lip
-		const cavityLevels = standardLipCavityLevels(bodyW, bodyL, topZ);
-
-		function cavitySketchAt(idx: number): Sketch {
-			const l = cavityLevels[idx]!;
-			return drawRoundedRectangle(l.w, l.l, l.r).sketchOnPlane('XY', l.z) as Sketch;
-		}
+		const sections = profileSections(standardLipCavityLevels(bodyW, bodyL, topZ));
+		const [lowerStart, lowerEnd] = sections.lowerChamfer;
+		const [verticalStart, verticalEnd] = sections.vertical;
+		const [upperStart, upperEnd] = sections.upperChamfer;
 
 		// Build cavity as 3 sections matching base profile construction
-		const c1 = cavitySketchAt(0).loftWith(cavitySketchAt(1), { ruled: true }) as Solid;
-		const cl1 = cavityLevels[1]!;
-		const cl2 = cavityLevels[2]!;
-		const c2 = (
-			drawRoundedRectangle(
-				cl1.w,
-				cl1.l,
-				cl1.r
-			).sketchOnPlane('XY', cl1.z) as Sketch
-		).extrude(cl2.z - cl1.z) as Solid;
-		const c3 = cavitySketchAt(2).loftWith(cavitySketchAt(3), { ruled: true }) as Solid;
+		const c1 = rectProfileSketch(lowerStart).loftWith(rectProfileSketch(lowerEnd), { ruled: true }) as Solid;
+		const c2 = rectProfileSketch(verticalStart).extrude(verticalEnd.z - verticalStart.z) as Solid;
+		const c3 = rectProfileSketch(upperStart).loftWith(rectProfileSketch(upperEnd), { ruled: true }) as Solid;
 
 		const cavity = c1.fuse(c2).fuse(c3) as Solid;
 		return outer.cut(cavity) as Solid;
 	} else {
 		// Reduced lip — single chamfer section
 		const [bottomLevel, topLevel] = reducedLipCavityLevels(bodyW, bodyL, topZ, lipHeight);
-		const bottomSketch = drawRoundedRectangle(bottomLevel.w, bottomLevel.l, bottomLevel.r).sketchOnPlane('XY', bottomLevel.z) as Sketch;
-		const topSketch = drawRoundedRectangle(topLevel.w, topLevel.l, topLevel.r).sketchOnPlane('XY', topLevel.z) as Sketch;
+		const bottomSketch = rectProfileSketch(bottomLevel);
+		const topSketch = rectProfileSketch(topLevel);
 
 		const cavity = bottomSketch.loftWith(topSketch, { ruled: true }) as Solid;
 		return outer.cut(cavity) as Solid;
