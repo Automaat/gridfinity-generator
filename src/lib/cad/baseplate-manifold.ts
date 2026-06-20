@@ -35,9 +35,14 @@ import {
 	MAGNET_HOLE_DIAMETER,
 	SCREW_HOLE_DIAMETER
 } from './gridfinity-spec';
-
-const PREVIEW_SEGMENTS = 32;
-const EXPORT_SEGMENTS = 64;
+import {
+	combinedGridPlacements,
+	EXPORT_SEGMENTS,
+	gridExportName,
+	PREVIEW_SEGMENTS,
+	type BuildOpts,
+	type NamedSolid
+} from './split-export';
 
 // One dovetail tab at `along` on a seam, through the full plate thickness. Male =
 // a protruding tail rooted in this tile; female = the matching pocket (clearance-
@@ -156,10 +161,6 @@ function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, 
 	return solid;
 }
 
-export interface BuildOpts {
-	segments?: number;
-}
-
 // Assembled plate (all tiles in place) — the live preview.
 export function buildBaseplateAssembled(bp: BaseplateParams, { segments = PREVIEW_SEGMENTS }: BuildOpts = {}): Manifold {
 	setSegments(segments);
@@ -169,18 +170,13 @@ export function buildBaseplateAssembled(bp: BaseplateParams, { segments = PREVIE
 	return tiles.length === 1 ? tiles[0]! : oc().Manifold.union(tiles);
 }
 
-export interface NamedSolid {
-	name: string;
-	solid: Manifold;
-}
-
 // Each tile localized to its own origin — for per-file (ZIP) STL export.
 export function buildBaseplateTiles(bp: BaseplateParams, { segments = EXPORT_SEGMENTS }: BuildOpts = {}): NamedSolid[] {
 	setSegments(segments);
 	const layout = planBaseplate(bp);
 	const t = baseplateThickness(bp.style);
 	return layout.tiles.map((tile) => ({
-		name: `tile_r${tile.row + 1}c${tile.col + 1}.stl`,
+		name: gridExportName('tile', tile),
 		solid: buildTile(tile, bp, t, segments).translate([-tile.cx, -tile.cy, 0])
 	}));
 }
@@ -190,27 +186,9 @@ export function buildBaseplateCombined(bp: BaseplateParams, { segments = EXPORT_
 	setSegments(segments);
 	const layout = planBaseplate(bp);
 	const t = baseplateThickness(bp.style);
-	const colW: number[] = [];
-	const rowL: number[] = [];
-	for (const tile of layout.tiles) {
-		colW[tile.col] = Math.max(colW[tile.col] ?? 0, tile.w);
-		rowL[tile.row] = Math.max(rowL[tile.row] ?? 0, tile.l);
-	}
-	const colX: number[] = [];
-	const rowY: number[] = [];
-	let cx = 0;
-	for (let c = 0; c < colW.length; c++) {
-		colX[c] = cx;
-		cx += (colW[c] ?? 0) + COMBINED_TILE_GAP;
-	}
-	let cy = 0;
-	for (let r = 0; r < rowL.length; r++) {
-		rowY[r] = cy;
-		cy += (rowL[r] ?? 0) + COMBINED_TILE_GAP;
-	}
-	const placed = layout.tiles.map((tile) => {
+	const placed = combinedGridPlacements(layout.tiles, COMBINED_TILE_GAP).map(({ item: tile, x, y }) => {
 		const local = buildTile(tile, bp, t, segments).translate([-tile.cx, -tile.cy, 0]);
-		return local.translate([colX[tile.col]! + tile.w / 2, rowY[tile.row]! + tile.l / 2, 0]);
+		return local.translate([x, y, 0]);
 	});
 	return placed.length === 1 ? placed[0]! : oc().Manifold.union(placed);
 }
