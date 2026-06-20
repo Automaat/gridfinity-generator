@@ -54,7 +54,12 @@ export const presets: Preset[] = [
 			wallCut: false,
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
-			wallCutRun: 1
+			wallCutRun: 1,
+			splitToFit: false,
+			bedWidth: 220,
+			bedDepth: 220,
+			splitAlgorithm: 'ideal',
+			splitLayout: 'zip'
 		}
 	},
 	{
@@ -78,7 +83,12 @@ export const presets: Preset[] = [
 			wallCut: false,
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
-			wallCutRun: 1
+			wallCutRun: 1,
+			splitToFit: false,
+			bedWidth: 220,
+			bedDepth: 220,
+			splitAlgorithm: 'ideal',
+			splitLayout: 'zip'
 		}
 	},
 	{
@@ -102,7 +112,12 @@ export const presets: Preset[] = [
 			wallCut: false,
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
-			wallCutRun: 1
+			wallCutRun: 1,
+			splitToFit: false,
+			bedWidth: 220,
+			bedDepth: 220,
+			splitAlgorithm: 'ideal',
+			splitLayout: 'zip'
 		}
 	},
 	{
@@ -126,7 +141,12 @@ export const presets: Preset[] = [
 			wallCut: false,
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
-			wallCutRun: 1
+			wallCutRun: 1,
+			splitToFit: false,
+			bedWidth: 220,
+			bedDepth: 220,
+			splitAlgorithm: 'ideal',
+			splitLayout: 'zip'
 		}
 	},
 	{
@@ -150,7 +170,12 @@ export const presets: Preset[] = [
 			wallCut: false,
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
-			wallCutRun: 1
+			wallCutRun: 1,
+			splitToFit: false,
+			bedWidth: 220,
+			bedDepth: 220,
+			splitAlgorithm: 'ideal',
+			splitLayout: 'zip'
 		}
 	}
 ];

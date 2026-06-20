@@ -22,7 +22,7 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 		width: 1, length: 1, height: 3, wallThickness: 1.2, magnetHoles: false, magnetCornersOnly: false, screwHoles: false,
 		stackingLip: 'none', labelTab: false, dividersX: 0, dividersY: 0, lightweightDividers: false,
 		scoopWalls: [], scoopRadius: 0, wallCut: false, wallCutSide: 'front', wallCutLowFraction: 0,
-		wallCutRun: 1, ...overrides
+		wallCutRun: 1, splitToFit: false, bedWidth: 220, bedDepth: 220, splitAlgorithm: 'ideal', splitLayout: 'zip', ...overrides
 	};
 }
 

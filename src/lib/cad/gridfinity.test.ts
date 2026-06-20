@@ -102,6 +102,11 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 		wallCutSide: 'front',
 		wallCutLowFraction: 0,
 		wallCutRun: 1,
+		splitToFit: false,
+		bedWidth: 220,
+		bedDepth: 220,
+		splitAlgorithm: 'ideal',
+		splitLayout: 'zip',
 		...overrides
 	};
 }
