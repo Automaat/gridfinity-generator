@@ -422,7 +422,7 @@
 					pieces ({binSplit.tilesX}×{binSplit.tilesY}) along grid lines · glue the flush faces.
 				</p>
 				<label class="block">
-					<span class={lbl}>Split layout</span>
+					<span class={lbl}>Piece sizing</span>
 					<select bind:value={$params.splitAlgorithm} class={selectInput} style:background-image={chevron}>
 						<option value="ideal">Balanced (even pieces)</option>
 						<option value="incremental">Packed (max per piece)</option>
