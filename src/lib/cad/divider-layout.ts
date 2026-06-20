@@ -7,13 +7,15 @@
 // from the low wall (left for X, back for Y). Fractions stay correct when the bin
 // is resized; the geometry converts them to centered model coordinates.
 import type { BinParams } from '$lib/stores/params';
+import { WALL_BOTTOM, bodySize, nominalHeight } from './gridfinity-spec';
 
-// Gridfinity spec constants (mirror gridfinity.ts / manifold-bin.ts).
-export const GRID_UNIT = 42;
-export const HEIGHT_UNIT = 7;
-export const TOLERANCE = 0.5;
-export const BASE_PROFILE_HEIGHT = 4.75;
-export const FLOOR_THICKNESS = 2.25;
+export {
+	BASE_PROFILE_HEIGHT,
+	FLOOR_THICKNESS,
+	GRID_UNIT,
+	HEIGHT_UNIT,
+	TOLERANCE
+} from './gridfinity-spec';
 
 export function clamp(v: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, v));
@@ -87,10 +89,10 @@ export interface InteriorBox {
 // Interior dimensions in model space, matching the CAD builders. Used by the
 // gizmos to place drag handles and dimension lines on the rim.
 export function interiorBox(p: BinParams): InteriorBox {
-	const bodyW = p.width * GRID_UNIT - TOLERANCE;
-	const bodyL = p.length * GRID_UNIT - TOLERANCE;
-	const heightMm = p.height * HEIGHT_UNIT;
-	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS; // 7
+	const bodyW = bodySize(p.width);
+	const bodyL = bodySize(p.length);
+	const heightMm = nominalHeight(p.height);
+	const wallBottom = WALL_BOTTOM;
 	const wallHeight = Math.max(0, heightMm - wallBottom);
 	return {
 		bodyW,

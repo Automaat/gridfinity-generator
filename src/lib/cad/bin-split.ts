@@ -4,14 +4,13 @@
 //
 // Only X/Y can exceed a bed: bins cap at 6 units (≈252mm) wide/deep but ≤10 units
 // (≤73.5mm incl. lip) tall, well within any bed's Z — so pieces are never split in
-// height. Cuts land on cell boundaries (multiples of 42mm) where the cross-section
+// height. Cuts land on cell boundaries (multiples of PITCH) where the cross-section
 // is clean. Pieces are flush; the geometry builder glues/exports them as-is.
 //
 // Coordinate frame matches the bin builder: the assembled bin is centered on the
-// origin, cell i center at i·42 − gridOffset.
+// origin, cell i center at i * PITCH - gridOffset.
 import { PITCH, tileSpans } from './baseplate-layout';
-
-const TOLERANCE = 0.5; // matches manifold-bin TOLERANCE — bodySize = units·42 − 0.5
+import { bodySize, gridOffset } from './gridfinity-spec';
 
 // One printable piece of a split bin, in assembled (centered) mm. [x0,x1]×[y0,y1]
 // is the clip region; cx/cy is its center (used to localize the piece for export).
@@ -45,10 +44,10 @@ export function planBinSplit(
 	bedDepth: number,
 	algo: 'ideal' | 'incremental'
 ): BinSplitPlan {
-	const bodyW = width * PITCH - TOLERANCE;
-	const bodyL = length * PITCH - TOLERANCE;
-	const gridOffsetX = ((width - 1) * PITCH) / 2;
-	const gridOffsetY = ((length - 1) * PITCH) / 2;
+	const bodyW = bodySize(width);
+	const bodyL = bodySize(length);
+	const gridOffsetX = gridOffset(width);
+	const gridOffsetY = gridOffset(length);
 	// Internal grid line before cell i (assembled mm); i in 1..units-1.
 	const lineX = (i: number) => i * PITCH - PITCH / 2 - gridOffsetX;
 	const lineY = (j: number) => j * PITCH - PITCH / 2 - gridOffsetY;

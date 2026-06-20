@@ -1,4 +1,5 @@
 import type { BinParams, BaseplateParams, SkadisParams } from '$lib/stores/params';
+import { GRID_UNIT } from './gridfinity-spec';
 
 // Timeout is detected on the main thread, but shares this vocabulary so the UI
 // can present every failure uniformly.
@@ -29,8 +30,8 @@ export function validateParams(p: BinParams): void {
 	if (!Number.isFinite(p.scoopRadius) || p.scoopRadius < 0) {
 		throw new InvalidParamsError('Scoop radius must be a non-negative number');
 	}
-	if (p.splitToFit && (!Number.isFinite(p.bedWidth) || !Number.isFinite(p.bedDepth) || p.bedWidth < 42 || p.bedDepth < 42)) {
-		throw new InvalidParamsError('Printer bed must be at least 42mm on each side');
+	if (p.splitToFit && (!Number.isFinite(p.bedWidth) || !Number.isFinite(p.bedDepth) || p.bedWidth < GRID_UNIT || p.bedDepth < GRID_UNIT)) {
+		throw new InvalidParamsError(`Printer bed must be at least ${GRID_UNIT}mm on each side`);
 	}
 }
 
@@ -39,17 +40,17 @@ export function validateBaseplate(bp: BaseplateParams): void {
 	if (!Number.isFinite(bp.drawerWidth) || !Number.isFinite(bp.drawerDepth)) {
 		throw new InvalidParamsError('Drawer dimensions must be finite numbers');
 	}
-	if (bp.drawerWidth < 42 || bp.drawerDepth < 42) {
-		throw new InvalidParamsError('Drawer must be at least 42mm (one grid cell) on each side');
+	if (bp.drawerWidth < GRID_UNIT || bp.drawerDepth < GRID_UNIT) {
+		throw new InvalidParamsError(`Drawer must be at least ${GRID_UNIT}mm (one grid cell) on each side`);
 	}
-	if (!Number.isFinite(bp.bedWidth) || !Number.isFinite(bp.bedDepth) || bp.bedWidth < 42 || bp.bedDepth < 42) {
-		throw new InvalidParamsError('Printer bed must be at least 42mm on each side');
+	if (!Number.isFinite(bp.bedWidth) || !Number.isFinite(bp.bedDepth) || bp.bedWidth < GRID_UNIT || bp.bedDepth < GRID_UNIT) {
+		throw new InvalidParamsError(`Printer bed must be at least ${GRID_UNIT}mm on each side`);
 	}
 	// An edge tile carries one cell plus the leftover skirt; if the bed can't hold
 	// that, planBaseplate would still emit an unprintable tile. Reject it up front.
-	const skirtX = bp.drawerWidth - Math.floor(bp.drawerWidth / 42) * 42;
-	const skirtY = bp.drawerDepth - Math.floor(bp.drawerDepth / 42) * 42;
-	if (bp.bedWidth < 42 + skirtX || bp.bedDepth < 42 + skirtY) {
+	const skirtX = bp.drawerWidth - Math.floor(bp.drawerWidth / GRID_UNIT) * GRID_UNIT;
+	const skirtY = bp.drawerDepth - Math.floor(bp.drawerDepth / GRID_UNIT) * GRID_UNIT;
+	if (bp.bedWidth < GRID_UNIT + skirtX || bp.bedDepth < GRID_UNIT + skirtY) {
 		throw new InvalidParamsError('Printer bed is too small to fit one tile with the drawer padding — increase the bed size or adjust the drawer dimensions');
 	}
 }
