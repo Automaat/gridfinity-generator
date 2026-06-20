@@ -8,10 +8,28 @@
 import type { Manifold } from 'manifold-3d';
 import type { BaseplateParams } from '$lib/stores/params';
 import { oc, roundedPrism, box, unitBase, setSegments } from './manifold-bin';
-import { planBaseplate, PITCH, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
+import { planBaseplate, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
 import {
-	BASE_PROFILE_HEIGHT,
-	HOLE_DISTANCE_FROM_EDGE,
+	baseplateCellCorners,
+	baseplateThickness,
+	COMBINED_TILE_GAP,
+	CORNER_OFFSETS,
+	DOVETAIL_ANCHOR as DT_ANCHOR,
+	DOVETAIL_CLEARANCE as DT_CLEARANCE,
+	DOVETAIL_DEPTH as DT_DEPTH,
+	DOVETAIL_NECK as DT_NECK,
+	DOVETAIL_TIP as DT_TIP,
+	FILAMENT_PIN_DEPTH as FIL_DEPTH,
+	FILAMENT_PIN_RADIUS as FIL_R,
+	FILAMENT_PIN_Z as FIL_Z,
+	MAGNET_BOSS_RADIUS as MAGNET_BOSS_R,
+	SCREW_CONNECTOR_RADIUS as SCREW_R,
+	SCREW_CONNECTOR_WALL as SCREW_WALL,
+	SKELETON_CORNER_RADIUS as SKEL_CORNER_R,
+	SKELETON_OPENING as SKEL_OPENING,
+	SOCKET_DEPTH
+} from './baseplate-spec';
+import {
 	MAGNET_HOLE_DEPTH,
 	MAGNET_HOLE_DIAMETER,
 	SCREW_HOLE_DIAMETER
@@ -19,59 +37,6 @@ import {
 
 const PREVIEW_SEGMENTS = 32;
 const EXPORT_SEGMENTS = 64;
-
-// Plate thickness = full socket profile + a floor. Magnet style adds room for a
-// 2.4mm magnet pocket plus a skin below the socket (cross-ref reference plates:
-// thin ≈4.75, screw-together ≈6.75).
-const SOCKET_DEPTH = BASE_PROFILE_HEIGHT; // 4.75
-const SIMPLE_FLOOR = 1.25;
-const MAGNET_SKIN = 0.8;
-const THICKNESS_SIMPLE = SOCKET_DEPTH + SIMPLE_FLOOR; // 6.0
-const THICKNESS_MAGNET = SOCKET_DEPTH + MAGNET_HOLE_DEPTH + MAGNET_SKIN; // 7.95
-
-// In-plane dovetail snap-tab (jigsaw style): a trapezoid through the full plate
-// thickness, narrow at the seam mouth and wider at the tip so a pressed joint
-// locks. Kept small/subtle. One tab per shared cell.
-const DT_DEPTH = 4; // mm the tail reaches past the seam
-const DT_NECK = 5; // mm tab width at the seam mouth
-const DT_TIP = 8; // mm tab width at the tip (must exceed neck to lock)
-const DT_ANCHOR = 1.5; // mm the tab roots back into its own tile body
-const DT_CLEARANCE = 0.15; // mm added to the female pocket per side
-
-// Tile-seam connectors via horizontal holes, one per shared cell.
-//  - `filament`: a 1.75mm filament scrap pushed in as a dowel. The hole sits LOW,
-//    in the solid floor that already exists between cells, so NO rib is added and
-//    the grid surface stays clean (just gridfinity cells).
-//  - `screw`: an M3 bolt needs more meat, so it keeps a solid seam rail with the
-//    hole at mid-height (gridfinity-rebuilt screw-together — has visible walls).
-const SCREW_WALL = 6; // screw-together rail depth into the body
-const SCREW_R = 1.7; // M3 clearance radius
-const FIL_DEPTH = 5; // filament pin reach into each tile
-const FIL_R = 0.9; // 1.8mm, snug on 1.75mm filament
-const FIL_Z = 1.6; // filament hole height — low, hidden in the seam floor (no rib)
-
-// Gap between spread-out tiles in the single combined STL — must clear the male
-// tabs / rails, which protrude past the footprint.
-const COMBINED_GAP = SCREW_WALL + 8;
-
-// Skeletonized cell: each cell floor is opened through the plate (the canonical
-// gridfinity-rebuilt baseplate look — an airy frame, far less filament than a
-// solid slab). The opening leaves a rim around the receiving profile; the magnet
-// style adds scalloped corner bosses that bulge into the opening to hold magnets.
-const SKEL_OPENING = 33; // rounded-square through-cut side (mm)
-const SKEL_CORNER_R = 7;
-const MAGNET_BOSS_R = MAGNET_HOLE_DIAMETER / 2 + 2; // 5.25mm pad around the pocket
-const HOLE_INSET = PITCH / 2 - HOLE_DISTANCE_FROM_EDGE; // 13mm from the cell center
-const CORNER_OFFSETS: [number, number][] = [
-	[HOLE_INSET, HOLE_INSET],
-	[-HOLE_INSET, HOLE_INSET],
-	[HOLE_INSET, -HOLE_INSET],
-	[-HOLE_INSET, -HOLE_INSET]
-];
-
-function tileThickness(bp: BaseplateParams): number {
-	return bp.style === 'magnet' ? THICKNESS_MAGNET : THICKNESS_SIMPLE;
-}
 
 // CrossSection reads a clockwise contour as a hole; normalize to CCW (winding of
 // the tab polygon flips with the seam direction).
@@ -128,26 +93,6 @@ function pinHole(seam: Seam, along: number, depth: number, r: number, z: number,
 	return seam.axis === 'x' ? aligned.translate([start, along, z]) : aligned.translate([along, start, z]);
 }
 
-// Unique corner positions (magnet/screw sites) across the tile's cells — corners
-// are shared by adjacent cells, so dedupe to avoid redundant booleans.
-function cellCorners(tile: BaseplateTile): [number, number][] {
-	const seen = new Set<string>();
-	const out: [number, number][] = [];
-	for (const cell of tile.cells) {
-		for (const ox of [HOLE_INSET, -HOLE_INSET]) {
-			for (const oy of [HOLE_INSET, -HOLE_INSET]) {
-				const x = cell.x + ox;
-				const y = cell.y + oy;
-				const k = `${x.toFixed(2)}:${y.toFixed(2)}`;
-				if (seen.has(k)) continue;
-				seen.add(k);
-				out.push([x, y]);
-			}
-		}
-	}
-	return out;
-}
-
 // One tile in assembled (drawer) coordinates.
 function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, segments: number): Manifold {
 	const { Manifold } = oc();
@@ -180,7 +125,7 @@ function buildTile(tile: BaseplateTile, bp: BaseplateParams, thickness: number, 
 	// the bin's foot magnet — the gridfinity convention. A thin floor stays below it.
 	// Optional M3 holes pass all the way through for mounting the plate down.
 	if (magnet) {
-		const cutters = cellCorners(tile).map(([x, y]) => {
+		const cutters = baseplateCellCorners(tile.cells).map(([x, y]) => {
 			const parts: Manifold[] = [
 				Manifold.cylinder(MAGNET_HOLE_DEPTH + 0.1, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, segments).translate([0, 0, socketZ - MAGNET_HOLE_DEPTH])
 			];
@@ -230,7 +175,7 @@ export interface BuildOpts {
 export function buildBaseplateAssembled(bp: BaseplateParams, { segments = PREVIEW_SEGMENTS }: BuildOpts = {}): Manifold {
 	setSegments(segments);
 	const layout = planBaseplate(bp);
-	const t = tileThickness(bp);
+	const t = baseplateThickness(bp.style);
 	const tiles = layout.tiles.map((tile) => buildTile(tile, bp, t, segments));
 	return tiles.length === 1 ? tiles[0]! : oc().Manifold.union(tiles);
 }
@@ -244,7 +189,7 @@ export interface NamedSolid {
 export function buildBaseplateTiles(bp: BaseplateParams, { segments = EXPORT_SEGMENTS }: BuildOpts = {}): NamedSolid[] {
 	setSegments(segments);
 	const layout = planBaseplate(bp);
-	const t = tileThickness(bp);
+	const t = baseplateThickness(bp.style);
 	return layout.tiles.map((tile) => ({
 		name: `tile_r${tile.row + 1}c${tile.col + 1}.stl`,
 		solid: buildTile(tile, bp, t, segments).translate([-tile.cx, -tile.cy, 0])
@@ -255,7 +200,7 @@ export function buildBaseplateTiles(bp: BaseplateParams, { segments = EXPORT_SEG
 export function buildBaseplateCombined(bp: BaseplateParams, { segments = EXPORT_SEGMENTS }: BuildOpts = {}): Manifold {
 	setSegments(segments);
 	const layout = planBaseplate(bp);
-	const t = tileThickness(bp);
+	const t = baseplateThickness(bp.style);
 	const colW: number[] = [];
 	const rowL: number[] = [];
 	for (const tile of layout.tiles) {
@@ -267,12 +212,12 @@ export function buildBaseplateCombined(bp: BaseplateParams, { segments = EXPORT_
 	let cx = 0;
 	for (let c = 0; c < colW.length; c++) {
 		colX[c] = cx;
-		cx += (colW[c] ?? 0) + COMBINED_GAP;
+		cx += (colW[c] ?? 0) + COMBINED_TILE_GAP;
 	}
 	let cy = 0;
 	for (let r = 0; r < rowL.length; r++) {
 		rowY[r] = cy;
-		cy += (rowL[r] ?? 0) + COMBINED_GAP;
+		cy += (rowL[r] ?? 0) + COMBINED_TILE_GAP;
 	}
 	const placed = layout.tiles.map((tile) => {
 		const local = buildTile(tile, bp, t, segments).translate([-tile.cx, -tile.cy, 0]);
