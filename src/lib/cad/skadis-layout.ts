@@ -51,14 +51,18 @@ function clampInt(v: number, min: number, max: number): number {
 
 // Absolute Z (world) an opened wall is cut down to. Floored to a printable minimum
 // and capped at the box top (a value ≥ outerH leaves the wall full height, i.e. a
-// no-op cut). Both geometry paths consume these so the cuts match.
+// no-op cut); a non-finite height falls back to the floor so NaN/Infinity can't
+// propagate into the cutters. Both geometry paths consume these so the cuts match.
+const MIN_WALL_CUT_Z = 5;
+function wallCutZ(height: number, outerH: number): number {
+	if (!Number.isFinite(height)) return MIN_WALL_CUT_Z;
+	return Math.min(outerH, Math.max(MIN_WALL_CUT_Z, height));
+}
 export function frontWallCutZ(p: SkadisParams): number {
-	const { outerH } = outerDims(p);
-	return Math.min(outerH, Math.max(5, p.frontWallHeight));
+	return wallCutZ(p.frontWallHeight, outerDims(p).outerH);
 }
 export function sideWallCutZ(p: SkadisParams): number {
-	const { outerH } = outerDims(p);
-	return Math.min(outerH, Math.max(5, p.sideWallHeight));
+	return wallCutZ(p.sideWallHeight, outerDims(p).outerH);
 }
 
 // Hex lattice (lightweight walls) — matches the bin divider lattice in

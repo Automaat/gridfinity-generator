@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { SkadisParams } from '$lib/stores/params';
-import { planSkadis, hexCells, hexPolygon, HEX_RADIUS, SKADIS_PITCH } from './skadis-layout';
+import { planSkadis, hexCells, hexPolygon, frontWallCutZ, sideWallCutZ, HEX_RADIUS, SKADIS_PITCH } from './skadis-layout';
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
 	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
@@ -54,6 +54,23 @@ describe('planSkadis', () => {
 	it('emits cols × rows hooks', () => {
 		const l = planSkadis(makeSk({ width: 160, height: 200, hookRows: 2 }));
 		expect(l.hooks).toHaveLength(l.cols * l.rows);
+	});
+});
+
+describe('wall cut height', () => {
+	it('floors at 5mm and caps at the box top', () => {
+		expect(frontWallCutZ(makeSk({ frontWallHeight: 1 }))).toBe(5);
+		expect(sideWallCutZ(makeSk({ sideWallHeight: 1 }))).toBe(5);
+		// outerH = height + wall = 80 + 2; an over-tall value caps to outerH (no-op cut).
+		expect(frontWallCutZ(makeSk({ height: 80, wallThickness: 2, frontWallHeight: 999 }))).toBe(82);
+		expect(sideWallCutZ(makeSk({ height: 80, wallThickness: 2, sideWallHeight: 999 }))).toBe(82);
+	});
+
+	it('falls back to the floor for non-finite heights (no NaN/Infinity leak)', () => {
+		for (const bad of [Number.NaN, Number.POSITIVE_INFINITY, Number.NEGATIVE_INFINITY]) {
+			expect(frontWallCutZ(makeSk({ frontWallHeight: bad }))).toBe(5);
+			expect(sideWallCutZ(makeSk({ sideWallHeight: bad }))).toBe(5);
+		}
 	});
 });
 
