@@ -109,13 +109,13 @@ export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
 	// Hex lattice through every wall + the floor; the back wall keeps a solid mount
 	// band around the hook rows.
 	if (p.lightweightWalls) {
-		const wallCz = t + p.height / 2;
+		const frontFaceH = frontH - t, sideFaceH = sideZ - t; // exposed wall heights (== outerH-t when closed)
 		const lowestHookZ = layout.hooks.length > 0 ? Math.min(...layout.hooks.map((h) => h.z)) : outerH;
 		const backFaceH = lowestHookZ - MOUNT_BAND - t;
 		const cutters = [
-			...wallHexCuttersSolid('X', p.depth, p.height, t, -outerW / 2 + t / 2, outerD / 2, wallCz),
-			...wallHexCuttersSolid('X', p.depth, p.height, t, outerW / 2 - t / 2, outerD / 2, wallCz),
-			...wallHexCuttersSolid('Y', p.width, p.height, t, 0, outerD - t / 2, wallCz),
+			...wallHexCuttersSolid('X', p.depth, sideFaceH, t, -outerW / 2 + t / 2, outerD / 2, t + sideFaceH / 2),
+			...wallHexCuttersSolid('X', p.depth, sideFaceH, t, outerW / 2 - t / 2, outerD / 2, t + sideFaceH / 2),
+			...wallHexCuttersSolid('Y', p.width, frontFaceH, t, 0, outerD - t / 2, t + frontFaceH / 2),
 			...wallHexCuttersSolid('Y', p.width, backFaceH, t, 0, t / 2, t + backFaceH / 2),
 			...wallHexCuttersSolid('Z', p.width, p.depth, t, 0, outerD / 2, t / 2)
 		];
