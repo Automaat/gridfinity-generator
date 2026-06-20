@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { classifyError, validateParams, validateBaseplate, InvalidParamsError } from './worker-errors';
-import { defaultParams, defaultBaseplate } from '$lib/stores/params';
+import { classifyError, validateParams, validateBaseplate, validateSkadis, InvalidParamsError } from './worker-errors';
+import { defaultParams, defaultBaseplate, defaultSkadis } from '$lib/stores/params';
 
 describe('validateParams', () => {
 	it('accepts default params', () => {
@@ -53,6 +53,28 @@ describe('validateBaseplate', () => {
 		expect(() => validateBaseplate({ ...defaultBaseplate, drawerWidth: 43, bedWidth: 42 })).toThrow(InvalidParamsError);
 		// same drawer with a bed that clears the skirt is fine
 		expect(() => validateBaseplate({ ...defaultBaseplate, drawerWidth: 43, bedWidth: 43 })).not.toThrow();
+	});
+});
+
+describe('validateSkadis', () => {
+	it('accepts default skadis params', () => {
+		expect(() => validateSkadis(defaultSkadis)).not.toThrow();
+	});
+
+	it('rejects non-finite or sub-minimum box dimensions', () => {
+		expect(() => validateSkadis({ ...defaultSkadis, width: NaN })).toThrow(InvalidParamsError);
+		expect(() => validateSkadis({ ...defaultSkadis, depth: 2 })).toThrow(InvalidParamsError);
+	});
+
+	it('rejects non-positive or non-finite wall thickness', () => {
+		expect(() => validateSkadis({ ...defaultSkadis, wallThickness: 0 })).toThrow(InvalidParamsError);
+		expect(() => validateSkadis({ ...defaultSkadis, wallThickness: NaN })).toThrow(InvalidParamsError);
+	});
+
+	it('rejects fractional, non-finite, or sub-one hook rows', () => {
+		expect(() => validateSkadis({ ...defaultSkadis, hookRows: 1.5 })).toThrow(InvalidParamsError);
+		expect(() => validateSkadis({ ...defaultSkadis, hookRows: NaN })).toThrow(InvalidParamsError);
+		expect(() => validateSkadis({ ...defaultSkadis, hookRows: 0 })).toThrow(InvalidParamsError);
 	});
 });
 

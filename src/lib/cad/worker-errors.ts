@@ -66,6 +66,9 @@ export function validateSkadis(p: SkadisParams): void {
 	if (!Number.isFinite(p.wallThickness) || p.wallThickness <= 0) {
 		throw new InvalidParamsError('Wall thickness must be a positive number');
 	}
+	if (!Number.isInteger(p.hookRows) || p.hookRows < 1) {
+		throw new InvalidParamsError('Hook rows must be a positive integer');
+	}
 }
 
 // OpenCascade/WASM surface failures as plain Errors; classify them so the UI can

@@ -333,13 +333,13 @@ function deserializeBaseplate(search: URLSearchParams): BaseplateParams {
 // ---------------------------------------------------------------------------
 
 export interface SkadisParams {
-	width: number; // mm — outer box width (X, along the board)
-	height: number; // mm — outer box height (Z)
-	depth: number; // mm — outer box depth (Y, projection from the board)
-	wallThickness: number; // mm — walls + floor
+	width: number; // mm — interior box width (X, along the board)
+	height: number; // mm — interior box height (Z)
+	depth: number; // mm — interior box depth (Y, projection from the board)
+	wallThickness: number; // mm — walls + floor, added outside the interior
 	hookRows: number; // rows of snap hooks (1–2), stacked at the 40mm pitch
 	openFront: boolean; // lower the front wall for easy access
-	lightweightWalls: boolean; // punch a hex lattice through the side + front walls
+	lightweightWalls: boolean; // punch a hex lattice through the walls + floor
 }
 
 export const defaultSkadis: SkadisParams = {

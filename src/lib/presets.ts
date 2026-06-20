@@ -215,7 +215,7 @@ export const skadisPresets: SkadisPreset[] = [
 	},
 	{
 		name: 'Wide tray',
-		description: 'Wide shallow tray, two hook columns',
+		description: 'Wide shallow tray for longer items',
 		params: { width: 160, height: 50, depth: 60, wallThickness: 2, hookRows: 1, openFront: true, lightweightWalls: false }
 	},
 	{
