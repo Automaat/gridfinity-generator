@@ -9,17 +9,13 @@ import type { Manifold } from 'manifold-3d';
 import type { BaseplateParams } from '$lib/stores/params';
 import { oc, roundedPrism, box, unitBase, setSegments } from './manifold-bin';
 import { planBaseplate, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
+import { dovetailTabSpec, pinHoleSpec, pinRailSpec } from './baseplate-connectors';
 import { ensureCounterClockwise } from './polygon';
 import {
 	baseplateCellCorners,
 	baseplateThickness,
 	COMBINED_TILE_GAP,
 	CORNER_OFFSETS,
-	DOVETAIL_ANCHOR as DT_ANCHOR,
-	DOVETAIL_CLEARANCE as DT_CLEARANCE,
-	DOVETAIL_DEPTH as DT_DEPTH,
-	DOVETAIL_NECK as DT_NECK,
-	DOVETAIL_TIP as DT_TIP,
 	FILAMENT_PIN_DEPTH as FIL_DEPTH,
 	FILAMENT_PIN_RADIUS as FIL_R,
 	FILAMENT_PIN_Z as FIL_Z,
@@ -49,42 +45,23 @@ import {
 // enlarged) cut into the abutting tile. Narrow at the mouth, wider at the tip.
 function dovetailTab(seam: Seam, along: number, thickness: number, female: boolean): Manifold {
 	const { Manifold, CrossSection } = oc();
-	const c = female ? DT_CLEARANCE : 0;
-	const neck = DT_NECK / 2 + c;
-	const tip = DT_TIP / 2 + c;
-	const depth = DT_DEPTH + c;
-	// Male tail extends away from the body (-bodyDir); female pocket into it (+bodyDir).
-	const dir = female ? seam.bodyDir : -seam.bodyDir;
-	const anchor = female ? 0 : DT_ANCHOR; // female mouth sits flush on the seam
-	const pNeck = seam.pos - dir * anchor;
-	const pTip = seam.pos + dir * depth;
-	const poly: [number, number][] = [
-		[pNeck, along - neck],
-		[pNeck, along + neck],
-		[pTip, along + tip],
-		[pTip, along - tip]
-	];
-	const ptsXY: [number, number][] = seam.axis === 'x' ? poly : poly.map(([p, q]) => [q, p]);
-	const cs = new CrossSection(ensureCounterClockwise(ptsXY));
-	const h = female ? thickness + 0.2 : thickness;
-	return Manifold.extrude(cs, h).translate([0, 0, female ? -0.1 : 0]);
+	const spec = dovetailTabSpec(seam, along, thickness, female);
+	const cs = new CrossSection(ensureCounterClockwise(spec.points));
+	return Manifold.extrude(cs, spec.height).translate([0, 0, spec.z]);
 }
 
 // Solid wall along a seam edge — material to pin/bolt through.
 function pinRail(seam: Seam, thickness: number, wall: number): Manifold {
-	const len = seam.max - seam.min;
-	const mid = (seam.min + seam.max) / 2;
-	const into = seam.pos + (seam.bodyDir * wall) / 2; // rail center, inside the body
-	return seam.axis === 'x' ? box(wall, len, thickness, into, mid, 0) : box(len, wall, thickness, mid, into, 0);
+	const spec = pinRailSpec(seam, wall);
+	return box(spec.w, spec.l, thickness, spec.cx, spec.cy, 0);
 }
 
 // Horizontal hole into the tile from the seam face, at height z, reaching `depth`.
 function pinHole(seam: Seam, along: number, depth: number, r: number, z: number, segments: number): Manifold {
-	const len = depth + 0.4;
-	const cyl = oc().Manifold.cylinder(len, r, r, segments);
-	const aligned = seam.axis === 'x' ? cyl.rotate([0, 90, 0]) : cyl.rotate([-90, 0, 0]); // spans +x / +y over [0, len]
-	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - len + 0.2;
-	return seam.axis === 'x' ? aligned.translate([start, along, z]) : aligned.translate([along, start, z]);
+	const spec = pinHoleSpec(seam, along, depth, z);
+	const cyl = oc().Manifold.cylinder(spec.length, r, r, segments);
+	const aligned = spec.axis === 'x' ? cyl.rotate([0, 90, 0]) : cyl.rotate([-90, 0, 0]); // spans +x / +y over the hole length
+	return aligned.translate([spec.x, spec.y, spec.z]);
 }
 
 // One tile in assembled (drawer) coordinates.
