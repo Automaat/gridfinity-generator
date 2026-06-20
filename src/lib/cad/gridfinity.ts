@@ -87,6 +87,16 @@ export function buildUnitBase(): Solid {
 	return chamfer1.fuse(vertical).fuse(chamfer2) as Solid;
 }
 
+// A corner sits at the bin's outer footprint when its tile is on the edge of the
+// grid AND its offset points outward on that axis. For a 1-wide/long grid both
+// signs qualify, so all 4 corners count. Used to restrict magnets to the bin's
+// 4 outer corners (magnetCornersOnly).
+function isBinCorner(p: BinParams, x: number, y: number, ox: number, oy: number): boolean {
+	const outerX = (x === 0 && ox < 0) || (x === p.width - 1 && ox > 0);
+	const outerY = (y === 0 && oy < 0) || (y === p.length - 1 && oy > 0);
+	return outerX && outerY;
+}
+
 function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Solid | null {
 	const unitBody = GRID_UNIT - TOLERANCE;
 	const holeOffset = unitBody / 2 - HOLE_DISTANCE_FROM_EDGE; // 12.75
@@ -112,7 +122,7 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Sol
 
 			for (const [ox, oy] of offsets as [number, number][]) {
 				let cutter: Solid | null = null;
-				if (p.magnetHoles) {
+				if (p.magnetHoles && (!p.magnetCornersOnly || isBinCorner(p, x, y, ox, oy))) {
 					const magnet = (
 						drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
 					).extrude(MAGNET_HOLE_DEPTH) as Solid;

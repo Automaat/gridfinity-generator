@@ -89,6 +89,7 @@ function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 		height: 3,
 		wallThickness: 1.2,
 		magnetHoles: false,
+		magnetCornersOnly: false,
 		screwHoles: false,
 		stackingLip: 'none',
 		labelTab: false,
@@ -148,6 +149,23 @@ describe('buildBin', () => {
 		buildBin(makeParams({ width: 2, length: 2, magnetHoles: true }));
 		// 4 grid cells × 4 corners = 16 magnet holes
 		expect(replicad.drawCircle).toHaveBeenCalledTimes(16);
+	});
+
+	it('restricts magnet holes to the 4 outer corners when magnetCornersOnly', () => {
+		buildBin(makeParams({ width: 2, length: 2, magnetHoles: true, magnetCornersOnly: true }));
+		// Only the bin's 4 outer corners get a magnet — not 16
+		expect(replicad.drawCircle).toHaveBeenCalledTimes(4);
+	});
+
+	it('magnetCornersOnly leaves a 1x1 bin unchanged (all 4 corners are outer)', () => {
+		buildBin(makeParams({ magnetHoles: true, magnetCornersOnly: true }));
+		expect(replicad.drawCircle).toHaveBeenCalledTimes(4);
+	});
+
+	it('magnetCornersOnly keeps screw holes on every tile corner', () => {
+		buildBin(makeParams({ width: 2, length: 2, magnetHoles: true, magnetCornersOnly: true, screwHoles: true }));
+		// 4 corner magnets + 16 per-corner screws
+		expect(replicad.drawCircle).toHaveBeenCalledTimes(20);
 	});
 
 	it('adds standard stacking lip', () => {

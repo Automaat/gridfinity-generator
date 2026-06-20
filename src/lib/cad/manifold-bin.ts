@@ -132,6 +132,15 @@ export function unitBase(): Manifold {
 	return oc().Manifold.union([c1, vertical, c2]);
 }
 
+// Mirrors gridfinity.ts: a corner is on the bin's outer footprint when its tile
+// is on the grid edge and its offset points outward. Restricts magnets to the
+// bin's 4 outer corners (magnetCornersOnly).
+function isBinCorner(p: BinParams, x: number, y: number, ox: number, oy: number): boolean {
+	const outerX = (x === 0 && ox < 0) || (x === p.width - 1 && ox > 0);
+	const outerY = (y === 0 && oy < 0) || (y === p.length - 1 && oy > 0);
+	return outerX && outerY;
+}
+
 function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Manifold | null {
 	const { Manifold } = oc();
 	const unitBody = GRID_UNIT - TOLERANCE;
@@ -147,7 +156,7 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Man
 			const cy = y * GRID_UNIT - gridOffsetY;
 			for (const [ox, oy] of offsets) {
 				const parts: Manifold[] = [];
-				if (p.magnetHoles) {
+				if (p.magnetHoles && (!p.magnetCornersOnly || isBinCorner(p, x, y, ox, oy))) {
 					parts.push(Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, circleSegments));
 				}
 				if (p.screwHoles) {

@@ -19,7 +19,7 @@ beforeAll(async () => {
 
 function makeParams(overrides: Partial<BinParams> = {}): BinParams {
 	return {
-		width: 1, length: 1, height: 3, wallThickness: 1.2, magnetHoles: false, screwHoles: false,
+		width: 1, length: 1, height: 3, wallThickness: 1.2, magnetHoles: false, magnetCornersOnly: false, screwHoles: false,
 		stackingLip: 'none', labelTab: false, dividersX: 0, dividersY: 0, lightweightDividers: false,
 		scoopWalls: [], scoopRadius: 0, wallCut: false, wallCutSide: 'front', wallCutLowFraction: 0,
 		wallCutRun: 1, ...overrides
@@ -50,6 +50,15 @@ describe('buildBinManifold', () => {
 		const solid = buildBinManifold(makeParams({ width: 2, length: 2 })).volume();
 		const holes = buildBinManifold(makeParams({ width: 2, length: 2, magnetHoles: true, screwHoles: true })).volume();
 		expect(holes).toBeLessThan(solid);
+	});
+
+	it('magnetCornersOnly removes fewer magnets than all-tile magnets', () => {
+		const all = buildBinManifold(makeParams({ width: 2, length: 2, magnetHoles: true })).volume();
+		const corners = buildBinManifold(makeParams({ width: 2, length: 2, magnetHoles: true, magnetCornersOnly: true })).volume();
+		const solid = buildBinManifold(makeParams({ width: 2, length: 2 })).volume();
+		// 4 corner magnets remove less than 16, so corners-only keeps more material
+		expect(corners).toBeGreaterThan(all);
+		expect(corners).toBeLessThan(solid);
 	});
 
 	it('stacking lip protrudes above the nominal height (reduced is shorter)', () => {
