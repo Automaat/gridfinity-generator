@@ -4,11 +4,11 @@
 //
 // Only X/Y can exceed a bed: bins cap at 6 units (≈252mm) wide/deep but ≤10 units
 // (≤73.5mm incl. lip) tall, well within any bed's Z — so pieces are never split in
-// height. Cuts land on cell boundaries (multiples of 42mm) where the cross-section
+// height. Cuts land on cell boundaries (multiples of PITCH) where the cross-section
 // is clean. Pieces are flush; the geometry builder glues/exports them as-is.
 //
 // Coordinate frame matches the bin builder: the assembled bin is centered on the
-// origin, cell i center at i·42 − gridOffset.
+// origin, cell i center at i * PITCH - gridOffset.
 import { PITCH, tileSpans } from './baseplate-layout';
 import { bodySize, gridOffset } from './gridfinity-spec';
 

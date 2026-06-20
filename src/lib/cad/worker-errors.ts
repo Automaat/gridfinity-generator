@@ -31,7 +31,7 @@ export function validateParams(p: BinParams): void {
 		throw new InvalidParamsError('Scoop radius must be a non-negative number');
 	}
 	if (p.splitToFit && (!Number.isFinite(p.bedWidth) || !Number.isFinite(p.bedDepth) || p.bedWidth < GRID_UNIT || p.bedDepth < GRID_UNIT)) {
-		throw new InvalidParamsError('Printer bed must be at least 42mm on each side');
+		throw new InvalidParamsError(`Printer bed must be at least ${GRID_UNIT}mm on each side`);
 	}
 }
 
@@ -41,10 +41,10 @@ export function validateBaseplate(bp: BaseplateParams): void {
 		throw new InvalidParamsError('Drawer dimensions must be finite numbers');
 	}
 	if (bp.drawerWidth < GRID_UNIT || bp.drawerDepth < GRID_UNIT) {
-		throw new InvalidParamsError('Drawer must be at least 42mm (one grid cell) on each side');
+		throw new InvalidParamsError(`Drawer must be at least ${GRID_UNIT}mm (one grid cell) on each side`);
 	}
 	if (!Number.isFinite(bp.bedWidth) || !Number.isFinite(bp.bedDepth) || bp.bedWidth < GRID_UNIT || bp.bedDepth < GRID_UNIT) {
-		throw new InvalidParamsError('Printer bed must be at least 42mm on each side');
+		throw new InvalidParamsError(`Printer bed must be at least ${GRID_UNIT}mm on each side`);
 	}
 	// An edge tile carries one cell plus the leftover skirt; if the bed can't hold
 	// that, planBaseplate would still emit an unprintable tile. Reject it up front.
