@@ -10,11 +10,6 @@ import {
 	baseplateCellCorners,
 	baseplateThickness,
 	CORNER_OFFSETS,
-	DOVETAIL_ANCHOR as DT_ANCHOR,
-	DOVETAIL_CLEARANCE as DT_CLEARANCE,
-	DOVETAIL_DEPTH as DT_DEPTH,
-	DOVETAIL_NECK as DT_NECK,
-	DOVETAIL_TIP as DT_TIP,
 	FILAMENT_PIN_DEPTH as FIL_DEPTH,
 	FILAMENT_PIN_RADIUS as FIL_R,
 	FILAMENT_PIN_Z as FIL_Z,
@@ -26,6 +21,7 @@ import {
 	SOCKET_DEPTH
 } from './baseplate-spec';
 import { planBaseplate, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
+import { dovetailTabSpec, pinHoleSpec, pinRailSpec } from './baseplate-connectors';
 import {
 	MAGNET_HOLE_DEPTH,
 	MAGNET_HOLE_DIAMETER,
@@ -44,46 +40,23 @@ function init(): Promise<void> {
 }
 
 function dovetailTabSolid(seam: Seam, along: number, thickness: number, female: boolean): Solid {
-	const c = female ? DT_CLEARANCE : 0;
-	const neck = DT_NECK / 2 + c;
-	const tip = DT_TIP / 2 + c;
-	const depth = DT_DEPTH + c;
-	const dir = female ? seam.bodyDir : -seam.bodyDir;
-	const anchor = female ? 0 : DT_ANCHOR;
-	const pNeck = seam.pos - dir * anchor;
-	const pTip = seam.pos + dir * depth;
-	const poly: [number, number][] = [
-		[pNeck, along - neck],
-		[pNeck, along + neck],
-		[pTip, along + tip],
-		[pTip, along - tip]
-	];
-	const ptsXY: [number, number][] = seam.axis === 'x' ? poly : poly.map(([p, q]) => [q, p]);
-	let dw = draw(ptsXY[0]);
-	for (let i = 1; i < ptsXY.length; i++) dw = dw.lineTo(ptsXY[i]!);
-	const z0 = female ? -0.1 : 0;
-	const h = female ? thickness + 0.2 : thickness;
-	return (dw.close().sketchOnPlane('XY', z0) as Sketch).extrude(h) as Solid;
+	const spec = dovetailTabSpec(seam, along, thickness, female);
+	let dw = draw(spec.points[0]);
+	for (let i = 1; i < spec.points.length; i++) dw = dw.lineTo(spec.points[i]!);
+	return (dw.close().sketchOnPlane('XY', spec.z) as Sketch).extrude(spec.height) as Solid;
 }
 
 function pinRailSolid(seam: Seam, thickness: number, wall: number): Solid {
-	const len = seam.max - seam.min;
-	const mid = (seam.min + seam.max) / 2;
-	const into = seam.pos + (seam.bodyDir * wall) / 2;
-	const w = seam.axis === 'x' ? wall : len;
-	const l = seam.axis === 'x' ? len : wall;
-	const cx = seam.axis === 'x' ? into : mid;
-	const cy = seam.axis === 'x' ? mid : into;
-	return (drawRoundedRectangle(w, l, 0).sketchOnPlane('XY') as Sketch).extrude(thickness).translate(cx, cy, 0) as Solid;
+	const spec = pinRailSpec(seam, wall);
+	return (drawRoundedRectangle(spec.w, spec.l, 0).sketchOnPlane('XY') as Sketch).extrude(thickness).translate(spec.cx, spec.cy, 0) as Solid;
 }
 
 function pinHoleSolid(seam: Seam, along: number, depth: number, r: number, z: number): Solid {
-	const len = depth + 0.4;
-	const start = seam.bodyDir > 0 ? seam.pos - 0.2 : seam.pos - len + 0.2;
+	const spec = pinHoleSpec(seam, along, depth, z);
 	// Horizontal hole: sketch on the plane normal to the seam, extrude into the body.
-	return seam.axis === 'x'
-		? ((drawCircle(r).sketchOnPlane('YZ', start) as Sketch).extrude(len).translate(0, along, z) as Solid)
-		: ((drawCircle(r).sketchOnPlane('XZ', start) as Sketch).extrude(len).translate(along, 0, z) as Solid);
+	return spec.axis === 'x'
+		? ((drawCircle(r).sketchOnPlane('YZ', spec.start) as Sketch).extrude(spec.length).translate(0, spec.y, spec.z) as Solid)
+		: ((drawCircle(r).sketchOnPlane('XZ', spec.start) as Sketch).extrude(spec.length).translate(spec.x, 0, spec.z) as Solid);
 }
 
 function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: number, foot: Solid): Solid {
