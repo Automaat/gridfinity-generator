@@ -74,7 +74,8 @@ function hookProfile(z: number): [number, number][] {
 	];
 }
 
-// One self-supporting drop-catch hook at (x, z); the profile is extruded HOOK_W along X.
+// One conventional hook at (x, z); the profile is extruded HOOK_W along X. Its arm
+// underside + lip bottom are overhangs — prints with supports (see hookProfile).
 function buildHook(x: number, z: number): Manifold {
 	return prismAlongX(hookProfile(z), HOOK_W).translate([x - HOOK_W / 2, 0, 0]);
 }
