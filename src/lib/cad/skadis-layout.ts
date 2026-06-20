@@ -17,7 +17,7 @@ export const SLOT_H = 15;
 // Placement margins (mm).
 const COL_EDGE_MARGIN = 6; // keep the outer columns inside the box width
 const TOP_MARGIN = 8; // drop of the top hook row below the box top edge
-const HOOK_REACH_BELOW = 6; // arm half-height + barb drop the lowest row needs above the floor
+const HOOK_REACH_BELOW = 9; // self-supporting wedge reaches ~8mm below the row center — keep it clear of the floor
 
 export interface SkadisHook {
 	x: number; // column center (box centered on X)
@@ -65,8 +65,9 @@ export function sideWallCutZ(p: SkadisParams): number {
 	return wallCutZ(p.sideWallHeight, outerDims(p).outerH);
 }
 
-// Hex lattice (lightweight walls) — matches the bin divider lattice in
-// manifold-bin.ts so the look is consistent across the app.
+// Hex lattice (lightweight walls). Same radius/web/margin as the bin dividers, but
+// flat-top (vs the bins' pointy-top) so a wall hole's cut edges stay ~30° from
+// vertical and the top closes with only a short bridge — printable without supports.
 export const HEX_RADIUS = 6;
 const HEX_WEB = 2; // wall left between adjacent hexes
 const HEX_MARGIN = 3; // solid border kept around each wall panel
@@ -76,37 +77,41 @@ export interface HexCell {
 	v: number; // vertical offset from the panel center
 }
 
-// Pointy-top hexagon vertices centered at the origin (circumradius HEX_RADIUS).
+// Flat-top hexagon vertices centered at the origin (circumradius HEX_RADIUS). Flat-top
+// (a flat edge at top/bottom, points left/right) is the printable orientation for a
+// hole in a vertical wall: the upper edges sit ~30° from vertical and the top closes
+// with a short bridge, vs a pointy-top's 60° overhang.
 export function hexPolygon(): [number, number][] {
 	const pts: [number, number][] = [];
 	for (let i = 0; i < 6; i++) {
-		const a = ((30 + 60 * i) * Math.PI) / 180;
+		const a = (60 * i * Math.PI) / 180;
 		pts.push([HEX_RADIUS * Math.cos(a), HEX_RADIUS * Math.sin(a)]);
 	}
 	return pts;
 }
 
-// Staggered hex grid over a faceW×faceH panel (minus margins); returns the in-plane
-// center of each hex. Empty when the panel is too small for even one hex — both
-// geometry paths consume this so the cutouts stay identical.
+// Staggered flat-top hex grid over a faceW×faceH panel (minus margins); returns the
+// in-plane center of each hex. Columns interlock at the 1.5R pitch and stack at the
+// √3R pitch, with alternate columns dropped half a row. Empty when the panel is too
+// small for even one hex — both geometry paths consume this so the cutouts stay identical.
 export function hexCells(faceW: number, faceH: number): HexCell[] {
 	const usableW = faceW - 2 * HEX_MARGIN;
 	const usableH = faceH - 2 * HEX_MARGIN;
 	if (usableW < 2 * HEX_RADIUS || usableH < 2 * HEX_RADIUS) return [];
-	const colSpacing = Math.sqrt(3) * HEX_RADIUS + HEX_WEB;
-	const rowSpacing = 1.5 * HEX_RADIUS + HEX_WEB;
+	const colSpacing = 1.5 * HEX_RADIUS + HEX_WEB;
+	const rowSpacing = Math.sqrt(3) * HEX_RADIUS + HEX_WEB;
 	const cols = Math.floor(usableW / colSpacing);
 	const rows = Math.floor(usableH / rowSpacing);
 	if (cols < 1 || rows < 1) return [];
 	const gridW = (cols - 1) * colSpacing;
 	const gridH = (rows - 1) * rowSpacing;
 	const cells: HexCell[] = [];
-	for (let row = 0; row < rows; row++) {
-		const isOdd = row % 2 === 1;
-		const maxCols = isOdd ? cols - 1 : cols;
-		const rowOffset = isOdd ? colSpacing / 2 : 0;
-		for (let col = 0; col < maxCols; col++) {
-			cells.push({ u: -gridW / 2 + col * colSpacing + rowOffset, v: -gridH / 2 + row * rowSpacing });
+	for (let col = 0; col < cols; col++) {
+		const isOdd = col % 2 === 1;
+		const maxRows = isOdd ? rows - 1 : rows;
+		const colOffset = isOdd ? rowSpacing / 2 : 0;
+		for (let row = 0; row < maxRows; row++) {
+			cells.push({ u: -gridW / 2 + col * colSpacing, v: -gridH / 2 + row * rowSpacing + colOffset });
 		}
 	}
 	return cells;

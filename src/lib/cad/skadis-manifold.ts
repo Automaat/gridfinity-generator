@@ -14,17 +14,18 @@ import type { SkadisParams } from '$lib/stores/params';
 import { oc, box, prismAlongX, prismAlongY } from './manifold-bin';
 import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, hexPolygon, hexCells, BOARD_THICKNESS } from './skadis-layout';
 
-// Snap-hook geometry (mm). The horizontal arm slides into a slot; the barb at the
-// far end drops behind the board so the box weight locks it; a small top nub adds
-// push-past retention against vibration. MUST match skadis-occt.ts.
+// Snap-hook geometry (mm). The hook is a wedge: a flat top slides over the slot
+// bridge, the tip reaches behind the board, and the underside is a single 45° ramp
+// down to the back wall — so it prints support-free with the box floor down. A small
+// nub on top, just behind the board, gives push-past retention. MUST match skadis-occt.ts.
 const HOOK_W = 4.4; // X width — clears the 5mm slot with print tolerance
-const ARM_H = 4; // arm height (Z)
-const ARM_OVERLAP = 1.2; // arm root welded into the back wall (+Y)
-const ARM_REACH = BOARD_THICKNESS + 2.5; // arm reach behind the board front face (-Y)
-const BARB_Y = 2; // barb thickness (Y)
-const BARB_DROP = 4.5; // barb drop below the arm (Z)
+const HOOK_TOP = 2; // hook top rises this far above the row center z (Z)
+const ARM_OVERLAP = 1.2; // root welded into the back wall (+Y)
+const ARM_REACH = BOARD_THICKNESS + 2.5; // tip reach behind the board front face (-Y)
+const TIP_THICK = 1.4; // hook thickness (Z) at the tip; the 45° underside ramps up from the wall to here
 const NUB_Y = 2; // retention nub length (Y)
-const NUB_H = 0.8; // retention nub height (Z)
+const NUB_H = 0.9; // retention nub height above the hook top (Z)
+const NUB_Y_CENTER = -(BOARD_THICKNESS + 1); // nub sits just behind the board back face
 
 const HEX_CUT_OVERSHOOT = 0.1;
 // Solid back-wall band kept around the hook rows so the Skadis mount stays strong;
@@ -49,14 +50,23 @@ function wallHexCutters(axis: 'X' | 'Y' | 'Z', faceW: number, faceH: number, thi
 	return oc().Manifold.union(cutters);
 }
 
-// One snap hook at (x, z) on the back wall; back face at Y=0, board into -Y.
+// One self-supporting snap hook at (x, z) on the back wall; back face at Y=0, board
+// into -Y. The wedge profile lives in the Y-Z plane and is extruded HOOK_W along X;
+// its underside is a single 45° ramp (tip thin, root deep) so nothing overhangs.
 function buildHook(x: number, z: number): Manifold {
 	const { Manifold } = oc();
-	const armLen = ARM_REACH + ARM_OVERLAP;
-	const arm = box(HOOK_W, armLen, ARM_H, x, (ARM_OVERLAP - ARM_REACH) / 2, z - ARM_H / 2);
-	const barb = box(HOOK_W, BARB_Y, ARM_H + BARB_DROP, x, -(ARM_REACH - BARB_Y / 2), z - ARM_H / 2 - BARB_DROP);
-	const nub = box(HOOK_W, NUB_Y, NUB_H, x, -(NUB_Y / 2 + 0.5), z + ARM_H / 2 - 0.05);
-	return Manifold.union([arm, barb, nub]);
+	const top = z + HOOK_TOP;
+	const tipBottom = top - TIP_THICK;
+	const rootBottom = tipBottom - (ARM_REACH + ARM_OVERLAP); // 45° underside back to the wall
+	const profile: [number, number][] = [
+		[ARM_OVERLAP, top], // wall top (root welds into the back wall, +Y)
+		[-ARM_REACH, top], // tip top (flat top that rides over the slot bridge)
+		[-ARM_REACH, tipBottom], // tip face (vertical)
+		[ARM_OVERLAP, rootBottom] // 45° underside down to the wall — self-supporting
+	];
+	const wedge = prismAlongX(profile, HOOK_W).translate([x - HOOK_W / 2, 0, 0]);
+	const nub = box(HOOK_W, NUB_Y, NUB_H, x, NUB_Y_CENTER, top - 0.05);
+	return Manifold.union([wedge, nub]);
 }
 
 export function buildSkadisManifold(p: SkadisParams): Manifold {
