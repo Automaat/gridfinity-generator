@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import type { SkadisParams } from '$lib/stores/params';
 import { setBinManifold, box } from './manifold-bin';
 import { buildSkadisManifold } from './skadis-manifold';
-import { planSkadis, outerDims, BOARD_THICKNESS } from './skadis-layout';
+import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, BOARD_THICKNESS } from './skadis-layout';
 
 // Real manifold WASM, like the bin/baseplate tests — mocking a CSG kernel verifies nothing.
 beforeAll(async () => {
@@ -101,5 +101,24 @@ describe('buildSkadisManifold', () => {
 		expect(hex.volume()).toBeLessThan(solid.volume()); // hex cutouts saved filament
 		expect(span(hex, 0)).toBeCloseTo(span(solid, 0), 1); // envelope unchanged
 		expect(span(hex, 2)).toBeCloseTo(span(solid, 2), 1);
+	});
+
+	it('lightweight front + side walls finish with a solid top edge (no sliced hex)', () => {
+		const base = { width: 120, height: 80, depth: 50, wallThickness: 2 } as const;
+		const t = base.wallThickness;
+		// A 1mm band at the very top of a lowered + hexed front wall must be fully solid
+		// (interior width x thickness) -- the lattice is cut to a clean straight finish, not
+		// a hex sliced through the rim.
+		const fp = makeSk({ ...base, openFront: true, frontWallHeight: 30, lightweightWalls: true });
+		const fTop = frontWallCutZ(fp);
+		const { outerD } = outerDims(fp);
+		const frontProbe = box(base.width, t, 1, 0, outerD - t / 2, fTop - 1);
+		expect(buildSkadisManifold(fp).intersect(frontProbe).volume()).toBeCloseTo(base.width * t, 0);
+		// Same guarantee on a lowered + hexed side wall, probed along its interior depth.
+		const sp = makeSk({ ...base, openSides: true, sideWallHeight: 30, lightweightWalls: true });
+		const sTop = sideWallCutZ(sp);
+		const { outerW } = outerDims(sp);
+		const sideProbe = box(t, base.depth, 1, -outerW / 2 + t / 2, outerD / 2, sTop - 1);
+		expect(buildSkadisManifold(sp).intersect(sideProbe).volume()).toBeCloseTo(base.depth * t, 0);
 	});
 });

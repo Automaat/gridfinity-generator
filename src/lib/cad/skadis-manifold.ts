@@ -108,15 +108,18 @@ export function buildSkadisManifold(p: SkadisParams): Manifold {
 
 	// Optional hex lattice through every wall + the floor. The back wall is hexed only
 	// below the hook rows — a solid mount band stays around the hooks. Done before the
-	// hooks are added so they always weld onto the solid band.
+	// hooks are added so they always weld onto the solid band. Front/side panels
+	// are sized to the EXPOSED wall height (after any openFront/openSides lowering) and
+	// centered within it, so the lattice keeps a solid band at the top edge: a clean
+	// straight finish, never a hex sliced by the lowered rim.
 	if (p.lightweightWalls) {
-		const wallCz = t + p.height / 2; // wall panel vertical center (interior height)
+		const frontFaceH = frontH - t, sideFaceH = sideZ - t; // exposed wall heights (== outerH-t when closed)
 		const lowestHookZ = layout.hooks.length > 0 ? Math.min(...layout.hooks.map((h) => h.z)) : outerH;
 		const backFaceH = lowestHookZ - MOUNT_BAND - t; // floor up to just below the lowest hook
 		const panels = [
-			wallHexCutters('X', p.depth, p.height, t, -outerW / 2 + t / 2, outerD / 2, wallCz), // left
-			wallHexCutters('X', p.depth, p.height, t, outerW / 2 - t / 2, outerD / 2, wallCz), // right
-			wallHexCutters('Y', p.width, p.height, t, 0, outerD - t / 2, wallCz), // front
+			wallHexCutters('X', p.depth, sideFaceH, t, -outerW / 2 + t / 2, outerD / 2, t + sideFaceH / 2), // left
+			wallHexCutters('X', p.depth, sideFaceH, t, outerW / 2 - t / 2, outerD / 2, t + sideFaceH / 2), // right
+			wallHexCutters('Y', p.width, frontFaceH, t, 0, outerD - t / 2, t + frontFaceH / 2), // front
 			wallHexCutters('Y', p.width, backFaceH, t, 0, t / 2, t + backFaceH / 2), // back (below the mount band)
 			wallHexCutters('Z', p.width, p.depth, t, 0, outerD / 2, t / 2) // floor
 		];
