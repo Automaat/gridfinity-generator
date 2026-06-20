@@ -32,10 +32,6 @@ interface MockDrawing {
 	sketchOnPlane: Mock<(plane?: string, origin?: number) => MockSketch>;
 }
 
-interface MockPolysides {
-	rotate: Mock<(angle: number) => MockSketchOnPlane>;
-}
-
 function mockSolid(): MockSolid {
 	return {
 		fuse: vi.fn<(other: MockSolid) => MockSolid>(() => mockSolid()),
@@ -73,9 +69,7 @@ vi.mock('replicad', () => ({
 	draw: vi.fn<(start?: [number, number]) => MockDrawing>(() => mockDrawing()),
 	drawCircle: vi.fn<(radius: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
 	drawRoundedRectangle: vi.fn<(w: number, l: number, r?: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
-	drawPolysides: vi.fn<(radius: number, sides: number) => MockPolysides>(() => ({
-		rotate: vi.fn<(angle: number) => MockSketchOnPlane>(() => mockSketchOnPlane())
-	})),
+	drawPolysides: vi.fn<(radius: number, sides: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
 	makeCompound: vi.fn<(shapes: MockSolid[]) => MockSolid>(() => mockSolid())
 }));
 

@@ -7,6 +7,7 @@
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import { dividerCoords, compartmentEdges } from './divider-layout';
+import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
 
 export const GRID_UNIT = 42;
 const HEIGHT_UNIT = 7;
@@ -29,10 +30,6 @@ const REDUCED_LIP_PROTRUSION = 2.15;
 const FLOOR_THICKNESS = 2.25;
 const LABEL_TAB_HEIGHT = 14;
 const LABEL_TAB_DEPTH = 4.5;
-const HEX_RADIUS = 6;
-const HEX_WEB = 2;
-const HEX_MARGIN = 3;
-const HEX_CUT_OVERSHOOT = 0.1;
 
 // Circle/arc tessellation. 32 segments keeps holes and corner fillets smooth at
 // screen scale for the preview; exports pass a higher count via buildBinManifold.
@@ -196,54 +193,24 @@ function buildStackingLip(bodyW: number, bodyL: number, topZ: number, lipHeight:
 	return outer.subtract(cavity);
 }
 
-function hexPointsCentered(): [number, number][] {
-	const pts: [number, number][] = [];
-	for (let i = 0; i < 6; i++) {
-		const a = ((30 + 60 * i) * Math.PI) / 180;
-		pts.push([HEX_RADIUS * Math.cos(a), HEX_RADIUS * Math.sin(a)]);
-	}
-	return pts;
-}
-
-// Punch a self-supporting hex lattice through a divider wall (built at the origin,
+// Punch the shared flat-top hex lattice through a divider wall (built at the origin,
 // cut along its thickness axis before it is translated into position).
 function cutHexPattern(
 	wall: Manifold, faceWidth: number, faceHeight: number, wallThickness: number,
 	axis: 'X' | 'Y', wallBottom: number
 ): Manifold {
+	const cells = hexCells(faceWidth, faceHeight);
+	if (cells.length === 0) return wall;
 	const { Manifold } = oc();
-	const usableW = faceWidth - 2 * HEX_MARGIN;
-	const usableH = faceHeight - 2 * HEX_MARGIN;
-	if (usableW < 2 * HEX_RADIUS || usableH < 2 * HEX_RADIUS) return wall;
-
-	const colSpacing = Math.sqrt(3) * HEX_RADIUS + HEX_WEB;
-	const rowSpacing = 1.5 * HEX_RADIUS + HEX_WEB;
-	const cols = Math.floor(usableW / colSpacing);
-	const rows = Math.floor(usableH / rowSpacing);
-	if (cols < 1 || rows < 1) return wall;
-
-	const gridW = (cols - 1) * colSpacing;
-	const gridH = (rows - 1) * rowSpacing;
 	const cutDepth = wallThickness + 2 * HEX_CUT_OVERSHOOT;
-	const hex = hexPointsCentered();
-	const cutters: Manifold[] = [];
-
-	for (let row = 0; row < rows; row++) {
-		const isOdd = row % 2 === 1;
-		const maxCols = isOdd ? cols - 1 : cols;
-		const rowOffset = isOdd ? colSpacing / 2 : 0;
-		for (let col = 0; col < maxCols; col++) {
-			const u = -gridW / 2 + col * colSpacing + rowOffset;
-			const v = -gridH / 2 + row * rowSpacing;
-			const zCenter = wallBottom + faceHeight / 2 + v;
-			cutters.push(
-				axis === 'X'
-					? prismAlongX(hex, cutDepth).translate([-cutDepth / 2, u, zCenter])
-					: prismAlongY(hex, cutDepth).translate([u, -cutDepth / 2, zCenter])
-			);
-		}
-	}
-	return cutters.length ? wall.subtract(Manifold.union(cutters)) : wall;
+	const hex = hexPolygon();
+	const cutters = cells.map(({ u, v }) => {
+		const zCenter = wallBottom + faceHeight / 2 + v;
+		return axis === 'X'
+			? prismAlongX(hex, cutDepth).translate([-cutDepth / 2, u, zCenter])
+			: prismAlongY(hex, cutDepth).translate([u, -cutDepth / 2, zCenter]);
+	});
+	return wall.subtract(Manifold.union(cutters));
 }
 
 function buildDividers(

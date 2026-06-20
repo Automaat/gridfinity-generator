@@ -9,6 +9,7 @@ import {
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
 import { dividerCoords, compartmentEdges } from './divider-layout';
+import { HEX_RADIUS, HEX_CUT_OVERSHOOT, hexCells } from './hex-lattice';
 
 // Gridfinity spec (from kennetek/gridfinity-rebuilt-openscad)
 const GRID_UNIT = 42;
@@ -232,12 +233,8 @@ function buildStackingLip(
 	}
 }
 
-// Lightweight divider hex pattern
-const HEX_RADIUS = 6;
-const HEX_WEB = 2; // strut between holes — 2mm stays rigid and self-supporting on FDM
-const HEX_MARGIN = 3;
-const HEX_CUT_OVERSHOOT = 0.1;
-
+// Punch the shared flat-top hex lattice through a divider wall. `drawPolysides(R, 6)`
+// without rotation is the flat-top hexagon matching hex-lattice's hexPolygon().
 function cutHexPattern(
 	wall: Solid,
 	faceWidth: number,
@@ -246,52 +243,21 @@ function cutHexPattern(
 	plane: 'YZ' | 'XZ',
 	wallBottom: number
 ): Solid {
-	const usableW = faceWidth - 2 * HEX_MARGIN;
-	const usableH = faceHeight - 2 * HEX_MARGIN;
-	if (usableW < 2 * HEX_RADIUS || usableH < 2 * HEX_RADIUS) return wall;
-
-	const colSpacing = Math.sqrt(3) * HEX_RADIUS + HEX_WEB;
-	const rowSpacing = 1.5 * HEX_RADIUS + HEX_WEB;
-
-	const cols = Math.floor(usableW / colSpacing);
-	const rows = Math.floor(usableH / rowSpacing);
-	if (cols < 1 || rows < 1) return wall;
-
-	const gridW = (cols - 1) * colSpacing;
-	const gridH = (rows - 1) * rowSpacing;
+	const cells = hexCells(faceWidth, faceHeight);
+	if (cells.length === 0) return wall;
 
 	// Oversize the cutter past both wall faces — coincident faces make the
 	// OCCT boolean leave the wall uncut (no through-hole forms).
 	const cutDepth = wallThickness + 2 * HEX_CUT_OVERSHOOT;
 
-	const cutters: Solid[] = [];
-
-	for (let row = 0; row < rows; row++) {
-		const isOdd = row % 2 === 1;
-		const maxCols = isOdd ? cols - 1 : cols;
-		const rowOffset = isOdd ? colSpacing / 2 : 0;
-
-		for (let col = 0; col < maxCols; col++) {
-			const u = -gridW / 2 + col * colSpacing + rowOffset;
-			const v = -gridH / 2 + row * rowSpacing;
-			const zCenter = wallBottom + faceHeight / 2 + v;
-
-			const hex = (
-				drawPolysides(HEX_RADIUS, 6)
-					.rotate(30)
-					.sketchOnPlane(plane, -cutDepth / 2) as Sketch
-			).extrude(cutDepth) as Solid;
-
-			cutters.push(
-				plane === 'YZ'
-					? (hex.translate(0, u, zCenter) as Solid)
-					: (hex.translate(u, 0, zCenter) as Solid)
-			);
-		}
-	}
+	const cutters = cells.map(({ u, v }) => {
+		const zCenter = wallBottom + faceHeight / 2 + v;
+		const hex = (drawPolysides(HEX_RADIUS, 6).sketchOnPlane(plane, -cutDepth / 2) as Sketch).extrude(cutDepth) as Solid;
+		return plane === 'YZ' ? (hex.translate(0, u, zCenter) as Solid) : (hex.translate(u, 0, zCenter) as Solid);
+	});
 
 	// Single compound cut instead of fusing every hex first.
-	return cutters.length ? (wall.cut(makeCompound(cutters) as Solid) as Solid) : wall;
+	return wall.cut(makeCompound(cutters) as Solid) as Solid;
 }
 
 function buildDividers(

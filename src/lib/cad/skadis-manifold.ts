@@ -12,7 +12,8 @@
 import type { Manifold } from 'manifold-3d';
 import type { SkadisParams } from '$lib/stores/params';
 import { oc, box, prismAlongX, prismAlongY } from './manifold-bin';
-import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, hexPolygon, hexCells, BOARD_THICKNESS } from './skadis-layout';
+import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, BOARD_THICKNESS } from './skadis-layout';
+import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
 
 // Snap-hook geometry (mm). The hook is a wedge: a flat top slides over the slot
 // bridge, the tip reaches behind the board, and the underside is a single 45° ramp
@@ -27,7 +28,6 @@ const NUB_Y = 2; // retention nub length (Y)
 const NUB_H = 0.9; // retention nub height above the hook top (Z)
 const NUB_Y_CENTER = -(BOARD_THICKNESS + 1); // nub sits just behind the board back face
 
-const HEX_CUT_OVERSHOOT = 0.1;
 // Solid back-wall band kept around the hook rows so the Skadis mount stays strong;
 // measured downward from the lowest hook center.
 const MOUNT_BAND = 12;
