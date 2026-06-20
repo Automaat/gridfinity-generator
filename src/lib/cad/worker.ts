@@ -2,6 +2,8 @@ import manifoldModule from 'manifold-3d';
 import manifoldWasm from 'manifold-3d/manifold.wasm?url';
 import { zipSync } from 'fflate';
 import { buildBinManifold, setBinManifold } from './manifold-bin';
+import { planBinSplit } from './bin-split';
+import { buildBinSplitPreview, buildBinSplitTiles, buildBinSplitCombined } from './bin-split-manifold';
 import { buildBaseplateAssembled, buildBaseplateTiles, buildBaseplateCombined } from './baseplate-manifold';
 import { buildSkadisManifold } from './skadis-manifold';
 import { manifoldToMesh, manifoldToStlBlob, manifoldToStlBytes } from './mesh-util';
@@ -62,7 +64,9 @@ self.addEventListener('message', async (e: MessageEvent<WorkerRequest>) => {
 
 		if (msg.type === 'build') {
 			validateParams(msg.params);
-			const solid = buildBinManifold(msg.params);
+			// Split bins render an exploded preview so the cut seams are visible; the
+			// build functions fall back to the whole bin when it fits one piece.
+			const solid = msg.params.splitToFit ? buildBinSplitPreview(msg.params) : buildBinManifold(msg.params);
 			const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
 			postMesh(vertices, triangles, normals, edges);
 		} else if (msg.type === 'exportSTEP') {
@@ -72,8 +76,21 @@ self.addEventListener('message', async (e: MessageEvent<WorkerRequest>) => {
 			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP(), filename: 'bin.step' } satisfies WorkerResponse);
 		} else if (msg.type === 'exportSTL') {
 			validateParams(msg.params);
-			const solid = buildBinManifold(msg.params, { segments: STL_SEGMENTS });
-			self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid), filename: 'bin.stl' } satisfies WorkerResponse);
+			const p = msg.params;
+			const plan = p.splitToFit ? planBinSplit(p.width, p.length, p.bedWidth, p.bedDepth, p.splitAlgorithm) : null;
+			if (plan?.multiTile && p.splitLayout === 'zip') {
+				const pieces = buildBinSplitTiles(p, { segments: STL_SEGMENTS });
+				const files: Record<string, Uint8Array> = {};
+				for (const t of pieces) files[t.name] = manifoldToStlBytes(t.solid);
+				const zipped = zipSync(files);
+				self.postMessage({ type: 'exportSTL', blob: new Blob([zipped], { type: 'application/zip' }), filename: 'bin.zip' } satisfies WorkerResponse);
+			} else if (plan?.multiTile) {
+				const solid = buildBinSplitCombined(p, { segments: STL_SEGMENTS });
+				self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid), filename: 'bin.stl' } satisfies WorkerResponse);
+			} else {
+				const solid = buildBinManifold(p, { segments: STL_SEGMENTS });
+				self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid), filename: 'bin.stl' } satisfies WorkerResponse);
+			}
 		} else if (msg.type === 'buildBaseplate') {
 			validateBaseplate(msg.params);
 			const solid = buildBaseplateAssembled(msg.params);

@@ -29,6 +29,9 @@ export function validateParams(p: BinParams): void {
 	if (!Number.isFinite(p.scoopRadius) || p.scoopRadius < 0) {
 		throw new InvalidParamsError('Scoop radius must be a non-negative number');
 	}
+	if (p.splitToFit && (!Number.isFinite(p.bedWidth) || !Number.isFinite(p.bedDepth) || p.bedWidth < 42 || p.bedDepth < 42)) {
+		throw new InvalidParamsError('Printer bed must be at least 42mm on each side');
+	}
 }
 
 // A drawer/bed smaller than one grid cell can't hold a baseplate.

@@ -26,7 +26,12 @@ describe('defaultParams', () => {
 			wallCut: false,
 			wallCutSide: 'front',
 			wallCutLowFraction: 0,
-			wallCutRun: 1
+			wallCutRun: 1,
+			splitToFit: false,
+			bedWidth: 220,
+			bedDepth: 220,
+			splitAlgorithm: 'ideal',
+			splitLayout: 'zip'
 		});
 	});
 });
@@ -66,7 +71,12 @@ describe('params store', () => {
 			wallCut: true,
 			wallCutSide: 'right',
 			wallCutLowFraction: 0.5,
-			wallCutRun: 0.6
+			wallCutRun: 0.6,
+			splitToFit: true,
+			bedWidth: 250,
+			bedDepth: 210,
+			splitAlgorithm: 'incremental',
+			splitLayout: 'combined'
 		};
 		params.set(custom);
 		expect(get(params)).toEqual(custom);
@@ -139,7 +149,12 @@ describe('URL serialization', () => {
 			wallCut: true,
 			wallCutSide: 'back',
 			wallCutLowFraction: 0.25,
-			wallCutRun: 0.75
+			wallCutRun: 0.75,
+			splitToFit: true,
+			bedWidth: 256,
+			bedDepth: 256,
+			splitAlgorithm: 'incremental',
+			splitLayout: 'combined'
 		};
 		const sp = serializeParams(custom);
 		const result = deserializeParams(sp);
@@ -254,6 +269,29 @@ describe('URL serialization', () => {
 		expect(deserializeParams(new URLSearchParams('wcf=-1')).wallCutLowFraction).toBe(0);
 	});
 
+	it('round-trips split params via short keys', () => {
+		const p: BinParams = {
+			...defaultParams,
+			splitToFit: true,
+			bedWidth: 256,
+			bedDepth: 180,
+			splitAlgorithm: 'incremental',
+			splitLayout: 'combined'
+		};
+		const sp = serializeParams(p);
+		expect(sp.get('sp')).toBe('1');
+		expect(sp.get('sbw')).toBe('256');
+		expect(sp.get('sbd')).toBe('180');
+		expect(sp.get('sal')).toBe('n'); // incremental
+		expect(sp.get('sel')).toBe('c'); // combined
+		const result = deserializeParams(sp);
+		expect(result.splitToFit).toBe(true);
+		expect(result.bedWidth).toBe(256);
+		expect(result.bedDepth).toBe(180);
+		expect(result.splitAlgorithm).toBe('incremental');
+		expect(result.splitLayout).toBe('combined');
+	});
+
 	it('assigns a unique short key to every param', () => {
 		// non-default value per param, chosen to stay in range so a key is emitted
 		const nonDefault: BinParams = {
@@ -274,7 +312,12 @@ describe('URL serialization', () => {
 			wallCut: true,
 			wallCutSide: 'back',
 			wallCutLowFraction: 0.5,
-			wallCutRun: 0.5
+			wallCutRun: 0.5,
+			splitToFit: true,
+			bedWidth: 200,
+			bedDepth: 250,
+			splitAlgorithm: 'incremental',
+			splitLayout: 'combined'
 		};
 		const urlKeys = new Set<string>();
 		for (const param of Object.keys(defaultParams) as (keyof BinParams)[]) {
