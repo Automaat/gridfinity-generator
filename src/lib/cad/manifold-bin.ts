@@ -29,8 +29,12 @@ import {
 	isOuterGridCorner,
 	lipProfileHeight,
 	lipProtrusion,
+	profileSections,
 	reducedLipCavityLevels,
-	standardLipCavityLevels
+	standardLipCavityLevels,
+	type ProfilePair,
+	type RectProfileLevel,
+	type SquareProfileLevel
 } from './gridfinity-spec';
 
 export {
@@ -130,15 +134,28 @@ function cylinderAlongY(radius: number, length: number): Manifold {
 	return oc().Manifold.cylinder(length, radius, radius, circleSegments).rotate([-90, 0, 0]);
 }
 
+function squareChamfer([a, b]: ProfilePair<SquareProfileLevel>): Manifold {
+	return chamfer(a.size, a.size, a.r, a.z, b.size, b.size, b.r, b.z);
+}
+
+function squareVertical([a, b]: ProfilePair<SquareProfileLevel>): Manifold {
+	return roundedPrism(a.size, a.size, a.r, b.z - a.z, a.z);
+}
+
+function rectChamfer([a, b]: ProfilePair<RectProfileLevel>): Manifold {
+	return chamfer(a.w, a.l, a.r, a.z, b.w, b.l, b.r, b.z);
+}
+
+function rectVertical([a, b]: ProfilePair<RectProfileLevel>): Manifold {
+	return roundedPrism(a.w, a.l, a.r, b.z - a.z, a.z);
+}
+
 export function unitBase(): Manifold {
 	// levels: (z0,35.6,0.8)(z0.8,37.2,1.6)(z2.6,37.2,1.6)(z4.75,41.5,3.75)
-	const b0 = BASE_PROFILE_LEVELS[0]!;
-	const b1 = BASE_PROFILE_LEVELS[1]!;
-	const b2 = BASE_PROFILE_LEVELS[2]!;
-	const b3 = BASE_PROFILE_LEVELS[3]!;
-	const c1 = chamfer(b0.size, b0.size, b0.r, b0.z, b1.size, b1.size, b1.r, b1.z);
-	const vertical = roundedPrism(b1.size, b1.size, b1.r, b2.z - b1.z, b1.z);
-	const c2 = chamfer(b2.size, b2.size, b2.r, b2.z, b3.size, b3.size, b3.r, b3.z);
+	const sections = profileSections(BASE_PROFILE_LEVELS);
+	const c1 = squareChamfer(sections.lowerChamfer);
+	const vertical = squareVertical(sections.vertical);
+	const c2 = squareChamfer(sections.upperChamfer);
 	return oc().Manifold.union([c1, vertical, c2]);
 }
 
@@ -172,17 +189,14 @@ function buildStackingLip(bodyW: number, bodyL: number, topZ: number, lipHeight:
 	const outer = roundedPrism(bodyW, bodyL, CORNER_FILLET_RADIUS, lipHeight, topZ);
 
 	if (lipHeight >= BASE_PROFILE_HEIGHT) {
-		const lv = standardLipCavityLevels(bodyW, bodyL, topZ);
-		const c1 = chamfer(lv[0]!.w, lv[0]!.l, lv[0]!.r, lv[0]!.z, lv[1]!.w, lv[1]!.l, lv[1]!.r, lv[1]!.z);
-		const c2 = roundedPrism(lv[1]!.w, lv[1]!.l, lv[1]!.r, lv[2]!.z - lv[1]!.z, lv[1]!.z);
-		const c3 = chamfer(lv[2]!.w, lv[2]!.l, lv[2]!.r, lv[2]!.z, lv[3]!.w, lv[3]!.l, lv[3]!.r, lv[3]!.z);
+		const sections = profileSections(standardLipCavityLevels(bodyW, bodyL, topZ));
+		const c1 = rectChamfer(sections.lowerChamfer);
+		const c2 = rectVertical(sections.vertical);
+		const c3 = rectChamfer(sections.upperChamfer);
 		return outer.subtract(Manifold.union([c1, c2, c3]));
 	}
 	const [bottom, top] = reducedLipCavityLevels(bodyW, bodyL, topZ, lipHeight);
-	const cavity = chamfer(
-		bottom.w, bottom.l, bottom.r, bottom.z,
-		top.w, top.l, top.r, top.z
-	);
+	const cavity = rectChamfer([bottom, top]);
 	return outer.subtract(cavity);
 }
 

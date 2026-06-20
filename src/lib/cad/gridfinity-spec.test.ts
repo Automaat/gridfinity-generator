@@ -16,6 +16,7 @@ import {
 	isOuterGridCorner,
 	lipProfileHeight,
 	lipProtrusion,
+	profileSections,
 	reducedLipCavityLevels,
 	standardLipCavityLevels
 } from './gridfinity-spec';
@@ -37,6 +38,14 @@ describe('gridfinity spec', () => {
 			{ z: 2.6, size: 37.2, r: 1.6 },
 			{ z: 4.75, size: 41.5, r: 3.75 }
 		]);
+	});
+
+	it('names the three build sections in a four-level profile', () => {
+		const sections = profileSections(BASE_PROFILE_LEVELS);
+
+		expect(sections.lowerChamfer).toEqual([BASE_PROFILE_LEVELS[0], BASE_PROFILE_LEVELS[1]]);
+		expect(sections.vertical).toEqual([BASE_PROFILE_LEVELS[1], BASE_PROFILE_LEVELS[2]]);
+		expect(sections.upperChamfer).toEqual([BASE_PROFILE_LEVELS[2], BASE_PROFILE_LEVELS[3]]);
 	});
 
 	it('derives lip profile and protrusion by lip mode', () => {
