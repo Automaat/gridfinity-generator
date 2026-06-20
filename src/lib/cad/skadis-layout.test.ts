@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import type { SkadisParams } from '$lib/stores/params';
-import { planSkadis, hexCells, hexPolygon, frontWallCutZ, sideWallCutZ, HEX_RADIUS, SKADIS_PITCH } from './skadis-layout';
+import { planSkadis, frontWallCutZ, sideWallCutZ, SKADIS_PITCH } from './skadis-layout';
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
 	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
@@ -71,34 +71,5 @@ describe('wall cut height', () => {
 			expect(frontWallCutZ(makeSk({ frontWallHeight: bad }))).toBe(5);
 			expect(sideWallCutZ(makeSk({ sideWallHeight: bad }))).toBe(5);
 		}
-	});
-});
-
-describe('hex lattice', () => {
-	it('returns no cells for a panel too small for one hex', () => {
-		expect(hexCells(10, 10)).toEqual([]);
-		expect(hexCells(200, 5)).toEqual([]);
-	});
-
-	it('fills a large panel with staggered cells inside the margin', () => {
-		const faceW = 120, faceH = 80;
-		const cells = hexCells(faceW, faceH);
-		expect(cells.length).toBeGreaterThan(10);
-		for (const { u, v } of cells) {
-			expect(Math.abs(u)).toBeLessThanOrEqual(faceW / 2 - HEX_RADIUS);
-			expect(Math.abs(v)).toBeLessThanOrEqual(faceH / 2 - HEX_RADIUS);
-		}
-	});
-
-	it('staggers alternating rows (two distinct column offsets)', () => {
-		const cells = hexCells(120, 80);
-		const us = new Set(cells.map((c) => Math.round(c.u * 100)));
-		expect(us.size).toBeGreaterThan(1);
-	});
-
-	it('hexPolygon has six vertices at the circumradius', () => {
-		const pts = hexPolygon();
-		expect(pts).toHaveLength(6);
-		for (const [x, y] of pts) expect(Math.hypot(x, y)).toBeCloseTo(HEX_RADIUS, 6);
 	});
 });

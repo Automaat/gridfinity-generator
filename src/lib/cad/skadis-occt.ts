@@ -5,7 +5,8 @@ import { draw, drawRoundedRectangle, makeCompound, setOC, type Solid, type Sketc
 import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import type { SkadisParams } from '$lib/stores/params';
-import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, hexPolygon, hexCells, BOARD_THICKNESS } from './skadis-layout';
+import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, BOARD_THICKNESS } from './skadis-layout';
+import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
 
 // Snap-hook geometry (mm) — MUST match skadis-manifold.ts.
 const HOOK_W = 4.4;
@@ -34,7 +35,6 @@ function boxSolid(w: number, l: number, h: number, cx: number, cy: number, zBase
 	return (drawRoundedRectangle(w, l, 0).sketchOnPlane('XY', zBase) as Sketch).extrude(h).translate(cx, cy, 0) as Solid;
 }
 
-const HEX_CUT_OVERSHOOT = 0.1;
 const MOUNT_BAND = 12;
 
 // Hex lattice cutters for one panel (mirror skadis-manifold.ts wallHexCutters).
