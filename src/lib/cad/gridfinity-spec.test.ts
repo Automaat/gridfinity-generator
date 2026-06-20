@@ -12,6 +12,7 @@ import {
 	bodySize,
 	cellCenter,
 	gridOffset,
+	gridHoleSites,
 	innerFillet,
 	isOuterGridCorner,
 	lipProfileHeight,
@@ -87,6 +88,15 @@ describe('gridfinity spec', () => {
 		]);
 		expect(isOuterGridCorner(2, 2, 0, 0, -HOLE_OFFSET, -HOLE_OFFSET)).toBe(true);
 		expect(isOuterGridCorner(2, 2, 0, 0, HOLE_OFFSET, HOLE_OFFSET)).toBe(false);
+
+		const sites = gridHoleSites(2, 2);
+		expect(sites).toHaveLength(16);
+		expect(sites.filter((site) => site.outerCorner).map(({ x, y }) => [x, y])).toEqual([
+			[-33.75, -33.75],
+			[-33.75, 33.75],
+			[33.75, -33.75],
+			[33.75, 33.75]
+		]);
 	});
 
 	it('keeps inner fillets printable', () => {

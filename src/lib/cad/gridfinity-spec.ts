@@ -50,6 +50,16 @@ export interface ProfileSections<TLevel> {
 	upperChamfer: ProfilePair<TLevel>;
 }
 
+export interface GridHoleSite {
+	cellX: number;
+	cellY: number;
+	x: number;
+	y: number;
+	offsetX: number;
+	offsetY: number;
+	outerCorner: boolean;
+}
+
 export function bodySize(units: number): number {
 	return units * GRID_UNIT - TOLERANCE;
 }
@@ -145,4 +155,26 @@ export function isOuterGridCorner(width: number, length: number, x: number, y: n
 	const outerX = (x === 0 && ox < 0) || (x === width - 1 && ox > 0);
 	const outerY = (y === 0 && oy < 0) || (y === length - 1 && oy > 0);
 	return outerX && outerY;
+}
+
+export function gridHoleSites(width: number, length: number): GridHoleSite[] {
+	const sites: GridHoleSite[] = [];
+	for (let cellX = 0; cellX < width; cellX++) {
+		for (let cellY = 0; cellY < length; cellY++) {
+			const cx = cellCenter(cellX, width);
+			const cy = cellCenter(cellY, length);
+			for (const [offsetX, offsetY] of HOLE_OFFSETS) {
+				sites.push({
+					cellX,
+					cellY,
+					x: cx + offsetX,
+					y: cy + offsetY,
+					offsetX,
+					offsetY,
+					outerCorner: isOuterGridCorner(width, length, cellX, cellY, offsetX, offsetY)
+				});
+			}
+		}
+	}
+	return sites;
 }
