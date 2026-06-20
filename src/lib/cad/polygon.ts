@@ -13,5 +13,11 @@ export function signedArea(points: readonly Point2[]): number {
 // Manifold CrossSection treats clockwise contours as holes. Normalize generated
 // polygons to counter-clockwise before constructing a solid section.
 export function ensureCounterClockwise<TPoint extends Point2>(points: readonly TPoint[]): TPoint[] {
-	return signedArea(points) < 0 ? points.toReversed() : [...points];
+	if (signedArea(points) >= 0) return [...points];
+
+	const reversed: TPoint[] = [];
+	for (let i = points.length - 1; i >= 0; i--) {
+		reversed.push(points[i]!);
+	}
+	return reversed;
 }
