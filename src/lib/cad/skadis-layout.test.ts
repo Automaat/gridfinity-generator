@@ -3,7 +3,7 @@ import type { SkadisParams } from '$lib/stores/params';
 import { planSkadis, hexCells, hexPolygon, HEX_RADIUS, SKADIS_PITCH } from './skadis-layout';
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, lightweightWalls: false, ...overrides };
+	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
 }
 
 describe('planSkadis', () => {

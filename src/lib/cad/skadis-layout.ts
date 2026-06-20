@@ -49,6 +49,18 @@ function clampInt(v: number, min: number, max: number): number {
 	return Math.min(max, Math.max(min, Math.round(v)));
 }
 
+// Absolute Z (world) an opened wall is cut down to. Floored to a printable minimum
+// and capped at the box top (a value ≥ outerH leaves the wall full height, i.e. a
+// no-op cut). Both geometry paths consume these so the cuts match.
+export function frontWallCutZ(p: SkadisParams): number {
+	const { outerH } = outerDims(p);
+	return Math.min(outerH, Math.max(5, p.frontWallHeight));
+}
+export function sideWallCutZ(p: SkadisParams): number {
+	const { outerH } = outerDims(p);
+	return Math.min(outerH, Math.max(5, p.sideWallHeight));
+}
+
 // Hex lattice (lightweight walls) — matches the bin divider lattice in
 // manifold-bin.ts so the look is consistent across the app.
 export const HEX_RADIUS = 6;

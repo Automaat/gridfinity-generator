@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import type { SkadisParams } from '$lib/stores/params';
-import { setBinManifold } from './manifold-bin';
+import { setBinManifold, box } from './manifold-bin';
 import { buildSkadisManifold } from './skadis-manifold';
-import { planSkadis, BOARD_THICKNESS } from './skadis-layout';
+import { planSkadis, outerDims, BOARD_THICKNESS } from './skadis-layout';
 
 // Real manifold WASM, like the bin/baseplate tests — mocking a CSG kernel verifies nothing.
 beforeAll(async () => {
@@ -13,12 +13,21 @@ beforeAll(async () => {
 }, 30000);
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, lightweightWalls: false, ...overrides };
+	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
 }
 
 const span = (s: ReturnType<typeof buildSkadisManifold>, axis: number) => {
 	const bb = s.boundingBox();
 	return bb.max[axis]! - bb.min[axis]!;
+};
+
+// Volume of a front-corner column probe above both lowered walls: solid when the box
+// is closed (corner is full-height wall), empty when both front + sides open (post gone).
+const frontCornerFill = (p: SkadisParams): number => {
+	const { outerW, outerD, outerH } = outerDims(p);
+	const t = p.wallThickness;
+	const probe = box(t + 2, t + 2, outerH - 50, -outerW / 2 + t / 2, outerD - t / 2, 50);
+	return buildSkadisManifold(p).intersect(probe).volume();
 };
 
 describe('buildSkadisManifold', () => {
@@ -53,6 +62,32 @@ describe('buildSkadisManifold', () => {
 		const closed = buildSkadisManifold(makeSk({ openFront: false })).volume();
 		const open = buildSkadisManifold(makeSk({ openFront: true })).volume();
 		expect(open).toBeLessThan(closed);
+	});
+
+	it('a taller front wall removes less material than a shorter one', () => {
+		const low = buildSkadisManifold(makeSk({ openFront: true, frontWallHeight: 20 })).volume();
+		const high = buildSkadisManifold(makeSk({ openFront: true, frontWallHeight: 60 })).volume();
+		expect(high).toBeGreaterThan(low);
+	});
+
+	it('open sides removes material and keeps the outer footprint', () => {
+		const closed = buildSkadisManifold(makeSk({ openSides: false }));
+		const open = buildSkadisManifold(makeSk({ openSides: true, sideWallHeight: 25 }));
+		expect(open.volume()).toBeLessThan(closed.volume());
+		expect(span(open, 0)).toBeCloseTo(span(closed, 0), 1); // width envelope unchanged
+		expect(span(open, 1)).toBeCloseTo(span(closed, 1), 1); // depth envelope unchanged (corner posts stay)
+	});
+
+	it('a taller side wall removes less material than a shorter one', () => {
+		const low = buildSkadisManifold(makeSk({ openSides: true, sideWallHeight: 20 })).volume();
+		const high = buildSkadisManifold(makeSk({ openSides: true, sideWallHeight: 60 })).volume();
+		expect(high).toBeGreaterThan(low);
+	});
+
+	it('drops the front corner posts when both front and sides are open (no poles)', () => {
+		const base = { width: 160, height: 80, depth: 60, sideWallHeight: 22 } as const;
+		expect(frontCornerFill(makeSk({ ...base, openFront: false, openSides: false }))).toBeGreaterThan(0);
+		expect(frontCornerFill(makeSk({ ...base, openFront: true, openSides: true }))).toBeCloseTo(0, 3);
 	});
 
 	it('builds a narrow single-column box', () => {

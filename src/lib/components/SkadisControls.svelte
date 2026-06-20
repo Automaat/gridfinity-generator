@@ -14,7 +14,7 @@
 	let outer = $derived(outerDims($skadisParams));
 	let round1 = (v: number) => Math.round(v * 10) / 10;
 
-	type NumKey = 'width' | 'height' | 'depth' | 'wallThickness';
+	type NumKey = 'width' | 'height' | 'depth' | 'wallThickness' | 'frontWallHeight' | 'sideWallHeight';
 	function clamp(v: number, min: number, max: number): number {
 		return Math.min(max, Math.max(min, v));
 	}
@@ -132,6 +132,19 @@
 				<span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all peer-checked:left-4"></span>
 			</span>
 		</label>
+		{#if $skadisParams.openFront}
+			{@render numField('frontWallHeight', 'Front wall height (mm)', 5, 400, 5)}
+		{/if}
+		<label class="relative flex cursor-pointer items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/40 px-3 py-2.5 transition hover:border-zinc-700 has-[:checked]:border-blue-500/40 has-[:checked]:bg-blue-500/10">
+			<input type="checkbox" bind:checked={$skadisParams.openSides} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label="Open side walls" />
+			<span class="text-sm text-zinc-200">Open side walls (low walls)</span>
+			<span class="relative h-5 w-9 shrink-0 rounded-full bg-zinc-600 transition-colors peer-checked:bg-blue-500">
+				<span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all peer-checked:left-4"></span>
+			</span>
+		</label>
+		{#if $skadisParams.openSides}
+			{@render numField('sideWallHeight', 'Side wall height (mm)', 5, 400, 5)}
+		{/if}
 		<label class="relative flex cursor-pointer items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/40 px-3 py-2.5 transition hover:border-zinc-700 has-[:checked]:border-blue-500/40 has-[:checked]:bg-blue-500/10">
 			<input type="checkbox" bind:checked={$skadisParams.lightweightWalls} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label="Lightweight walls" />
 			<span class="text-sm text-zinc-200">Lightweight walls (hex cutouts)</span>

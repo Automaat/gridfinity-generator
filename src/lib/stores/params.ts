@@ -339,6 +339,9 @@ export interface SkadisParams {
 	wallThickness: number; // mm — walls + floor, added outside the interior
 	hookRows: number; // rows of snap hooks (1–2), stacked at the 40mm pitch
 	openFront: boolean; // lower the front wall for easy access
+	frontWallHeight: number; // mm — top edge (Z) of the front wall when openFront
+	openSides: boolean; // lower the left + right walls to sideWallHeight
+	sideWallHeight: number; // mm — top edge (Z) of the side walls when openSides
 	lightweightWalls: boolean; // punch a hex lattice through the walls + floor
 }
 
@@ -349,6 +352,9 @@ export const defaultSkadis: SkadisParams = {
 	wallThickness: 2,
 	hookRows: 1,
 	openFront: false,
+	frontWallHeight: 30,
+	openSides: false,
+	sideWallHeight: 30,
 	lightweightWalls: false
 };
 
@@ -370,6 +376,9 @@ const SK_CODECS: SkCodecs = {
 	wallThickness: { ...num(1, 5), key: 'skt' },
 	hookRows: { ...num(1, 2, true), key: 'skr' },
 	openFront: { ...bool, key: 'sko' },
+	frontWallHeight: { ...num(5, 400, true), key: 'skf' },
+	openSides: { ...bool, key: 'sks' },
+	sideWallHeight: { ...num(5, 400, true), key: 'skv' },
 	lightweightWalls: { ...bool, key: 'skl' }
 };
 
