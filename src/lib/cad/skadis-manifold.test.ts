@@ -13,7 +13,7 @@ beforeAll(async () => {
 }, 30000);
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
+	return { width: 120, height: 80, depth: 50, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
 }
 
 const span = (s: ReturnType<typeof buildSkadisManifold>, axis: number) => {
@@ -88,6 +88,21 @@ describe('buildSkadisManifold', () => {
 		const base = { width: 160, height: 80, depth: 60, sideWallHeight: 22 } as const;
 		expect(frontCornerFill(makeSk({ ...base, openFront: false, openSides: false }))).toBeGreaterThan(0);
 		expect(frontCornerFill(makeSk({ ...base, openFront: true, openSides: true }))).toBeCloseTo(0, 3);
+	});
+
+	it('screw mount: no hooks behind the board, and the back wall is bored at each mount site', () => {
+		const p = makeSk({ mountType: 'screw' });
+		const s = buildSkadisManifold(p);
+		const t = p.wallThickness;
+		expect(s.volume()).toBeGreaterThan(0);
+		// Screws replace hooks: nothing protrudes behind the board face (contrast the hook test).
+		expect(s.boundingBox().min[1]!).toBeGreaterThan(-BOARD_THICKNESS);
+		// A small probe through the back wall at the top-center mount: solid for hooks, bored for screws.
+		const site = planSkadis(p).hooks[0]!;
+		const probe = box(2, t + 0.2, 2, site.x, t / 2, site.z - 1);
+		const screwWall = s.intersect(probe).volume();
+		const hookWall = buildSkadisManifold(makeSk({ mountType: 'hook' })).intersect(probe).volume();
+		expect(screwWall).toBeLessThan(0.1 * hookWall); // clearance hole hollows the wall
 	});
 
 	it('builds a narrow single-column box', () => {

@@ -3,7 +3,7 @@ import type { SkadisParams } from '$lib/stores/params';
 import { planSkadis, frontWallCutZ, sideWallCutZ, SKADIS_PITCH } from './skadis-layout';
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
+	return { width: 120, height: 80, depth: 50, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
 }
 
 describe('planSkadis', () => {
@@ -54,6 +54,12 @@ describe('planSkadis', () => {
 	it('emits cols × rows hooks', () => {
 		const l = planSkadis(makeSk({ width: 160, height: 200, hookRows: 2 }));
 		expect(l.hooks).toHaveLength(l.cols * l.rows);
+	});
+
+	it('places mounts on the same grid regardless of mount type (hooks vs screws)', () => {
+		const hooks = planSkadis(makeSk({ width: 160, height: 120, hookRows: 2, mountType: 'hook' }));
+		const screws = planSkadis(makeSk({ width: 160, height: 120, hookRows: 2, mountType: 'screw' }));
+		expect(screws.hooks).toEqual(hooks.hooks);
 	});
 });
 

@@ -211,21 +211,21 @@ export const skadisPresets: SkadisPreset[] = [
 	{
 		name: 'Small bin',
 		description: 'Compact open-front wall box for small parts',
-		params: { width: 80, height: 60, depth: 45, wallThickness: 2, hookRows: 1, openFront: true, frontWallHeight: 25, openSides: false, sideWallHeight: 30, lightweightWalls: false }
+		params: { width: 80, height: 60, depth: 45, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: true, frontWallHeight: 25, openSides: false, sideWallHeight: 30, lightweightWalls: false }
 	},
 	{
 		name: 'Wide tray',
 		description: 'Wide shallow open tray for longer items',
-		params: { width: 160, height: 50, depth: 60, wallThickness: 2, hookRows: 1, openFront: true, frontWallHeight: 20, openSides: true, sideWallHeight: 25, lightweightWalls: false }
+		params: { width: 160, height: 50, depth: 60, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: true, frontWallHeight: 20, openSides: true, sideWallHeight: 25, lightweightWalls: false }
 	},
 	{
 		name: 'Deep cup',
 		description: 'Tall cup for pens or tools, double hook row',
-		params: { width: 80, height: 130, depth: 70, wallThickness: 2.4, hookRows: 2, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false }
+		params: { width: 80, height: 130, depth: 70, wallThickness: 2.4, mountType: 'hook', hookRows: 2, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false }
 	},
 	{
 		name: 'Hex caddy',
 		description: 'Lightweight hex-wall box, less filament',
-		params: { width: 120, height: 90, depth: 55, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: true }
+		params: { width: 120, height: 90, depth: 55, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: true }
 	}
 ];

@@ -17,7 +17,7 @@ export const SLOT_H = 15;
 // Placement margins (mm).
 const COL_EDGE_MARGIN = 6; // keep the outer columns inside the box width
 const TOP_MARGIN = 8; // drop of the top hook row below the box top edge
-const HOOK_REACH_BELOW = 9; // self-supporting wedge reaches ~8mm below the row center — keep it clear of the floor
+const HOOK_REACH_BELOW = 10; // hook lip drops ~8mm below the row center — keep the lowest row clear of the floor
 
 export interface SkadisHook {
 	x: number; // column center (box centered on X)
