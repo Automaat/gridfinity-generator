@@ -8,6 +8,7 @@ import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import { dividerCoords, compartmentEdges } from './divider-layout';
 import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
+import { ensureCounterClockwise } from './polygon';
 import {
 	BASE_PROFILE_HEIGHT,
 	BASE_PROFILE_LEVELS,
@@ -99,29 +100,17 @@ export function box(w: number, l: number, h: number, cx: number, cy: number, zBa
 	return oc().Manifold.cube([w, l, h]).translate([cx - w / 2, cy - l / 2, zBase]);
 }
 
-// CrossSection treats a clockwise contour as a hole, so normalize to CCW (the
-// source polygons flip orientation depending on bin side / slope direction).
-function ensureCCW(pts: [number, number][]): [number, number][] {
-	let area = 0;
-	for (let i = 0; i < pts.length; i++) {
-		const [x1, y1] = pts[i]!;
-		const [x2, y2] = pts[(i + 1) % pts.length]!;
-		area += x1 * y2 - x2 * y1;
-	}
-	return area < 0 ? pts.toReversed() : pts;
-}
-
 // A prism whose cross-section lies in a world plane, extruded along world X or Y.
 // Both use proper rotations (no mirroring) so the section shape is preserved, and
 // each spans its axis [0, length]. `ptsYZ`/`ptsXZ` are world-plane points.
 //   X: section→(-Z, Y) then rotate([0,90,0]) ⇒ extrude→+X
 //   Y: section→(X, Z) then rotate([90,0,0])+shift ⇒ extrude→+Y
 export function prismAlongX(ptsYZ: [number, number][], length: number): Manifold {
-	const cs = new (oc().CrossSection)(ensureCCW(ptsYZ.map(([y, z]) => [-z, y])));
+	const cs = new (oc().CrossSection)(ensureCounterClockwise(ptsYZ.map(([y, z]) => [-z, y])));
 	return oc().Manifold.extrude(cs, length).rotate([0, 90, 0]);
 }
 export function prismAlongY(ptsXZ: [number, number][], length: number): Manifold {
-	const cs = new (oc().CrossSection)(ensureCCW(ptsXZ.map(([x, z]) => [x, z])));
+	const cs = new (oc().CrossSection)(ensureCounterClockwise(ptsXZ.map(([x, z]) => [x, z])));
 	return oc().Manifold.extrude(cs, length).rotate([90, 0, 0]).translate([0, length, 0]);
 }
 function cylinderAlongX(radius: number, length: number): Manifold {
