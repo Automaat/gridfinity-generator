@@ -5,9 +5,10 @@ import { buildBinManifold, setBinManifold } from './manifold-bin';
 import { planBinSplit } from './bin-split';
 import { buildBinSplitPreview, buildBinSplitTiles, buildBinSplitCombined } from './bin-split-manifold';
 import { buildBaseplateAssembled, buildBaseplateTiles, buildBaseplateCombined } from './baseplate-manifold';
+import { buildSkadisManifold } from './skadis-manifold';
 import { manifoldToMesh, manifoldToStlBlob, manifoldToStlBytes } from './mesh-util';
-import type { BinParams, BaseplateParams } from '$lib/stores/params';
-import { classifyError, validateParams, validateBaseplate, type WorkerErrorCode } from './worker-errors';
+import type { BinParams, BaseplateParams, SkadisParams } from '$lib/stores/params';
+import { classifyError, validateParams, validateBaseplate, validateSkadis, type WorkerErrorCode } from './worker-errors';
 
 // Preview and STL export both run on the manifold engine (small WASM, eager).
 // STL is rebuilt at a finer tessellation than the preview. OpenCascade is
@@ -31,7 +32,10 @@ export type WorkerRequest =
 	| { type: 'exportSTL'; params: BinParams }
 	| { type: 'buildBaseplate'; params: BaseplateParams }
 	| { type: 'exportBaseplateSTL'; params: BaseplateParams }
-	| { type: 'exportBaseplateSTEP'; params: BaseplateParams };
+	| { type: 'exportBaseplateSTEP'; params: BaseplateParams }
+	| { type: 'buildSkadis'; params: SkadisParams }
+	| { type: 'exportSkadisSTL'; params: SkadisParams }
+	| { type: 'exportSkadisSTEP'; params: SkadisParams };
 
 export type WorkerResponse =
 	| {
@@ -109,6 +113,20 @@ self.addEventListener('message', async (e: MessageEvent<WorkerRequest>) => {
 			const { buildOcctBaseplate } = await import('./baseplate-occt');
 			const shape = await buildOcctBaseplate(msg.params);
 			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP(), filename: 'baseplate.step' } satisfies WorkerResponse);
+		} else if (msg.type === 'buildSkadis') {
+			validateSkadis(msg.params);
+			const solid = buildSkadisManifold(msg.params);
+			const { vertices, triangles, normals, edges } = manifoldToMesh(solid);
+			postMesh(vertices, triangles, normals, edges);
+		} else if (msg.type === 'exportSkadisSTL') {
+			validateSkadis(msg.params);
+			const solid = buildSkadisManifold(msg.params);
+			self.postMessage({ type: 'exportSTL', blob: manifoldToStlBlob(solid), filename: 'skadis-box.stl' } satisfies WorkerResponse);
+		} else if (msg.type === 'exportSkadisSTEP') {
+			validateSkadis(msg.params);
+			const { buildOcctSkadis } = await import('./skadis-occt');
+			const shape = await buildOcctSkadis(msg.params);
+			self.postMessage({ type: 'exportSTEP', blob: shape.blobSTEP(), filename: 'skadis-box.step' } satisfies WorkerResponse);
 		}
 	} catch (err) {
 		const { code, message } = classifyError(err);

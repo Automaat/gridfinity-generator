@@ -1,7 +1,7 @@
 <script lang="ts">
 	import { onMount, onDestroy } from 'svelte';
 	import { base } from '$app/paths';
-	import { params, baseplateParams, mode, serializeAll, deserializeAll } from '$lib/stores/params';
+	import { params, baseplateParams, skadisParams, mode, serializeAll, deserializeAll } from '$lib/stores/params';
 	import Viewer from '$lib/components/Viewer.svelte';
 	import Controls from '$lib/components/Controls.svelte';
 	import type { WorkerRequest, WorkerResponse } from '$lib/cad/worker';
@@ -128,15 +128,16 @@
 
 	onMount(() => {
 		const url = new URLSearchParams(window.location.search);
-		const { mode: m, bin, baseplate } = deserializeAll(url);
+		const { mode: m, bin, baseplate, skadis } = deserializeAll(url);
 		mode.set(m);
 		params.set(bin);
 		baseplateParams.set(baseplate);
+		skadisParams.set(skadis);
 		spawnWorker();
 		// Paint the precomputed default bin immediately so the first visit shows a
 		// real model while the worker starts up. Only valid for the default bin view
-		// — any params (or baseplate mode) mean a different model, so let the worker build it.
-		if (m === 'bin' && serializeAll(m, bin, baseplate).toString() === '') {
+		// — any params (or another mode) mean a different model, so let the worker build it.
+		if (m === 'bin' && serializeAll(m, bin, baseplate, skadis).toString() === '') {
 			loadDefaultMesh();
 		}
 	});
@@ -187,7 +188,9 @@
 		const req: WorkerRequest =
 			$mode === 'baseplate'
 				? { type: 'buildBaseplate', params: $baseplateParams }
-				: { type: 'build', params: $params };
+				: $mode === 'skadis'
+					? { type: 'buildSkadis', params: $skadisParams }
+					: { type: 'build', params: $params };
 		worker.postMessage(req);
 	}
 
@@ -202,7 +205,9 @@
 		const req: WorkerRequest =
 			$mode === 'baseplate'
 				? { type: format === 'step' ? 'exportBaseplateSTEP' : 'exportBaseplateSTL', params: $baseplateParams }
-				: { type: format === 'step' ? 'exportSTEP' : 'exportSTL', params: $params };
+				: $mode === 'skadis'
+					? { type: format === 'step' ? 'exportSkadisSTEP' : 'exportSkadisSTL', params: $skadisParams }
+					: { type: format === 'step' ? 'exportSTEP' : 'exportSTL', params: $params };
 		worker.postMessage(req);
 	}
 
@@ -223,17 +228,19 @@
 		debounceTimer = setTimeout(() => requestBuild(), 40);
 		clearTimeout(urlTimer);
 		urlTimer = setTimeout(() => {
-			const qs = serializeAll($mode, $params, $baseplateParams).toString();
+			const qs = serializeAll($mode, $params, $baseplateParams, $skadisParams).toString();
 			history.replaceState(null, '', qs ? `?${qs}` : window.location.pathname);
 		}, 250);
 	}
 	const unsubP = params.subscribe(() => scheduleBuildAndSync());
 	const unsubBp = baseplateParams.subscribe(() => scheduleBuildAndSync());
+	const unsubSk = skadisParams.subscribe(() => scheduleBuildAndSync());
 	const unsubMode = mode.subscribe(() => scheduleBuildAndSync());
 
 	onDestroy(() => {
 		unsubP();
 		unsubBp();
+		unsubSk();
 		unsubMode();
 	});
 </script>

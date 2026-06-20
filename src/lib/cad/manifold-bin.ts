@@ -108,11 +108,11 @@ function ensureCCW(pts: [number, number][]): [number, number][] {
 // each spans its axis [0, length]. `ptsYZ`/`ptsXZ` are world-plane points.
 //   X: section→(-Z, Y) then rotate([0,90,0]) ⇒ extrude→+X
 //   Y: section→(X, Z) then rotate([90,0,0])+shift ⇒ extrude→+Y
-function prismAlongX(ptsYZ: [number, number][], length: number): Manifold {
+export function prismAlongX(ptsYZ: [number, number][], length: number): Manifold {
 	const cs = new (oc().CrossSection)(ensureCCW(ptsYZ.map(([y, z]) => [-z, y])));
 	return oc().Manifold.extrude(cs, length).rotate([0, 90, 0]);
 }
-function prismAlongY(ptsXZ: [number, number][], length: number): Manifold {
+export function prismAlongY(ptsXZ: [number, number][], length: number): Manifold {
 	const cs = new (oc().CrossSection)(ensureCCW(ptsXZ.map(([x, z]) => [x, z])));
 	return oc().Manifold.extrude(cs, length).rotate([90, 0, 0]).translate([0, length, 0]);
 }

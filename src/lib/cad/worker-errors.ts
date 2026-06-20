@@ -1,4 +1,4 @@
-import type { BinParams, BaseplateParams } from '$lib/stores/params';
+import type { BinParams, BaseplateParams, SkadisParams } from '$lib/stores/params';
 
 // Timeout is detected on the main thread, but shares this vocabulary so the UI
 // can present every failure uniformly.
@@ -51,6 +51,23 @@ export function validateBaseplate(bp: BaseplateParams): void {
 	const skirtY = bp.drawerDepth - Math.floor(bp.drawerDepth / 42) * 42;
 	if (bp.bedWidth < 42 + skirtX || bp.bedDepth < 42 + skirtY) {
 		throw new InvalidParamsError('Printer bed is too small to fit one tile with the drawer padding — increase the bed size or adjust the drawer dimensions');
+	}
+}
+
+// Box dimensions are INTERIOR sizes; walls/floor are added on top, so the only hard
+// requirement is a positive, printable interior and a positive wall.
+export function validateSkadis(p: SkadisParams): void {
+	if (!Number.isFinite(p.width) || !Number.isFinite(p.height) || !Number.isFinite(p.depth)) {
+		throw new InvalidParamsError('Box dimensions must be finite numbers');
+	}
+	if (p.width < 5 || p.height < 5 || p.depth < 3) {
+		throw new InvalidParamsError('Interior box size must be at least 5×5×3mm');
+	}
+	if (!Number.isFinite(p.wallThickness) || p.wallThickness <= 0) {
+		throw new InvalidParamsError('Wall thickness must be a positive number');
+	}
+	if (!Number.isInteger(p.hookRows) || p.hookRows < 1) {
+		throw new InvalidParamsError('Hook rows must be a positive integer');
 	}
 }
 

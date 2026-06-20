@@ -222,7 +222,7 @@ export function deserializeParams(search: URLSearchParams): BinParams {
 // from BinParams so the bin flow is untouched.
 // ---------------------------------------------------------------------------
 
-export type AppMode = 'bin' | 'baseplate';
+export type AppMode = 'bin' | 'baseplate' | 'skadis';
 export type Align = 'low' | 'center' | 'high';
 
 export interface BaseplateParams {
@@ -325,21 +325,106 @@ function deserializeBaseplate(search: URLSearchParams): BaseplateParams {
 	return p;
 }
 
+// ---------------------------------------------------------------------------
+// Skadis box generator — a third top-level mode. A plain wall-mounted box (no
+// Gridfinity base) sized freely in mm, with snap-in hooks on the back that
+// engage an IKEA Skadis pegboard (5×15mm slots on a 40mm grid). Kept structurally
+// separate from BinParams/BaseplateParams so neither existing flow is touched.
+// ---------------------------------------------------------------------------
+
+export interface SkadisParams {
+	width: number; // mm — interior box width (X, along the board)
+	height: number; // mm — interior box height (Z)
+	depth: number; // mm — interior box depth (Y, projection from the board)
+	wallThickness: number; // mm — walls + floor, added outside the interior
+	hookRows: number; // rows of snap hooks (1–2), stacked at the 40mm pitch
+	openFront: boolean; // lower the front wall for easy access
+	lightweightWalls: boolean; // punch a hex lattice through the walls + floor
+}
+
+export const defaultSkadis: SkadisParams = {
+	width: 120,
+	height: 80,
+	depth: 50,
+	wallThickness: 2,
+	hookRows: 1,
+	openFront: false,
+	lightweightWalls: false
+};
+
+export const skadisParams = writable<SkadisParams>({ ...defaultSkadis });
+
+type SkCodec<K extends keyof SkadisParams> = {
+	key: string;
+	encode: (value: SkadisParams[K]) => string;
+	decode: (raw: string, def: SkadisParams[K]) => SkadisParams[K];
+};
+type SkCodecs = { [K in keyof SkadisParams]-?: SkCodec<K> };
+
+// Skadis URL keys (sk*) never collide with the bin or baseplate keys above, so a
+// single URLSearchParams holds any one mode unambiguously.
+const SK_CODECS: SkCodecs = {
+	width: { ...num(20, 400), key: 'skw' },
+	height: { ...num(20, 400), key: 'skh' },
+	depth: { ...num(10, 300), key: 'skd' },
+	wallThickness: { ...num(1, 5), key: 'skt' },
+	hookRows: { ...num(1, 2, true), key: 'skr' },
+	openFront: { ...bool, key: 'sko' },
+	lightweightWalls: { ...bool, key: 'skl' }
+};
+
+const SK_KEYS = Object.keys(SK_CODECS) as (keyof SkadisParams)[];
+
+function skEncode<K extends keyof SkadisParams>(p: SkadisParams, param: K): string {
+	const codec = SK_CODECS[param] as unknown as SkCodec<K>;
+	return codec.encode(p[param]);
+}
+function skDecode<K extends keyof SkadisParams>(p: SkadisParams, param: K, raw: string): void {
+	const codec = SK_CODECS[param] as unknown as SkCodec<K>;
+	p[param] = codec.decode(raw, defaultSkadis[param]);
+}
+
+function serializeSkadis(p: SkadisParams): URLSearchParams {
+	const sp = new URLSearchParams();
+	for (const param of SK_KEYS) {
+		if (p[param] === defaultSkadis[param]) continue;
+		sp.set(SK_CODECS[param].key, skEncode(p, param));
+	}
+	return sp;
+}
+
+function deserializeSkadis(search: URLSearchParams): SkadisParams {
+	const p = { ...defaultSkadis };
+	for (const param of SK_KEYS) {
+		const raw = search.get(SK_CODECS[param].key);
+		if (raw === null) continue;
+		skDecode(p, param, raw);
+	}
+	return p;
+}
+
 // Combined (de)serialization: a single `m` marker selects the active mode; only
 // that mode's params are written, so existing bin-only URLs stay byte-identical.
-export function serializeAll(m: AppMode, bin: BinParams, bp: BaseplateParams): URLSearchParams {
+export function serializeAll(m: AppMode, bin: BinParams, bp: BaseplateParams, sk: SkadisParams = defaultSkadis): URLSearchParams {
 	if (m === 'baseplate') {
 		const sp = serializeBaseplate(bp);
 		sp.set('m', 'bp');
 		return sp;
 	}
+	if (m === 'skadis') {
+		const sp = serializeSkadis(sk);
+		sp.set('m', 'sk');
+		return sp;
+	}
 	return serializeParams(bin);
 }
 
-export function deserializeAll(search: URLSearchParams): { mode: AppMode; bin: BinParams; baseplate: BaseplateParams } {
+export function deserializeAll(search: URLSearchParams): { mode: AppMode; bin: BinParams; baseplate: BaseplateParams; skadis: SkadisParams } {
+	const m = search.get('m');
 	return {
-		mode: search.get('m') === 'bp' ? 'baseplate' : 'bin',
+		mode: m === 'bp' ? 'baseplate' : m === 'sk' ? 'skadis' : 'bin',
 		bin: deserializeParams(search),
-		baseplate: deserializeBaseplate(search)
+		baseplate: deserializeBaseplate(search),
+		skadis: deserializeSkadis(search)
 	};
 }

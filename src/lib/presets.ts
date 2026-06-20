@@ -1,4 +1,4 @@
-import type { BinParams, BaseplateParams } from '$lib/stores/params';
+import type { BinParams, BaseplateParams, SkadisParams } from '$lib/stores/params';
 
 export interface Preset {
 	name: string;
@@ -10,6 +10,12 @@ export interface BaseplatePreset {
 	name: string;
 	description: string;
 	params: BaseplateParams;
+}
+
+export interface SkadisPreset {
+	name: string;
+	description: string;
+	params: SkadisParams;
 }
 
 // Build-plate sizes (mm) for common printers — selecting one fills bed W×D in the
@@ -198,5 +204,28 @@ export const baseplatePresets: BaseplatePreset[] = [
 			style: 'simple', screwHoles: false, bedWidth: 256, bedDepth: 256,
 			splitAlgorithm: 'ideal', connector: 'filament', exportLayout: 'zip'
 		}
+	}
+];
+
+export const skadisPresets: SkadisPreset[] = [
+	{
+		name: 'Small bin',
+		description: 'Compact open-front wall box for small parts',
+		params: { width: 80, height: 60, depth: 45, wallThickness: 2, hookRows: 1, openFront: true, lightweightWalls: false }
+	},
+	{
+		name: 'Wide tray',
+		description: 'Wide shallow tray for longer items',
+		params: { width: 160, height: 50, depth: 60, wallThickness: 2, hookRows: 1, openFront: true, lightweightWalls: false }
+	},
+	{
+		name: 'Deep cup',
+		description: 'Tall cup for pens or tools, double hook row',
+		params: { width: 80, height: 130, depth: 70, wallThickness: 2.4, hookRows: 2, openFront: false, lightweightWalls: false }
+	},
+	{
+		name: 'Hex caddy',
+		description: 'Lightweight hex-wall box, less filament',
+		params: { width: 120, height: 90, depth: 55, wallThickness: 2, hookRows: 1, openFront: false, lightweightWalls: true }
 	}
 ];
