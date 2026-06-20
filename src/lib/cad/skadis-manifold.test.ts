@@ -117,8 +117,8 @@ describe('buildSkadisManifold', () => {
 		// Same guarantee on a lowered + hexed side wall, probed along its interior depth.
 		const sp = makeSk({ ...base, openSides: true, sideWallHeight: 30, lightweightWalls: true });
 		const sTop = sideWallCutZ(sp);
-		const { outerW } = outerDims(sp);
-		const sideProbe = box(t, base.depth, 1, -outerW / 2 + t / 2, outerD / 2, sTop - 1);
+		const sd = outerDims(sp);
+		const sideProbe = box(t, base.depth, 1, -sd.outerW / 2 + t / 2, sd.outerD / 2, sTop - 1);
 		expect(buildSkadisManifold(sp).intersect(sideProbe).volume()).toBeCloseTo(base.depth * t, 0);
 	});
 });
