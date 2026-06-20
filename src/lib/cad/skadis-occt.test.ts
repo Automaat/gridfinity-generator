@@ -55,7 +55,7 @@ const { buildOcctSkadis } = await import('./skadis-occt');
 const replicad = await import('replicad');
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, lightweightWalls: false, ...overrides };
+	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
 }
 
 beforeEach(() => {
@@ -86,6 +86,11 @@ describe('buildOcctSkadis', () => {
 
 	it('handles a narrow single-column box', async () => {
 		expect(await buildOcctSkadis(makeSk({ width: 30 }))).toBeDefined();
+	});
+
+	it('builds with open side walls at a chosen height', async () => {
+		expect(await buildOcctSkadis(makeSk({ openSides: true, sideWallHeight: 25 }))).toBeDefined();
+		expect(await buildOcctSkadis(makeSk({ openFront: true, openSides: true, sideWallHeight: 40 }))).toBeDefined();
 	});
 
 	it('cuts hex lattice cutters when lightweight walls are on', async () => {

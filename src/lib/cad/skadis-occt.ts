@@ -5,17 +5,17 @@ import { draw, drawRoundedRectangle, makeCompound, setOC, type Solid, type Sketc
 import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import type { SkadisParams } from '$lib/stores/params';
-import { planSkadis, outerDims, hexPolygon, hexCells, BOARD_THICKNESS } from './skadis-layout';
+import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, hexPolygon, hexCells, BOARD_THICKNESS } from './skadis-layout';
 
 // Snap-hook geometry (mm) — MUST match skadis-manifold.ts.
 const HOOK_W = 4.4;
-const ARM_H = 4;
+const HOOK_TOP = 2;
 const ARM_OVERLAP = 1.2;
 const ARM_REACH = BOARD_THICKNESS + 2.5;
-const BARB_Y = 2;
-const BARB_DROP = 4.5;
+const TIP_THICK = 1.4;
 const NUB_Y = 2;
-const NUB_H = 0.8;
+const NUB_H = 0.9;
+const NUB_Y_CENTER = -(BOARD_THICKNESS + 1);
 
 let ready: Promise<void> | null = null;
 function init(): Promise<void> {
@@ -54,12 +54,24 @@ function wallHexCuttersSolid(axis: 'X' | 'Y' | 'Z', faceW: number, faceH: number
 	});
 }
 
+// Self-supporting wedge hook (mirror skadis-manifold.ts buildHook): a Y-Z profile
+// extruded HOOK_W along X (sketched on the YZ plane like the side-wall hex cutters),
+// plus a retention nub on top.
 function buildHookSolid(x: number, z: number): Solid {
-	const armLen = ARM_REACH + ARM_OVERLAP;
-	const arm = boxSolid(HOOK_W, armLen, ARM_H, x, (ARM_OVERLAP - ARM_REACH) / 2, z - ARM_H / 2);
-	const barb = boxSolid(HOOK_W, BARB_Y, ARM_H + BARB_DROP, x, -(ARM_REACH - BARB_Y / 2), z - ARM_H / 2 - BARB_DROP);
-	const nub = boxSolid(HOOK_W, NUB_Y, NUB_H, x, -(NUB_Y / 2 + 0.5), z + ARM_H / 2 - 0.05);
-	return arm.fuse(barb).fuse(nub) as Solid;
+	const top = z + HOOK_TOP;
+	const tipBottom = top - TIP_THICK;
+	const rootBottom = tipBottom - (ARM_REACH + ARM_OVERLAP);
+	const profile: [number, number][] = [
+		[ARM_OVERLAP, top],
+		[-ARM_REACH, top],
+		[-ARM_REACH, tipBottom],
+		[ARM_OVERLAP, rootBottom]
+	];
+	let dw = draw(profile[0]);
+	for (let i = 1; i < profile.length; i++) dw = dw.lineTo(profile[i]!);
+	const wedge = (dw.close().sketchOnPlane('YZ', x - HOOK_W / 2) as Sketch).extrude(HOOK_W) as Solid;
+	const nub = boxSolid(HOOK_W, NUB_Y, NUB_H, x, NUB_Y_CENTER, top - 0.05);
+	return wedge.fuse(nub) as Solid;
 }
 
 export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
@@ -72,10 +84,26 @@ export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
 	const cavity = boxSolid(p.width, p.depth, p.height + 1, 0, outerD / 2, t);
 	solid = solid.cut(cavity) as Solid;
 
+	// Access cuts (mirror skadis-manifold.ts): front cut spans interior width, side cuts
+	// span interior depth, so a closed neighbour keeps its shared corner full height.
+	const frontH = p.openFront ? frontWallCutZ(p) : outerH;
+	const sideZ = p.openSides ? sideWallCutZ(p) : outerH;
 	if (p.openFront) {
-		const frontH = Math.min(outerH - t, Math.max(15, outerH * 0.45));
 		const cut = boxSolid(p.width, t + 2, outerH, 0, outerD - t / 2, frontH);
 		solid = solid.cut(cut) as Solid;
+	}
+	if (p.openSides) {
+		const cutL = boxSolid(t + 2, p.depth, outerH, -outerW / 2 + t / 2, outerD / 2, sideZ);
+		const cutR = boxSolid(t + 2, p.depth, outerH, outerW / 2 - t / 2, outerD / 2, sideZ);
+		solid = (solid.cut(cutL) as Solid).cut(cutR) as Solid;
+	}
+	// Drop the two front corner posts when both adjacent walls are open so they don't
+	// stand alone as poles; the back corners belong to the full-height back wall.
+	if (p.openFront && p.openSides) {
+		const cornerZ = Math.max(frontH, sideZ);
+		const cornerL = boxSolid(t + 2, t + 2, outerH, -outerW / 2 + t / 2, outerD - t / 2, cornerZ);
+		const cornerR = boxSolid(t + 2, t + 2, outerH, outerW / 2 - t / 2, outerD - t / 2, cornerZ);
+		solid = (solid.cut(cornerL) as Solid).cut(cornerR) as Solid;
 	}
 
 	// Hex lattice through every wall + the floor; the back wall keeps a solid mount
