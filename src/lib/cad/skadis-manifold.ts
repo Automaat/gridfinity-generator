@@ -15,22 +15,30 @@ import { oc, box, prismAlongX, prismAlongY } from './manifold-bin';
 import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, BOARD_THICKNESS } from './skadis-layout';
 import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
 
-// Snap-hook geometry (mm). The hook is a wedge: a flat top slides over the slot
-// bridge, the tip reaches behind the board, and the underside is a single 45° ramp
-// down to the back wall — so it prints support-free with the box floor down. A small
-// nub on top, just behind the board, gives push-past retention. MUST match skadis-occt.ts.
+// Snap-hook geometry (mm). A conventional Skadis hook: a horizontal arm passes through
+// the slot and a lip drops down behind the board, so the inside corner captures the
+// board (box back wall holds the front face, the lip's front face holds the back face).
+// Install = slide the arms into the slots, then lower the box so the lips drop behind
+// the bridges below them. The arm underside + lip bottom are overhangs — print with
+// supports. MUST match skadis-occt.ts.
 const HOOK_W = 4.4; // X width — clears the 5mm slot with print tolerance
-const HOOK_TOP = 2; // hook top rises this far above the row center z (Z)
 const ARM_OVERLAP = 1.2; // root welded into the back wall (+Y)
-const ARM_REACH = BOARD_THICKNESS + 2.5; // tip reach behind the board front face (-Y)
-const TIP_THICK = 1.4; // hook thickness (Z) at the tip; the 45° underside ramps up from the wall to here
-const NUB_Y = 2; // retention nub length (Y)
-const NUB_H = 0.9; // retention nub height above the hook top (Z)
-const NUB_Y_CENTER = -(BOARD_THICKNESS + 1); // nub sits just behind the board back face
+const ARM_TOP = 2; // arm top rises this far above the row center z (Z)
+const ARM_THICK = 3; // arm thickness (Z)
+const CATCH_FRONT_Y = BOARD_THICKNESS + 0.4; // lip front (catch) face: 0.4mm behind the board back (-Y), |value|
+const LIP_THICK = 2; // lip thickness (Y); arm reaches CATCH_FRONT_Y + LIP_THICK behind the board front
+const LIP_DROP = 8; // lip bottom drops this far below the row center (Z)
 
-// Solid back-wall band kept around the hook rows so the Skadis mount stays strong;
-// measured downward from the lowest hook center.
+// Solid back-wall band kept around the hook/screw rows so the Skadis mount stays
+// strong; measured downward from the lowest mount center.
 const MOUNT_BAND = 12;
+
+// M5 screw-mount geometry (mm) — the alternative to snap hooks. A plain clearance hole
+// straight through the back wall, FLUSH with the wall (no boss, no counterbore — a thin
+// wall has no meat to recess a head into). The shaft exits through a slot; a washer + nut
+// clamp behind the board. MUST match skadis-occt.ts.
+const SCREW_CLEAR_R = 2.75; // M5 clearance hole (Ø5.5)
+const SCREW_SEG = 48; // circle tessellation for screw cylinders
 
 // Hex lattice cut through one panel. `axis` is the panel's thickness direction
 // (X = side wall, Y = back/front wall, Z = floor); (cx, cy, cz) is the panel center
@@ -50,23 +58,37 @@ function wallHexCutters(axis: 'X' | 'Y' | 'Z', faceW: number, faceH: number, thi
 	return oc().Manifold.union(cutters);
 }
 
-// One self-supporting snap hook at (x, z) on the back wall; back face at Y=0, board
-// into -Y. The wedge profile lives in the Y-Z plane and is extruded HOOK_W along X;
-// its underside is a single 45° ramp (tip thin, root deep) so nothing overhangs.
-function buildHook(x: number, z: number): Manifold {
-	const { Manifold } = oc();
-	const top = z + HOOK_TOP;
-	const tipBottom = top - TIP_THICK;
-	const rootBottom = tipBottom - (ARM_REACH + ARM_OVERLAP); // 45° underside back to the wall
-	const profile: [number, number][] = [
-		[ARM_OVERLAP, top], // wall top (root welds into the back wall, +Y)
-		[-ARM_REACH, top], // tip top (flat top that rides over the slot bridge)
-		[-ARM_REACH, tipBottom], // tip face (vertical)
-		[ARM_OVERLAP, rootBottom] // 45° underside down to the wall — self-supporting
+// Y-Z profile of one drop-catch hook centered on row z; back wall outer face at Y=0,
+// board into -Y. Shared by both geometry paths (kept here, mirrored in skadis-occt.ts).
+function hookProfile(z: number): [number, number][] {
+	const top = z + ARM_TOP;
+	const armBottom = top - ARM_THICK;
+	const armReach = CATCH_FRONT_Y + LIP_THICK; // tip behind the board
+	return [
+		[ARM_OVERLAP, top], // root top (welds into the back wall, +Y)
+		[-armReach, top], // arm tip top
+		[-armReach, z - LIP_DROP], // down the back face of the lip
+		[-CATCH_FRONT_Y, z - LIP_DROP], // lip bottom (overhang)
+		[-CATCH_FRONT_Y, armBottom], // up the lip front (catch) face — captures the board back
+		[ARM_OVERLAP, armBottom] // arm underside back to the wall (overhang)
 	];
-	const wedge = prismAlongX(profile, HOOK_W).translate([x - HOOK_W / 2, 0, 0]);
-	const nub = box(HOOK_W, NUB_Y, NUB_H, x, NUB_Y_CENTER, top - 0.05);
-	return Manifold.union([wedge, nub]);
+}
+
+// One conventional hook at (x, z); the profile is extruded HOOK_W along X. Its arm
+// underside + lip bottom are overhangs — prints with supports (see hookProfile).
+function buildHook(x: number, z: number): Manifold {
+	return prismAlongX(hookProfile(z), HOOK_W).translate([x - HOOK_W / 2, 0, 0]);
+}
+
+// A cylinder whose axis runs along world +Y, base at Y=0, centered on X/Z at the origin.
+function cylinderAlongY(radius: number, length: number): Manifold {
+	return oc().Manifold.cylinder(length, radius, radius, SCREW_SEG).rotate([-90, 0, 0]);
+}
+
+// M5 clearance hole at (x, z): a plain bore straight through the back wall (Y∈[0, t]),
+// overshooting both faces so the boolean is clean. No boss/counterbore — flush wall.
+function buildScrewHole(x: number, z: number, t: number): Manifold {
+	return cylinderAlongY(SCREW_CLEAR_R, t + 2).translate([x, -1, z]);
 }
 
 export function buildSkadisManifold(p: SkadisParams): Manifold {
@@ -126,8 +148,15 @@ export function buildSkadisManifold(p: SkadisParams): Manifold {
 		for (const cutters of panels) if (cutters) solid = solid.subtract(cutters);
 	}
 
-	const hooks = layout.hooks.map(({ x, z }) => buildHook(x, z));
-	if (hooks.length > 0) solid = solid.add(hooks.length === 1 ? hooks[0]! : Manifold.union(hooks));
+	// Mounts land on the solid back-wall band (added/cut after the hex above). Hooks
+	// weld on; screws bore a plain flush clearance hole through the wall.
+	if (p.mountType === 'screw') {
+		const holes = layout.hooks.map(({ x, z }) => buildScrewHole(x, z, t));
+		if (holes.length > 0) solid = solid.subtract(holes.length === 1 ? holes[0]! : Manifold.union(holes));
+	} else {
+		const hooks = layout.hooks.map(({ x, z }) => buildHook(x, z));
+		if (hooks.length > 0) solid = solid.add(hooks.length === 1 ? hooks[0]! : Manifold.union(hooks));
+	}
 
 	return solid;
 }

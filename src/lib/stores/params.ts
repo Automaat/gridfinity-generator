@@ -338,7 +338,8 @@ export interface SkadisParams {
 	height: number; // mm — interior box height (Z)
 	depth: number; // mm — interior box depth (Y, projection from the board)
 	wallThickness: number; // mm — walls + floor, added outside the interior
-	hookRows: number; // rows of snap hooks (1–2), stacked at the 40mm pitch
+	mountType: 'hook' | 'screw'; // snap-in hooks, or M5 screw holes through the back
+	hookRows: number; // rows of mounts (1–2), stacked at the 40mm pitch
 	openFront: boolean; // lower the front wall for easy access
 	frontWallHeight: number; // mm — top edge (Z) of the front wall when openFront
 	openSides: boolean; // lower the left + right walls to sideWallHeight
@@ -351,6 +352,7 @@ export const defaultSkadis: SkadisParams = {
 	height: 80,
 	depth: 50,
 	wallThickness: 2,
+	mountType: 'hook',
 	hookRows: 1,
 	openFront: false,
 	frontWallHeight: 30,
@@ -360,6 +362,9 @@ export const defaultSkadis: SkadisParams = {
 };
 
 export const skadisParams = writable<SkadisParams>({ ...defaultSkadis });
+
+const SK_MOUNT_TO_CHAR = { hook: 'h', screw: 's' } as const;
+const CHAR_TO_SK_MOUNT = invert(SK_MOUNT_TO_CHAR);
 
 type SkCodec<K extends keyof SkadisParams> = {
 	key: string;
@@ -375,6 +380,7 @@ const SK_CODECS: SkCodecs = {
 	height: { ...num(20, 400), key: 'skh' },
 	depth: { ...num(10, 300), key: 'skd' },
 	wallThickness: { ...num(1, 5), key: 'skt' },
+	mountType: { key: 'skm', encode: (v) => SK_MOUNT_TO_CHAR[v], decode: (raw, def) => CHAR_TO_SK_MOUNT[raw] ?? def },
 	hookRows: { ...num(1, 2, true), key: 'skr' },
 	openFront: { ...bool, key: 'sko' },
 	frontWallHeight: { ...num(5, 400, true), key: 'skf' },

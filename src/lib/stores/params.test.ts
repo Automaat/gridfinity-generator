@@ -417,7 +417,7 @@ describe('baseplate URL serialization', () => {
 
 describe('skadis URL serialization', () => {
 	const customSk: SkadisParams = {
-		width: 160, height: 130, depth: 70, wallThickness: 2.4, hookRows: 2, openFront: true, frontWallHeight: 45, openSides: true, sideWallHeight: 90, lightweightWalls: true
+		width: 160, height: 130, depth: 70, wallThickness: 2.4, mountType: 'screw', hookRows: 2, openFront: true, frontWallHeight: 45, openSides: true, sideWallHeight: 90, lightweightWalls: true
 	};
 
 	it('round-trips every skadis field via serializeAll/deserializeAll', () => {

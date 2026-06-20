@@ -119,7 +119,14 @@
 	<section class="flex flex-col gap-3">
 		<h2 class={section}>Skadis mount</h2>
 		<label class="block">
-			<span class={lbl}>Hook rows</span>
+			<span class={lbl}>Mount type</span>
+			<select bind:value={$skadisParams.mountType} class={selectInput} style:background-image={chevron}>
+				<option value="hook">Snap hooks (no screws)</option>
+				<option value="screw">M5 screw holes</option>
+			</select>
+		</label>
+		<label class="block">
+			<span class={lbl}>{$skadisParams.mountType === 'screw' ? 'Screw rows' : 'Hook rows'}</span>
 			<select bind:value={$skadisParams.hookRows} class={selectInput} style:background-image={chevron}>
 				<option value={1}>1 row</option>
 				<option value={2}>2 rows (heavier loads)</option>
@@ -153,10 +160,11 @@
 			</span>
 		</label>
 		<p class="rounded-lg bg-zinc-800/50 px-2.5 py-2 text-xs text-zinc-400">
-			<span class="font-semibold text-zinc-200">{layout.cols}×{layout.rows}</span> snap hooks
+			<span class="font-semibold text-zinc-200">{layout.cols}×{layout.rows}</span>
+			{$skadisParams.mountType === 'screw' ? 'M5 screw holes' : 'snap hooks'}
 			· {SKADIS_PITCH}mm pitch
 			{#if layout.cols < 2}
-				<span class="mt-1 block text-amber-300/90">Box is narrow — only one hook column; it may rotate on the board.</span>
+				<span class="mt-1 block text-amber-300/90">Box is narrow — only one mount column; it may rotate on the board.</span>
 			{/if}
 		</p>
 	</section>
@@ -197,6 +205,11 @@
 	</section>
 
 	<p class="rounded-lg bg-sky-500/10 px-2.5 py-2 text-xs text-sky-200/90">
-		Print with the open top facing up. Tilt the box, slide the hooks into the pegboard slots, then lower it so the hooks lock behind the board.
+		Print with the open top facing up.
+		{#if $skadisParams.mountType === 'screw'}
+			Bolt the box to the board with M5 screws through the slots — washer + nut behind the board.
+		{:else}
+			Print the hooks with supports. Slide the hooks into the pegboard slots, then lower the box so the lips drop behind the board.
+		{/if}
 	</p>
 </div>

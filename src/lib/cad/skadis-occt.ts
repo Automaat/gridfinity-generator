@@ -1,22 +1,26 @@
 // Lazy OpenCascade Skadis-box path — STEP export only (BRep kernel). Mirrors
 // skadis-manifold.ts in replicad; importing it pulls the ~4.6MB WASM, so the
 // worker dynamic-imports it on demand, exactly like occt.ts / baseplate-occt.ts.
-import { draw, drawRoundedRectangle, makeCompound, setOC, type Solid, type Sketch } from 'replicad';
+import { draw, drawCircle, drawRoundedRectangle, makeCompound, setOC, type Solid, type Sketch } from 'replicad';
 import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import type { SkadisParams } from '$lib/stores/params';
 import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, BOARD_THICKNESS } from './skadis-layout';
 import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
 
-// Snap-hook geometry (mm) — MUST match skadis-manifold.ts.
+// Conventional Skadis hook geometry (mm) — MUST match skadis-manifold.ts (see the
+// mechanism note there). Arm through the slot + lip down behind the board; print with
+// supports.
 const HOOK_W = 4.4;
-const HOOK_TOP = 2;
 const ARM_OVERLAP = 1.2;
-const ARM_REACH = BOARD_THICKNESS + 2.5;
-const TIP_THICK = 1.4;
-const NUB_Y = 2;
-const NUB_H = 0.9;
-const NUB_Y_CENTER = -(BOARD_THICKNESS + 1);
+const ARM_TOP = 2;
+const ARM_THICK = 3;
+const CATCH_FRONT_Y = BOARD_THICKNESS + 0.4;
+const LIP_THICK = 2;
+const LIP_DROP = 8;
+
+// M5 screw-mount geometry (mm) — MUST match skadis-manifold.ts. Plain flush hole.
+const SCREW_CLEAR_R = 2.75;
 
 let ready: Promise<void> | null = null;
 function init(): Promise<void> {
@@ -54,24 +58,35 @@ function wallHexCuttersSolid(axis: 'X' | 'Y' | 'Z', faceW: number, faceH: number
 	});
 }
 
-// Self-supporting wedge hook (mirror skadis-manifold.ts buildHook): a Y-Z profile
-// extruded HOOK_W along X (sketched on the YZ plane like the side-wall hex cutters),
-// plus a retention nub on top.
+// Conventional Skadis hook (mirror skadis-manifold.ts buildHook): a Y-Z profile
+// extruded HOOK_W along X (sketched on the YZ plane like the side-wall hex cutters).
 function buildHookSolid(x: number, z: number): Solid {
-	const top = z + HOOK_TOP;
-	const tipBottom = top - TIP_THICK;
-	const rootBottom = tipBottom - (ARM_REACH + ARM_OVERLAP);
+	const top = z + ARM_TOP;
+	const armBottom = top - ARM_THICK;
+	const armReach = CATCH_FRONT_Y + LIP_THICK;
 	const profile: [number, number][] = [
 		[ARM_OVERLAP, top],
-		[-ARM_REACH, top],
-		[-ARM_REACH, tipBottom],
-		[ARM_OVERLAP, rootBottom]
+		[-armReach, top],
+		[-armReach, z - LIP_DROP],
+		[-CATCH_FRONT_Y, z - LIP_DROP],
+		[-CATCH_FRONT_Y, armBottom],
+		[ARM_OVERLAP, armBottom]
 	];
 	let dw = draw(profile[0]);
 	for (let i = 1; i < profile.length; i++) dw = dw.lineTo(profile[i]!);
-	const wedge = (dw.close().sketchOnPlane('YZ', x - HOOK_W / 2) as Sketch).extrude(HOOK_W) as Solid;
-	const nub = boxSolid(HOOK_W, NUB_Y, NUB_H, x, NUB_Y_CENTER, top - 0.05);
-	return wedge.fuse(nub) as Solid;
+	return (dw.close().sketchOnPlane('YZ', x - HOOK_W / 2) as Sketch).extrude(HOOK_W) as Solid;
+}
+
+// A cylinder whose axis runs along world +Y: a circle on the XZ plane at yStart,
+// extruded +Y by length, centered on (x, z). Mirror of cylinderAlongY in the manifold path.
+function cylinderAlongY(radius: number, yStart: number, length: number, x: number, z: number): Solid {
+	return (drawCircle(radius).sketchOnPlane('XZ', yStart) as Sketch).extrude(length).translate(x, 0, z) as Solid;
+}
+
+// M5 clearance hole at (x, z): a plain bore through the back wall, flush (mirror
+// skadis-manifold.ts buildScrewHole).
+function buildScrewHoleSolid(x: number, z: number, t: number): Solid {
+	return cylinderAlongY(SCREW_CLEAR_R, -1, t + 2, x, z);
 }
 
 export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
@@ -122,8 +137,14 @@ export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
 		if (cutters.length > 0) solid = solid.cut(makeCompound(cutters) as Solid) as Solid;
 	}
 
-	const hooks = layout.hooks.map(({ x, z }) => buildHookSolid(x, z));
-	if (hooks.length > 0) solid = solid.fuse(makeCompound(hooks) as Solid) as Solid;
+	// Mounts: hooks weld onto the solid band; screws bore a plain flush clearance hole.
+	if (p.mountType === 'screw') {
+		const holes = layout.hooks.map(({ x, z }) => buildScrewHoleSolid(x, z, t));
+		if (holes.length > 0) solid = solid.cut(makeCompound(holes) as Solid) as Solid;
+	} else {
+		const hooks = layout.hooks.map(({ x, z }) => buildHookSolid(x, z));
+		if (hooks.length > 0) solid = solid.fuse(makeCompound(hooks) as Solid) as Solid;
+	}
 
 	return solid;
 }

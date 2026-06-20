@@ -44,6 +44,7 @@ function mockDrawing(): MockDrawing {
 
 vi.mock('replicad', () => ({
 	draw: vi.fn<(start?: [number, number]) => MockDrawing>(() => mockDrawing()),
+	drawCircle: vi.fn<(r: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
 	drawRoundedRectangle: vi.fn<(w: number, l: number, r?: number) => MockSketchOnPlane>(() => mockSketchOnPlane()),
 	makeCompound: vi.fn<(shapes: MockSolid[]) => MockSolid>(() => mockSolid()),
 	setOC: vi.fn<() => void>(() => undefined)
@@ -63,7 +64,7 @@ const { hexCells } = await import('./hex-lattice');
 const { frontWallCutZ, sideWallCutZ } = await import('./skadis-layout');
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
+	return { width: 120, height: 80, depth: 50, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
 }
 
 beforeEach(() => {
@@ -90,6 +91,13 @@ describe('buildOcctSkadis', () => {
 				expect(result).toBeDefined();
 			}
 		}
+	});
+
+	it('screw mount: bores flush clearance holes (drawCircle) instead of fusing hooks', async () => {
+		const result = await buildOcctSkadis(makeSk({ mountType: 'screw' }));
+		expect(result).toBeDefined();
+		expect(replicad.drawCircle).toHaveBeenCalled(); // clearance-hole cylinders
+		expect(replicad.makeCompound).toHaveBeenCalled(); // holes cut as one compound
 	});
 
 	it('handles a narrow single-column box', async () => {
