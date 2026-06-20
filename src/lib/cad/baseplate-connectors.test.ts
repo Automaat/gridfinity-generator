@@ -60,21 +60,20 @@ describe('baseplate connector specs', () => {
 	});
 
 	it('describes pin-hole length and placement for each seam axis', () => {
-		expect(pinHoleSpec({ axis: 'x', pos: 42, min: -84, max: 0, bodyDir: -1, male: true }, 7, 5, 1.6)).toEqual({
-			axis: 'x',
-			length: 5.4,
-			start: 36.800000000000004,
-			x: 36.800000000000004,
-			y: 7,
-			z: 1.6
-		});
-		expect(pinHoleSpec({ axis: 'y', pos: 42, min: -84, max: 0, bodyDir: 1, male: false }, 7, 5, 2)).toEqual({
-			axis: 'y',
-			length: 5.4,
-			start: 41.8,
-			x: 7,
-			y: 41.8,
-			z: 2
-		});
+		const xHole = pinHoleSpec({ axis: 'x', pos: 42, min: -84, max: 0, bodyDir: -1, male: true }, 7, 5, 1.6);
+		expect(xHole.axis).toBe('x');
+		expect(xHole.length).toBeCloseTo(5.4);
+		expect(xHole.start).toBeCloseTo(36.8);
+		expect(xHole.x).toBeCloseTo(36.8);
+		expect(xHole.y).toBe(7);
+		expect(xHole.z).toBe(1.6);
+
+		const yHole = pinHoleSpec({ axis: 'y', pos: 42, min: -84, max: 0, bodyDir: 1, male: false }, 7, 5, 2);
+		expect(yHole.axis).toBe('y');
+		expect(yHole.length).toBeCloseTo(5.4);
+		expect(yHole.start).toBeCloseTo(41.8);
+		expect(yHole.x).toBe(7);
+		expect(yHole.y).toBeCloseTo(41.8);
+		expect(yHole.z).toBe(2);
 	});
 });

@@ -36,7 +36,7 @@ const PIN_HOLE_FACE_OVERLAP = 0.2;
 const FEMALE_Z_OVERSHOOT = 0.1;
 
 function orientSeamPoints(seam: Seam, points: ConnectorPoint[]): ConnectorPoint[] {
-	return seam.axis === 'x' ? points : points.map(([p, q]) => [q, p]);
+	return seam.axis === 'x' ? points : points.map(([p, q]): ConnectorPoint => [q, p]);
 }
 
 export function dovetailTabSpec(seam: Seam, along: number, thickness: number, female: boolean): DovetailTabSpec {
