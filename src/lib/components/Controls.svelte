@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { params, dimensions, defaultParams, serializeParams, mode, type BinParams } from '$lib/stores/params';
-	import { presets } from '$lib/presets';
+	import { presets, printerBeds } from '$lib/presets';
+	import { planBinSplit } from '$lib/cad/bin-split';
 	import { estimatePrint } from '$lib/utils/print-estimate';
 	import BaseplateControls from './BaseplateControls.svelte';
 
@@ -13,6 +14,21 @@
 	let { onexport, exporting, loading = false }: Props = $props();
 	let dims = $derived($dimensions);
 	let estimate = $derived(estimatePrint($params));
+
+	// Split planning runs on pure math (no engine), so the panel can show the piece
+	// count live. `splitActive` gates the multi-piece-only controls and labels.
+	let binSplit = $derived(
+		planBinSplit($params.width, $params.length, $params.bedWidth, $params.bedDepth, $params.splitAlgorithm)
+	);
+	let splitActive = $derived($params.splitToFit && binSplit.multiTile);
+	let selectedPrinter = $derived(
+		printerBeds.findIndex((b) => b.w === $params.bedWidth && b.d === $params.bedDepth)
+	);
+	function applyPrinter(value: string) {
+		if (value === '') return; // "Custom" — keep the current bed size
+		const bed = printerBeds[Number(value)];
+		if (bed) params.update((p) => ({ ...p, bedWidth: bed.w, bedDepth: bed.d }));
+	}
 
 	let selectedPreset = $derived(
 		presets.findIndex((p) => JSON.stringify(p.params) === JSON.stringify($params))
@@ -36,7 +52,7 @@
 	let copied = $state(false);
 	let copyTimer: ReturnType<typeof setTimeout> | undefined;
 
-	type NumKey = 'width' | 'length' | 'height' | 'wallThickness' | 'dividersX' | 'dividersY';
+	type NumKey = 'width' | 'length' | 'height' | 'wallThickness' | 'dividersX' | 'dividersY' | 'bedWidth' | 'bedDepth';
 
 	function clamp(v: number, min: number, max: number): number {
 		return Math.min(max, Math.max(min, v));
@@ -382,6 +398,49 @@
 		</div>
 	</details>
 
+	<!-- Print in parts -->
+	<section class="flex flex-col gap-3">
+		<h2 class={section}>Print in parts</h2>
+		{@render toggleRow($params.splitToFit, 'Split to fit printer bed', (v) => ($params.splitToFit = v))}
+		{#if $params.splitToFit}
+			<label class="block">
+				<span class={lbl}>Printer</span>
+				<select onchange={(e) => applyPrinter(e.currentTarget.value)} class={selectInput} style:background-image={chevron}>
+					<option value="" selected={selectedPrinter === -1}>Custom</option>
+					{#each printerBeds as bed, i}
+						<option value={i} selected={i === selectedPrinter}>{bed.name} ({bed.w}×{bed.d})</option>
+					{/each}
+				</select>
+			</label>
+			<div class="grid grid-cols-2 gap-3">
+				{@render numField('bedWidth', 'Bed width (mm)', 'bed width', 42, 1000, 5)}
+				{@render numField('bedDepth', 'Bed depth (mm)', 'bed depth', 42, 1000, 5)}
+			</div>
+			{#if binSplit.multiTile}
+				<p class="rounded-lg bg-zinc-800/50 px-2.5 py-2 text-xs text-zinc-400">
+					Splits into <span class="font-semibold text-zinc-200">{binSplit.pieces.length}</span>
+					pieces ({binSplit.tilesX}×{binSplit.tilesY}) along grid lines · glue the flush faces.
+				</p>
+				<label class="block">
+					<span class={lbl}>Split layout</span>
+					<select bind:value={$params.splitAlgorithm} class={selectInput} style:background-image={chevron}>
+						<option value="ideal">Balanced (even pieces)</option>
+						<option value="incremental">Packed (max per piece)</option>
+					</select>
+				</label>
+				<label class="block">
+					<span class={lbl}>STL layout</span>
+					<select bind:value={$params.splitLayout} class={selectInput} style:background-image={chevron}>
+						<option value="zip">ZIP — one file per piece</option>
+						<option value="combined">Combined — pieces spread on one plate</option>
+					</select>
+				</label>
+			{:else}
+				<p class="text-xs text-zinc-500">Fits the bed in one piece — no split needed.</p>
+			{/if}
+		{/if}
+	</section>
+
 	<!-- Export -->
 	<section class="flex flex-col gap-2">
 		<h2 class={section}>Export</h2>
@@ -394,7 +453,7 @@
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
 			</svg>
-			{exporting ? 'Exporting…' : 'Download STL'}
+			{exporting ? 'Exporting…' : splitActive && $params.splitLayout === 'zip' ? 'Download STL (ZIP)' : 'Download STL'}
 			<span class="text-xs font-normal text-blue-200/80">for printing</span>
 		</button>
 		<button

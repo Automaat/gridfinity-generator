@@ -20,6 +20,14 @@ export interface BinParams {
 	wallCutSide: 'back' | 'front' | 'left' | 'right';
 	wallCutLowFraction: number;
 	wallCutRun: number;
+	// Split an oversized bin into printer-bed-sized pieces along grid lines. Off by
+	// default — the bin flow is untouched unless the user opts in. Pieces are flush
+	// (glue/tape the cut faces); see bin-split.ts for the layout math.
+	splitToFit: boolean;
+	bedWidth: number; // mm — printer bed size, the split target
+	bedDepth: number;
+	splitAlgorithm: 'ideal' | 'incremental';
+	splitLayout: 'zip' | 'combined'; // multi-piece STL delivery
 	// Per-divider positions as fractions (0..1) across the interior, measured from
 	// the low wall. Optional: absent or length≠count means even spacing (the
 	// default until a divider is dragged in the 3D view).
@@ -45,7 +53,12 @@ export const defaultParams: BinParams = {
 	wallCut: false,
 	wallCutSide: 'front',
 	wallCutLowFraction: 0,
-	wallCutRun: 1
+	wallCutRun: 1,
+	splitToFit: false,
+	bedWidth: 220,
+	bedDepth: 220,
+	splitAlgorithm: 'ideal',
+	splitLayout: 'zip'
 };
 
 export const params = writable<BinParams>({ ...defaultParams });
@@ -64,6 +77,8 @@ function clamp(v: number, min: number, max: number): number {
 // generated, so adding an enum member never requires touching a second table.
 const LIP_TO_CHAR = { standard: 's', reduced: 'r', none: 'n' } as const;
 const WALL_TO_CHAR = { back: 'b', front: 'f', left: 'l', right: 'r' } as const;
+const SPLIT_ALGO_TO_CHAR = { ideal: 'i', incremental: 'n' } as const;
+const SPLIT_LAYOUT_TO_CHAR = { zip: 'z', combined: 'c' } as const;
 
 function invert<V extends string, K extends string>(map: Record<K, V>): Record<string, K> {
 	return Object.fromEntries(Object.entries(map).map(([k, v]) => [v, k])) as Record<string, K>;
@@ -71,6 +86,8 @@ function invert<V extends string, K extends string>(map: Record<K, V>): Record<s
 
 const CHAR_TO_LIP = invert(LIP_TO_CHAR);
 const CHAR_TO_WALL = invert(WALL_TO_CHAR);
+const CHAR_TO_SPLIT_ALGO = invert(SPLIT_ALGO_TO_CHAR);
+const CHAR_TO_SPLIT_LAYOUT = invert(SPLIT_LAYOUT_TO_CHAR);
 
 // Per-field codec: short URL key + bidirectional encode/decode. Single source
 // of truth — adding a param means adding one entry here (plus the interface).
@@ -145,6 +162,19 @@ const CODECS: Codecs = {
 	},
 	wallCutLowFraction: { ...num(0, 0.95), key: 'wcf' },
 	wallCutRun: { ...num(0.1, 1), key: 'wcr' },
+	splitToFit: { ...bool, key: 'sp' },
+	bedWidth: { ...num(42, 1000, true), key: 'sbw' },
+	bedDepth: { ...num(42, 1000, true), key: 'sbd' },
+	splitAlgorithm: {
+		key: 'sal',
+		encode: (v) => SPLIT_ALGO_TO_CHAR[v],
+		decode: (raw, def) => CHAR_TO_SPLIT_ALGO[raw] ?? def
+	},
+	splitLayout: {
+		key: 'sel',
+		encode: (v) => SPLIT_LAYOUT_TO_CHAR[v],
+		decode: (raw, def) => CHAR_TO_SPLIT_LAYOUT[raw] ?? def
+	},
 	dividerPosX: { key: 'px', encode: fracsEncode, decode: (raw) => fracsDecode(raw) },
 	dividerPosY: { key: 'py', encode: fracsEncode, decode: (raw) => fracsDecode(raw) }
 };
