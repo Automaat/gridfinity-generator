@@ -15,9 +15,7 @@ import {
 	BASE_PROFILE_LEVELS,
 	CORNER_FILLET_RADIUS,
 	FLOOR_THICKNESS,
-	GRID_UNIT,
 	HEIGHT_UNIT,
-	HOLE_OFFSETS,
 	LABEL_TAB_DEPTH,
 	LABEL_TAB_HEIGHT,
 	MAGNET_HOLE_DEPTH,
@@ -26,9 +24,8 @@ import {
 	SCREW_HOLE_DIAMETER,
 	bodySize,
 	cellCenter,
-	gridOffset,
+	gridHoleSites,
 	innerFillet,
-	isOuterGridCorner,
 	lipProfileHeight,
 	lipProtrusion,
 	profileSections,
@@ -65,7 +62,7 @@ export function buildUnitBase(): Solid {
 	return chamfer1.fuse(vertical).fuse(chamfer2) as Solid;
 }
 
-function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Solid | null {
+function buildHoles(p: BinParams): Solid | null {
 	// Each corner's magnet + screw holes are concentric (they overlap), so they
 	// must be fused before cutting — cutting unfused overlapping tools leaves
 	// artifacts. Corners never overlap each other, so the per-corner cutters are
@@ -73,29 +70,22 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Sol
 	// than fusing every cylinder pairwise (6×6 magnet+screw: ~2900ms → ~525ms).
 	const cutters: Solid[] = [];
 
-	for (let x = 0; x < p.width; x++) {
-		for (let y = 0; y < p.length; y++) {
-			const cx = x * GRID_UNIT - gridOffsetX;
-			const cy = y * GRID_UNIT - gridOffsetY;
-
-			for (const [ox, oy] of HOLE_OFFSETS) {
-				let cutter: Solid | null = null;
-				if (p.magnetHoles && (!p.magnetCornersOnly || isOuterGridCorner(p.width, p.length, x, y, ox, oy))) {
-					const magnet = (
-						drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
-					).extrude(MAGNET_HOLE_DEPTH) as Solid;
-					cutter = magnet.translate(cx + ox, cy + oy, 0) as Solid;
-				}
-				if (p.screwHoles) {
-					const screw = (
-						drawCircle(SCREW_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
-					).extrude(SCREW_HOLE_DEPTH) as Solid;
-					const positioned = screw.translate(cx + ox, cy + oy, 0) as Solid;
-					cutter = cutter ? (cutter.fuse(positioned) as Solid) : positioned;
-				}
-				if (cutter) cutters.push(cutter);
-			}
+	for (const site of gridHoleSites(p.width, p.length)) {
+		let cutter: Solid | null = null;
+		if (p.magnetHoles && (!p.magnetCornersOnly || site.outerCorner)) {
+			const magnet = (
+				drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
+			).extrude(MAGNET_HOLE_DEPTH) as Solid;
+			cutter = magnet.translate(site.x, site.y, 0) as Solid;
 		}
+		if (p.screwHoles) {
+			const screw = (
+				drawCircle(SCREW_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
+			).extrude(SCREW_HOLE_DEPTH) as Solid;
+			const positioned = screw.translate(site.x, site.y, 0) as Solid;
+			cutter = cutter ? (cutter.fuse(positioned) as Solid) : positioned;
+		}
+		if (cutter) cutters.push(cutter);
 	}
 
 	if (cutters.length === 0) return null;
@@ -384,9 +374,6 @@ export function buildBin(p: BinParams): Solid {
 	const bodyL = bodySize(p.length);
 	const cavityFillet = innerFillet(p.wallThickness);
 
-	const gridOffsetX = gridOffset(p.width);
-	const gridOffsetY = gridOffset(p.length);
-
 	// 1. Grid of unit bases. Every cell is the same lofted foot, so build it once
 	// and clone+translate per cell — reconstructing the loft per cell costs
 	// ~50-65% more on multi-unit grids (4×4 base: 1377ms → 521ms).
@@ -410,7 +397,7 @@ export function buildBin(p: BinParams): Solid {
 
 	// 2b. Magnet/screw holes cut from bottom
 	if (p.magnetHoles || p.screwHoles) {
-		const holes = buildHoles(p, gridOffsetX, gridOffsetY);
+		const holes = buildHoles(p);
 		if (holes) {
 			bin = bin.cut(holes) as Solid;
 		}

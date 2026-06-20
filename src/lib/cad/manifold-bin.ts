@@ -13,9 +13,7 @@ import {
 	BASE_PROFILE_LEVELS,
 	CORNER_FILLET_RADIUS,
 	FLOOR_THICKNESS,
-	GRID_UNIT,
 	HEIGHT_UNIT,
-	HOLE_OFFSETS,
 	LABEL_TAB_DEPTH,
 	LABEL_TAB_HEIGHT,
 	MAGNET_HOLE_DEPTH,
@@ -24,9 +22,8 @@ import {
 	SCREW_HOLE_DIAMETER,
 	bodySize,
 	cellCenter,
-	gridOffset,
+	gridHoleSites,
 	innerFillet,
-	isOuterGridCorner,
 	lipProfileHeight,
 	lipProtrusion,
 	profileSections,
@@ -159,26 +156,20 @@ export function unitBase(): Manifold {
 	return oc().Manifold.union([c1, vertical, c2]);
 }
 
-function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Manifold | null {
+function buildHoles(p: BinParams): Manifold | null {
 	const { Manifold } = oc();
 	const cutters: Manifold[] = [];
-	for (let x = 0; x < p.width; x++) {
-		for (let y = 0; y < p.length; y++) {
-			const cx = x * GRID_UNIT - gridOffsetX;
-			const cy = y * GRID_UNIT - gridOffsetY;
-			for (const [ox, oy] of HOLE_OFFSETS) {
-				const parts: Manifold[] = [];
-				if (p.magnetHoles && (!p.magnetCornersOnly || isOuterGridCorner(p.width, p.length, x, y, ox, oy))) {
-					parts.push(Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, circleSegments));
-				}
-				if (p.screwHoles) {
-					parts.push(Manifold.cylinder(SCREW_HOLE_DEPTH, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, circleSegments));
-				}
-				if (parts.length === 0) continue;
-				const cutter = (parts.length === 1 ? parts[0]! : Manifold.union(parts));
-				cutters.push(cutter.translate([cx + ox, cy + oy, 0]));
-			}
+	for (const site of gridHoleSites(p.width, p.length)) {
+		const parts: Manifold[] = [];
+		if (p.magnetHoles && (!p.magnetCornersOnly || site.outerCorner)) {
+			parts.push(Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, circleSegments));
 		}
+		if (p.screwHoles) {
+			parts.push(Manifold.cylinder(SCREW_HOLE_DEPTH, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, circleSegments));
+		}
+		if (parts.length === 0) continue;
+		const cutter = (parts.length === 1 ? parts[0]! : Manifold.union(parts));
+		cutters.push(cutter.translate([site.x, site.y, 0]));
 	}
 	if (cutters.length === 0) return null;
 	return Manifold.union(cutters);
@@ -351,8 +342,6 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 	const bodyW = bodySize(p.width);
 	const bodyL = bodySize(p.length);
 	const cavityFillet = innerFillet(p.wallThickness);
-	const gridOffsetX = gridOffset(p.width);
-	const gridOffsetY = gridOffset(p.length);
 
 	// 1. Grid of unit bases (build once, translate copies)
 	const proto = unitBase();
@@ -369,7 +358,7 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 
 	// 2b. Magnet/screw holes
 	if (p.magnetHoles || p.screwHoles) {
-		const holes = buildHoles(p, gridOffsetX, gridOffsetY);
+		const holes = buildHoles(p);
 		if (holes) bin = bin.subtract(holes);
 	}
 
