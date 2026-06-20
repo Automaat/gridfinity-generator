@@ -6,6 +6,8 @@ export interface BinParams {
 	height: number;
 	wallThickness: number;
 	magnetHoles: boolean;
+	// Restrict magnet holes to the bin's 4 outer corners instead of every tile.
+	magnetCornersOnly: boolean;
 	screwHoles: boolean;
 	stackingLip: 'standard' | 'none' | 'reduced';
 	labelTab: boolean;
@@ -31,6 +33,7 @@ export const defaultParams: BinParams = {
 	height: 3,
 	wallThickness: 1.2,
 	magnetHoles: false,
+	magnetCornersOnly: false,
 	screwHoles: false,
 	stackingLip: 'standard',
 	labelTab: false,
@@ -117,6 +120,7 @@ const CODECS: Codecs = {
 	height: { ...num(1, 10, true), key: 'h' },
 	wallThickness: { ...num(0.8, 2.0), key: 'wt' },
 	magnetHoles: { ...bool, key: 'mh' },
+	magnetCornersOnly: { ...bool, key: 'mc' },
 	screwHoles: { ...bool, key: 'sh' },
 	stackingLip: {
 		key: 'sl',

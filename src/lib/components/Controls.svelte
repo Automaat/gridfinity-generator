@@ -224,6 +224,15 @@
 	<section class="flex flex-col gap-2">
 		<h2 class={section}>Features</h2>
 		{@render toggleRow($params.magnetHoles, 'Magnet holes', (v) => ($params.magnetHoles = v))}
+		{#if $params.magnetHoles}
+			<div class="pl-3">
+				{@render toggleRow(
+					$params.magnetCornersOnly,
+					'Corner magnets only (4 outer corners)',
+					(v) => ($params.magnetCornersOnly = v)
+				)}
+			</div>
+		{/if}
 		{@render toggleRow($params.screwHoles, 'Screw holes', (v) => ($params.screwHoles = v))}
 		{@render toggleRow($params.labelTab, 'Label tab', (v) => ($params.labelTab = v))}
 	</section>
