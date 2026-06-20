@@ -2,8 +2,8 @@ import { describe, it, expect } from 'vitest';
 import { get } from 'svelte/store';
 import {
 	params, defaultParams, dimensions, serializeParams, deserializeParams,
-	defaultBaseplate, serializeAll, deserializeAll,
-	type BinParams, type BaseplateParams
+	defaultBaseplate, defaultSkadis, serializeAll, deserializeAll,
+	type BinParams, type BaseplateParams, type SkadisParams
 } from './params';
 
 describe('defaultParams', () => {
@@ -369,5 +369,54 @@ describe('baseplate URL serialization', () => {
 			if (emitted.length === 1) keys.add(emitted[0]!);
 		}
 		expect(keys.size).toBeGreaterThan(5);
+	});
+});
+
+describe('skadis URL serialization', () => {
+	const customSk: SkadisParams = {
+		width: 160, height: 130, depth: 70, wallThickness: 2.4, hookRows: 2, openFront: true, lightweightWalls: true
+	};
+
+	it('round-trips every skadis field via serializeAll/deserializeAll', () => {
+		const sp = serializeAll('skadis', defaultParams, defaultBaseplate, customSk);
+		expect(sp.get('m')).toBe('sk');
+		const result = deserializeAll(sp);
+		expect(result.mode).toBe('skadis');
+		expect(result.skadis).toEqual(customSk);
+	});
+
+	it('emits only the mode marker when skadis is all defaults', () => {
+		const sp = serializeAll('skadis', defaultParams, defaultBaseplate, defaultSkadis);
+		expect(sp.toString()).toBe('m=sk');
+	});
+
+	it('defaults to default skadis for an empty search', () => {
+		expect(deserializeAll(new URLSearchParams('')).skadis).toEqual(defaultSkadis);
+	});
+
+	it('clamps out-of-range box dimensions', () => {
+		const sp = new URLSearchParams('m=sk&skw=5&skh=99999&skr=9');
+		const { skadis } = deserializeAll(sp);
+		expect(skadis.width).toBe(20); // min
+		expect(skadis.height).toBe(400); // max
+		expect(skadis.hookRows).toBe(2); // max
+	});
+
+	it('keeps bin and baseplate keys untouched in skadis mode', () => {
+		const sp = serializeAll('skadis', defaultParams, defaultBaseplate, customSk);
+		expect(sp.get('w')).toBeNull();
+		expect(sp.get('dw')).toBeNull();
+		expect(deserializeAll(sp).bin).toEqual(defaultParams);
+		expect(deserializeAll(sp).baseplate).toEqual(defaultBaseplate);
+	});
+
+	it('gives every skadis field a distinct URL key', () => {
+		const keys = new Set<string>();
+		for (const key of Object.keys(defaultSkadis) as (keyof SkadisParams)[]) {
+			const sp = serializeAll('skadis', defaultParams, defaultBaseplate, { ...defaultSkadis, [key]: customSk[key] });
+			const emitted = [...sp.keys()].filter((k) => k !== 'm');
+			if (emitted.length === 1) keys.add(emitted[0]!);
+		}
+		expect(keys.size).toBe(Object.keys(defaultSkadis).length);
 	});
 });

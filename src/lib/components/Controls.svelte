@@ -3,6 +3,7 @@
 	import { presets } from '$lib/presets';
 	import { estimatePrint } from '$lib/utils/print-estimate';
 	import BaseplateControls from './BaseplateControls.svelte';
+	import SkadisControls from './SkadisControls.svelte';
 
 	interface Props {
 		onexport: (format: 'step' | 'stl') => void;
@@ -160,9 +161,9 @@
 	</label>
 {/snippet}
 
-<!-- Mode toggle: bin generator vs drawer-insert baseplate -->
+<!-- Mode toggle: bin generator vs drawer-insert baseplate vs Skadis wall box -->
 <div class="px-4 pt-4">
-	<div class="grid grid-cols-2 gap-1 rounded-lg border border-zinc-800 bg-zinc-800/40 p-1">
+	<div class="grid grid-cols-3 gap-1 rounded-lg border border-zinc-800 bg-zinc-800/40 p-1">
 		<button
 			type="button"
 			onclick={() => ($mode = 'bin')}
@@ -177,11 +178,20 @@
 		>
 			Baseplate
 		</button>
+		<button
+			type="button"
+			onclick={() => ($mode = 'skadis')}
+			class="rounded-md px-3 py-1.5 text-sm font-medium transition {$mode === 'skadis' ? 'bg-blue-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}"
+		>
+			Skadis
+		</button>
 	</div>
 </div>
 
 {#if $mode === 'baseplate'}
 	<BaseplateControls {onexport} {exporting} {loading} />
+{:else if $mode === 'skadis'}
+	<SkadisControls {onexport} {exporting} {loading} />
 {:else}
 <div class="flex flex-col gap-6 p-4 pt-3">
 	<!-- Presets -->

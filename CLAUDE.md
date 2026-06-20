@@ -14,12 +14,16 @@ src/
 │   │   ├── baseplate-layout.ts # Pure tile-split/dovetail/skirt math (engine-free, tested)
 │   │   ├── baseplate-manifold.ts # Baseplate preview + STL (manifold), uses manifold-bin prims
 │   │   ├── baseplate-occt.ts   # Baseplate STEP (replicad, lazy), reuses gridfinity buildUnitBase
-│   │   ├── worker.ts           # Web Worker: builds mesh, exports STEP/STL (bin + baseplate)
+│   │   ├── skadis-layout.ts    # Pure Skadis hook-grid math (engine-free, tested)
+│   │   ├── skadis-manifold.ts  # Skadis wall-box preview + STL (manifold)
+│   │   ├── skadis-occt.ts      # Skadis wall-box STEP (replicad, lazy)
+│   │   ├── worker.ts           # Web Worker: builds mesh, exports STEP/STL (bin + baseplate + skadis)
 │   │   └── opencascade.d.ts    # WASM type declarations
 │   ├── components/
 │   │   ├── Viewer.svelte       # Threlte 3D viewport (overlays bin-mode only)
-│   │   ├── Controls.svelte     # Bin/Baseplate mode toggle + bin parameter panel
+│   │   ├── Controls.svelte     # Bin/Baseplate/Skadis mode toggle + bin parameter panel
 │   │   ├── BaseplateControls.svelte # Drawer/bed/style/tiling panel
+│   │   ├── SkadisControls.svelte # Skadis wall-box size/hook/open-front panel
 │   │   └── DimensionOverlay.svelte
 │   ├── stores/
 │   │   └── params.ts           # BinParams + BaseplateParams stores, mode, URL serialization
@@ -119,6 +123,7 @@ When modifying geometry, cross-reference constants at top of `gridfinity.ts` aga
 - **Coordinate system:** Origin is at center of grid footprint. Multi-unit grids offset by `((units - 1) * 42) / 2`
 - **Stacking lip:** Female cavity mirrors base profile inverted. The lip offset constants (`LIP_OFFSET_BOTTOM=2.95`, `LIP_OFFSET_MID=0.8`) must match base profile exactly or bins won't stack. The lip **protrudes above** `height×7` (`STACKING_LIP_PROTRUSION=3.551`): a lipped bin's total Z is `units×7 + 3.551`. Wall fills the nominal height; the lip base overlaps the rim ~1.2mm as support. Both geometry paths (`manifold-bin.ts` STL + `gridfinity.ts` STEP) must change together.
 - **Zero-size sketches:** `drawRoundedRectangle` with radius=0 works but produces sharp corners — use it intentionally for divider walls
+- **Skadis box:** A third top-level mode (`AppMode = 'bin' | 'baseplate' | 'skadis'`, URL marker `m=sk`, `SkadisParams` store + `SK_CODECS` with non-colliding `sk*` keys). NOT a Gridfinity bin — a plain hollow box sized freely in mm with snap-in hooks for an IKEA Skadis pegboard (5×15mm slots, **40mm** pitch both axes, ~5mm board). Coordinate frame: box centered on X, back face at **Y=0** (flush to the board), body extends **+Y**, hooks protrude into **−Y** through the slots; bottom rests at Z=0. Hook = horizontal arm + downward barb (gravity-locks behind the board) + small top retention nub; all hook constants MUST match across both geometry paths (`skadis-manifold.ts` STL/preview + `skadis-occt.ts` STEP). `SkadisParams` width/height/depth are **interior** sizes — the printed envelope adds a wall each side and a floor below via `outerDims(p)` (the single inner→outer conversion both geometry paths and the layout consume). Hook placement (columns/rows on the 40mm grid, centered on the OUTER width, capped to what fits) lives in the engine-free `skadis-layout.ts` (the single tested source). Box top is always open; `openFront` lowers the front wall between the side walls. `lightweightWalls` punches a hex lattice (same `HEX_RADIUS`/web/margin as the bin dividers, math in `skadis-layout.ts` `hexCells`/`hexPolygon`) through **all four walls + the floor**. `wallHexCutters` takes an axis: `X` (side walls), `Y` (back/front), `Z` (floor). The **back wall is hexed only below the hook rows** — a solid mount band (`MOUNT_BAND` below the lowest hook) stays around the hooks; cut **before** the hooks are added so they weld onto that solid band. Panels too small for a hex stay solid.
 - **Baseplate sockets:** The receiving socket is the bin foot (`unitBase()`/`buildUnitBase()`) subtracted from the plate top, flush at top. Plates are **skeletonized** (each cell floor opened through the plate — the canonical gridfinity-rebuilt look, far less filament); the magnet style preserves scalloped corner pads inside the opening (full-height, `MAGNET_BOSS_R`) and the **magnet pocket opens upward from the cavity floor** (`socketZ`), facing the bin foot's magnet — NOT downward. Both baseplate paths (`baseplate-manifold.ts` STL/preview + `baseplate-occt.ts` STEP) must change together, and the tile/seam/skirt math lives in the engine-free `baseplate-layout.ts` (the single tested source; it emits generic `Seam`s, geometry turns them into the chosen connector). Tiles use square corners (r=0) so they butt seamlessly. Connectors (`BaseplateParams.connector`): `filament` (default — Ø1.8 horizontal holes for a 1.75mm filament-scrap dowel pin, placed LOW (`FIL_Z`) in the existing seam floor so NO rib is added and the grid surface stays clean cells), `screw` (a solid seam rail `pinRail` + horizontal M3 holes at mid-height, gridfinity-rebuilt style — has visible seam walls), `dovetail` (small in-plane snap-tabs in the rim), or `none`. Filament keeps the seam clean; only `screw` adds a visible rib (M3 needs the meat). Filament suits thicker (magnet) plates; thin simple plates have little floor below the profile.
 
 ## Quality Gates
