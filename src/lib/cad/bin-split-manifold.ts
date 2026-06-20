@@ -10,9 +10,14 @@ import type { Manifold } from 'manifold-3d';
 import type { BinParams } from '$lib/stores/params';
 import { buildBinManifold, oc, box } from './manifold-bin';
 import { planBinSplit, type BinPiece } from './bin-split';
-
-const PREVIEW_SEGMENTS = 32;
-const EXPORT_SEGMENTS = 64;
+import {
+	combinedGridPlacements,
+	EXPORT_SEGMENTS,
+	gridExportName,
+	PREVIEW_SEGMENTS,
+	type BuildOpts,
+	type NamedSolid
+} from './split-export';
 
 // Clip box height — far taller than any bin (≤10U·7 + lip ≈ 73.5mm), so a single
 // box value clips every piece through its full Z without per-bin sizing.
@@ -22,11 +27,6 @@ const CLIP_Z = 1000;
 const PREVIEW_GAP = 6;
 // Combined-export gap: pieces laid flat on one plate, clearly separated for slicing.
 const COMBINED_GAP = 12;
-
-export interface NamedSolid {
-	name: string;
-	solid: Manifold;
-}
 
 // The bed-sized region this piece keeps, as a tall box covering the full bin Z.
 function clipBox(piece: BinPiece): Manifold {
@@ -41,7 +41,7 @@ function explodeShift(idx: number, n: number): number {
 
 // Live preview: pieces clipped from the full bin and pushed apart by a small gap
 // so the user sees where the bin will be cut. Single-piece bins return as-is.
-export function buildBinSplitPreview(p: BinParams, { segments = PREVIEW_SEGMENTS }: { segments?: number } = {}): Manifold {
+export function buildBinSplitPreview(p: BinParams, { segments = PREVIEW_SEGMENTS }: BuildOpts = {}): Manifold {
 	const { Manifold } = oc();
 	const plan = planBinSplit(p.width, p.length, p.bedWidth, p.bedDepth, p.splitAlgorithm);
 	const full = buildBinManifold(p, { segments });
@@ -55,43 +55,24 @@ export function buildBinSplitPreview(p: BinParams, { segments = PREVIEW_SEGMENTS
 }
 
 // Each piece localized to its own origin — for per-file (ZIP) STL export.
-export function buildBinSplitTiles(p: BinParams, { segments = EXPORT_SEGMENTS }: { segments?: number } = {}): NamedSolid[] {
+export function buildBinSplitTiles(p: BinParams, { segments = EXPORT_SEGMENTS }: BuildOpts = {}): NamedSolid[] {
 	const plan = planBinSplit(p.width, p.length, p.bedWidth, p.bedDepth, p.splitAlgorithm);
 	const full = buildBinManifold(p, { segments });
 	return plan.pieces.map((pc) => ({
-		name: `piece_r${pc.row + 1}c${pc.col + 1}.stl`,
+		name: gridExportName('piece', pc),
 		solid: full.intersect(clipBox(pc)).translate([-pc.cx, -pc.cy, 0])
 	}));
 }
 
 // All pieces spread apart on one plate — for the single combined STL.
-export function buildBinSplitCombined(p: BinParams, { segments = EXPORT_SEGMENTS }: { segments?: number } = {}): Manifold {
+export function buildBinSplitCombined(p: BinParams, { segments = EXPORT_SEGMENTS }: BuildOpts = {}): Manifold {
 	const { Manifold } = oc();
 	const plan = planBinSplit(p.width, p.length, p.bedWidth, p.bedDepth, p.splitAlgorithm);
 	const full = buildBinManifold(p, { segments });
 
-	const colW: number[] = [];
-	const rowL: number[] = [];
-	for (const pc of plan.pieces) {
-		colW[pc.col] = Math.max(colW[pc.col] ?? 0, pc.w);
-		rowL[pc.row] = Math.max(rowL[pc.row] ?? 0, pc.l);
-	}
-	const colX: number[] = [];
-	const rowY: number[] = [];
-	let cx = 0;
-	for (let c = 0; c < colW.length; c++) {
-		colX[c] = cx;
-		cx += (colW[c] ?? 0) + COMBINED_GAP;
-	}
-	let cy = 0;
-	for (let r = 0; r < rowL.length; r++) {
-		rowY[r] = cy;
-		cy += (rowL[r] ?? 0) + COMBINED_GAP;
-	}
-
-	const placed = plan.pieces.map((pc) => {
+	const placed = combinedGridPlacements(plan.pieces, COMBINED_GAP).map(({ item: pc, x, y }) => {
 		const local = full.intersect(clipBox(pc)).translate([-pc.cx, -pc.cy, 0]);
-		return local.translate([colX[pc.col]! + pc.w / 2, rowY[pc.row]! + pc.l / 2, 0]);
+		return local.translate([x, y, 0]);
 	});
 	return placed.length === 1 ? placed[0]! : Manifold.union(placed);
 }
