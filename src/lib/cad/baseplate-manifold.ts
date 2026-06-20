@@ -9,6 +9,7 @@ import type { Manifold } from 'manifold-3d';
 import type { BaseplateParams } from '$lib/stores/params';
 import { oc, roundedPrism, box, unitBase, setSegments } from './manifold-bin';
 import { planBaseplate, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
+import { ensureCounterClockwise } from './polygon';
 import {
 	baseplateCellCorners,
 	baseplateThickness,
@@ -38,18 +39,6 @@ import {
 const PREVIEW_SEGMENTS = 32;
 const EXPORT_SEGMENTS = 64;
 
-// CrossSection reads a clockwise contour as a hole; normalize to CCW (winding of
-// the tab polygon flips with the seam direction).
-function ensureCCW(pts: [number, number][]): [number, number][] {
-	let area = 0;
-	for (let i = 0; i < pts.length; i++) {
-		const [x1, y1] = pts[i]!;
-		const [x2, y2] = pts[(i + 1) % pts.length]!;
-		area += x1 * y2 - x2 * y1;
-	}
-	return area < 0 ? pts.toReversed() : pts;
-}
-
 // One dovetail tab at `along` on a seam, through the full plate thickness. Male =
 // a protruding tail rooted in this tile; female = the matching pocket (clearance-
 // enlarged) cut into the abutting tile. Narrow at the mouth, wider at the tip.
@@ -71,7 +60,7 @@ function dovetailTab(seam: Seam, along: number, thickness: number, female: boole
 		[pTip, along - tip]
 	];
 	const ptsXY: [number, number][] = seam.axis === 'x' ? poly : poly.map(([p, q]) => [q, p]);
-	const cs = new CrossSection(ensureCCW(ptsXY));
+	const cs = new CrossSection(ensureCounterClockwise(ptsXY));
 	const h = female ? thickness + 0.2 : thickness;
 	return Manifold.extrude(cs, h).translate([0, 0, female ? -0.1 : 0]);
 }
