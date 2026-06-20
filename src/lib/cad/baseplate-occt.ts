@@ -6,59 +6,31 @@ import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import { buildUnitBase } from './gridfinity';
 import type { BaseplateParams } from '$lib/stores/params';
-import { planBaseplate, PITCH, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
 import {
-	BASE_PROFILE_HEIGHT,
-	HOLE_DISTANCE_FROM_EDGE,
+	baseplateCellCorners,
+	baseplateThickness,
+	CORNER_OFFSETS,
+	DOVETAIL_ANCHOR as DT_ANCHOR,
+	DOVETAIL_CLEARANCE as DT_CLEARANCE,
+	DOVETAIL_DEPTH as DT_DEPTH,
+	DOVETAIL_NECK as DT_NECK,
+	DOVETAIL_TIP as DT_TIP,
+	FILAMENT_PIN_DEPTH as FIL_DEPTH,
+	FILAMENT_PIN_RADIUS as FIL_R,
+	FILAMENT_PIN_Z as FIL_Z,
+	MAGNET_BOSS_RADIUS as MAGNET_BOSS_R,
+	SCREW_CONNECTOR_RADIUS as SCREW_R,
+	SCREW_CONNECTOR_WALL as SCREW_WALL,
+	SKELETON_CORNER_RADIUS as SKEL_CORNER_R,
+	SKELETON_OPENING as SKEL_OPENING,
+	SOCKET_DEPTH
+} from './baseplate-spec';
+import { planBaseplate, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
+import {
 	MAGNET_HOLE_DEPTH,
 	MAGNET_HOLE_DIAMETER,
 	SCREW_HOLE_DIAMETER
 } from './gridfinity-spec';
-
-// Mirror baseplate-manifold.ts constants.
-const SOCKET_DEPTH = BASE_PROFILE_HEIGHT;
-const THICKNESS_SIMPLE = SOCKET_DEPTH + 1.25; // 6.0
-const THICKNESS_MAGNET = SOCKET_DEPTH + MAGNET_HOLE_DEPTH + 0.8; // 7.95
-// Skeletonization (mirror baseplate-manifold.ts).
-const SKEL_OPENING = 33;
-const SKEL_CORNER_R = 7;
-const MAGNET_BOSS_R = MAGNET_HOLE_DIAMETER / 2 + 2;
-const HOLE_INSET = PITCH / 2 - HOLE_DISTANCE_FROM_EDGE;
-const CORNER_OFFSETS: [number, number][] = [
-	[HOLE_INSET, HOLE_INSET],
-	[-HOLE_INSET, HOLE_INSET],
-	[HOLE_INSET, -HOLE_INSET],
-	[-HOLE_INSET, -HOLE_INSET]
-];
-// Connectors (mirror baseplate-manifold.ts).
-const DT_DEPTH = 4;
-const DT_NECK = 5;
-const DT_TIP = 8;
-const DT_ANCHOR = 1.5;
-const DT_CLEARANCE = 0.15;
-const SCREW_WALL = 6;
-const SCREW_R = 1.7;
-const FIL_DEPTH = 5;
-const FIL_R = 0.9;
-const FIL_Z = 1.6;
-
-function cellCorners(tile: BaseplateTile): [number, number][] {
-	const seen = new Set<string>();
-	const out: [number, number][] = [];
-	for (const cell of tile.cells) {
-		for (const ox of [HOLE_INSET, -HOLE_INSET]) {
-			for (const oy of [HOLE_INSET, -HOLE_INSET]) {
-				const x = cell.x + ox;
-				const y = cell.y + oy;
-				const k = `${x.toFixed(2)}:${y.toFixed(2)}`;
-				if (seen.has(k)) continue;
-				seen.add(k);
-				out.push([x, y]);
-			}
-		}
-	}
-	return out;
-}
 
 let ready: Promise<void> | null = null;
 function init(): Promise<void> {
@@ -69,10 +41,6 @@ function init(): Promise<void> {
 		})();
 	}
 	return ready;
-}
-
-function tileThickness(bp: BaseplateParams): number {
-	return bp.style === 'magnet' ? THICKNESS_MAGNET : THICKNESS_SIMPLE;
 }
 
 function dovetailTabSolid(seam: Seam, along: number, thickness: number, female: boolean): Solid {
@@ -146,7 +114,7 @@ function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: num
 
 	if (magnet) {
 		// Pockets open upward from the cavity floor (socketZ) toward the bin magnets.
-		const cutters = cellCorners(tile).map(([x, y]) => {
+		const cutters = baseplateCellCorners(tile.cells).map(([x, y]) => {
 			let cutter = (drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY', socketZ - MAGNET_HOLE_DEPTH) as Sketch)
 				.extrude(MAGNET_HOLE_DEPTH + 0.1)
 				.translate(x, y, 0) as Solid;
@@ -194,7 +162,7 @@ function buildTileSolid(tile: BaseplateTile, bp: BaseplateParams, thickness: num
 export async function buildOcctBaseplate(bp: BaseplateParams): Promise<Solid> {
 	await init();
 	const layout = planBaseplate(bp);
-	const thickness = tileThickness(bp);
+	const thickness = baseplateThickness(bp.style);
 	const foot = buildUnitBase();
 	const tiles = layout.tiles.map((tile) => buildTileSolid(tile, bp, thickness, foot));
 	return (tiles.length === 1 ? tiles[0]! : (makeCompound(tiles) as Solid));
