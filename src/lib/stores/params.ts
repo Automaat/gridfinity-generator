@@ -1,4 +1,5 @@
 import { writable, derived } from 'svelte/store';
+import { GRID_UNIT, HEIGHT_UNIT } from '$lib/cad/gridfinity-spec';
 
 export interface BinParams {
 	width: number;
@@ -64,9 +65,9 @@ export const defaultParams: BinParams = {
 export const params = writable<BinParams>({ ...defaultParams });
 
 export const dimensions = derived(params, ($p) => ({
-	widthMm: $p.width * 42,
-	lengthMm: $p.length * 42,
-	heightMm: $p.height * 7
+	widthMm: $p.width * GRID_UNIT,
+	lengthMm: $p.length * GRID_UNIT,
+	heightMm: $p.height * HEIGHT_UNIT
 }));
 
 function clamp(v: number, min: number, max: number): number {
@@ -163,8 +164,8 @@ const CODECS: Codecs = {
 	wallCutLowFraction: { ...num(0, 0.95), key: 'wcf' },
 	wallCutRun: { ...num(0.1, 1), key: 'wcr' },
 	splitToFit: { ...bool, key: 'sp' },
-	bedWidth: { ...num(42, 1000, true), key: 'sbw' },
-	bedDepth: { ...num(42, 1000, true), key: 'sbd' },
+	bedWidth: { ...num(GRID_UNIT, 1000, true), key: 'sbw' },
+	bedDepth: { ...num(GRID_UNIT, 1000, true), key: 'sbd' },
 	splitAlgorithm: {
 		key: 'sal',
 		encode: (v) => SPLIT_ALGO_TO_CHAR[v],
@@ -257,8 +258,8 @@ export const mode = writable<AppMode>('bin');
 export const baseplateParams = writable<BaseplateParams>({ ...defaultBaseplate });
 
 export const baseplateGrid = derived(baseplateParams, ($b) => ({
-	cols: Math.max(1, Math.floor($b.drawerWidth / 42)),
-	rows: Math.max(1, Math.floor($b.drawerDepth / 42))
+	cols: Math.max(1, Math.floor($b.drawerWidth / GRID_UNIT)),
+	rows: Math.max(1, Math.floor($b.drawerDepth / GRID_UNIT))
 }));
 
 const ALIGN_TO_CHAR = { low: 'l', center: 'c', high: 'h' } as const;
@@ -282,14 +283,14 @@ type BpCodecs = { [K in keyof BaseplateParams]-?: BpCodec<K> };
 // Baseplate URL keys are chosen to never collide with the bin keys above, so a
 // single URLSearchParams can hold either set unambiguously.
 const BP_CODECS: BpCodecs = {
-	drawerWidth: { ...num(42, 2000, true), key: 'dw' },
-	drawerDepth: { ...num(42, 2000, true), key: 'dd' },
+	drawerWidth: { ...num(GRID_UNIT, 2000, true), key: 'dw' },
+	drawerDepth: { ...num(GRID_UNIT, 2000, true), key: 'dd' },
 	alignX: { key: 'ax', encode: (v) => ALIGN_TO_CHAR[v], decode: (raw, def) => CHAR_TO_ALIGN[raw] ?? def },
 	alignY: { key: 'ay', encode: (v) => ALIGN_TO_CHAR[v], decode: (raw, def) => CHAR_TO_ALIGN[raw] ?? def },
 	style: { key: 'st', encode: (v) => STYLE_TO_CHAR[v], decode: (raw, def) => CHAR_TO_STYLE[raw] ?? def },
 	screwHoles: { ...bool, key: 'bsh' },
-	bedWidth: { ...num(42, 1000, true), key: 'bw' },
-	bedDepth: { ...num(42, 1000, true), key: 'bd' },
+	bedWidth: { ...num(GRID_UNIT, 1000, true), key: 'bw' },
+	bedDepth: { ...num(GRID_UNIT, 1000, true), key: 'bd' },
 	splitAlgorithm: { key: 'sa', encode: (v) => ALGO_TO_CHAR[v], decode: (raw, def) => CHAR_TO_ALGO[raw] ?? def },
 	connector: { key: 'cn', encode: (v) => CONNECTOR_TO_CHAR[v], decode: (raw, def) => CHAR_TO_CONNECTOR[raw] ?? def },
 	exportLayout: { key: 'el', encode: (v) => LAYOUT_TO_CHAR[v], decode: (raw, def) => CHAR_TO_LAYOUT[raw] ?? def }

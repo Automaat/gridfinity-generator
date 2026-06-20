@@ -7,12 +7,15 @@
 // `setBinManifold` must have run first — the worker does that on init.
 import type { Manifold } from 'manifold-3d';
 import type { BaseplateParams } from '$lib/stores/params';
-import {
-	oc, roundedPrism, box, unitBase, setSegments,
-	BASE_PROFILE_HEIGHT, MAGNET_HOLE_DIAMETER, MAGNET_HOLE_DEPTH,
-	SCREW_HOLE_DIAMETER, HOLE_DISTANCE_FROM_EDGE
-} from './manifold-bin';
+import { oc, roundedPrism, box, unitBase, setSegments } from './manifold-bin';
 import { planBaseplate, PITCH, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
+import {
+	BASE_PROFILE_HEIGHT,
+	HOLE_DISTANCE_FROM_EDGE,
+	MAGNET_HOLE_DEPTH,
+	MAGNET_HOLE_DIAMETER,
+	SCREW_HOLE_DIAMETER
+} from './gridfinity-spec';
 
 const PREVIEW_SEGMENTS = 32;
 const EXPORT_SEGMENTS = 64;

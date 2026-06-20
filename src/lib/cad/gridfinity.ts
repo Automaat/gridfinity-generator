@@ -10,71 +10,43 @@ import {
 import type { BinParams } from '$lib/stores/params';
 import { dividerCoords, compartmentEdges } from './divider-layout';
 import { HEX_RADIUS, HEX_CUT_OVERSHOOT, hexCells } from './hex-lattice';
+import {
+	BASE_PROFILE_HEIGHT,
+	BASE_PROFILE_LEVELS,
+	CORNER_FILLET_RADIUS,
+	FLOOR_THICKNESS,
+	GRID_UNIT,
+	HEIGHT_UNIT,
+	HOLE_OFFSETS,
+	LABEL_TAB_DEPTH,
+	LABEL_TAB_HEIGHT,
+	MAGNET_HOLE_DEPTH,
+	MAGNET_HOLE_DIAMETER,
+	SCREW_HOLE_DEPTH,
+	SCREW_HOLE_DIAMETER,
+	bodySize,
+	cellCenter,
+	gridOffset,
+	innerFillet,
+	isOuterGridCorner,
+	lipProfileHeight,
+	lipProtrusion,
+	reducedLipCavityLevels,
+	standardLipCavityLevels
+} from './gridfinity-spec';
 
-// Gridfinity spec (from kennetek/gridfinity-rebuilt-openscad)
-const GRID_UNIT = 42;
-const HEIGHT_UNIT = 7;
-const TOLERANCE = 0.5;
-
-// Base profile cross-section (from center outward):
-// z=0.0, r_offset=0.00 (35.6mm, r=0.80)
-// z=0.8, r_offset=0.80 (37.2mm, r=1.60) — 45° chamfer
-// z=2.6, r_offset=0.80 (37.2mm, r=1.60) — vertical
-// z=4.75, r_offset=2.95 (41.5mm, r=3.75) — 45° chamfer
-const BASE_PROFILE_HEIGHT = 4.75;
-const BASE_TOP_RADIUS = 3.75;
-const CORNER_FILLET_RADIUS = 3.75;
-
-// Magnet/screw holes — 4 per grid unit at corners
-const MAGNET_HOLE_DIAMETER = 6.5;
-const MAGNET_HOLE_DEPTH = 2.4;
-const SCREW_HOLE_DIAMETER = 3;
-const SCREW_HOLE_DEPTH = 6;
-const HOLE_DISTANCE_FROM_EDGE = 8; // mm from each side
-
-// Stacking lip profile offsets (from body edge, per side)
-// These mirror the base profile to create a mating female cavity
-const LIP_OFFSET_BOTTOM = 2.95; // at lip bottom: body shrinks by 2.95 per side
-const LIP_OFFSET_MID = 0.8; // at mid levels: body shrinks by 0.8 per side
-// at lip top: offset 0 (flush with body)
-
-// The standard stacking lip protrudes above the nominal units×7 height — a
-// 6-unit lipped bin is 45.55mm, not 42mm (gridfinity-rebuilt convention). 3.551
-// is the canonical STACKING_LIP_HEIGHT less its wall-overlap support, measured
-// from the reference STLs. The reduced lip sits flush on the rim (our variant).
-const STACKING_LIP_PROTRUSION = 3.551;
-const REDUCED_LIP_PROTRUSION = 2.15;
-
-// Label tab dimensions
-const LABEL_TAB_HEIGHT = 14;
-const LABEL_TAB_DEPTH = 4.5;
-
-function bodySize(units: number): number {
-	return units * GRID_UNIT - TOLERANCE;
+function baseProfileSketchAt(idx: number): Sketch {
+	const l = BASE_PROFILE_LEVELS[idx]!;
+	return drawRoundedRectangle(l.size, l.size, l.r).sketchOnPlane('XY', l.z) as Sketch;
 }
 
 export function buildUnitBase(): Solid {
-	const unitBody = GRID_UNIT - TOLERANCE; // 41.5
-
-	// 4 Z-levels with (size, radius) at each:
-	const levels = [
-		{ z: 0, size: 35.6, r: 0.8 },
-		{ z: 0.8, size: 37.2, r: 1.6 },
-		{ z: 2.6, size: 37.2, r: 1.6 },
-		{ z: 4.75, size: unitBody, r: BASE_TOP_RADIUS }
-	];
-
-	function sketchAt(idx: number): Sketch {
-		const l = levels[idx]!;
-		return drawRoundedRectangle(l.size, l.size, l.r).sketchOnPlane('XY', l.z) as Sketch;
-	}
-
 	// Loft section 1: z=0 → z=0.8 (bottom 45° chamfer)
-	const chamfer1 = sketchAt(0).loftWith(sketchAt(1), { ruled: true }) as Solid;
+	const chamfer1 = baseProfileSketchAt(0).loftWith(baseProfileSketchAt(1), { ruled: true }) as Solid;
 
 	// Extrude section 2: z=0.8 → z=2.6 (vertical walls, constant size)
-	const l1 = levels[1]!;
-	const l2 = levels[2]!;
+	const l1 = BASE_PROFILE_LEVELS[1]!;
+	const l2 = BASE_PROFILE_LEVELS[2]!;
 	const vertical = (
 		drawRoundedRectangle(l1.size, l1.size, l1.r).sketchOnPlane(
 			'XY',
@@ -83,32 +55,12 @@ export function buildUnitBase(): Solid {
 	).extrude(l2.z - l1.z) as Solid;
 
 	// Loft section 3: z=2.6 → z=4.75 (top 45° chamfer)
-	const chamfer2 = sketchAt(2).loftWith(sketchAt(3), { ruled: true }) as Solid;
+	const chamfer2 = baseProfileSketchAt(2).loftWith(baseProfileSketchAt(3), { ruled: true }) as Solid;
 
 	return chamfer1.fuse(vertical).fuse(chamfer2) as Solid;
 }
 
-// A corner sits at the bin's outer footprint when its tile is on the edge of the
-// grid AND its offset points outward on that axis. For a 1-wide/long grid both
-// signs qualify, so all 4 corners count. Used to restrict magnets to the bin's
-// 4 outer corners (magnetCornersOnly).
-function isBinCorner(p: BinParams, x: number, y: number, ox: number, oy: number): boolean {
-	const outerX = (x === 0 && ox < 0) || (x === p.width - 1 && ox > 0);
-	const outerY = (y === 0 && oy < 0) || (y === p.length - 1 && oy > 0);
-	return outerX && outerY;
-}
-
 function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Solid | null {
-	const unitBody = GRID_UNIT - TOLERANCE;
-	const holeOffset = unitBody / 2 - HOLE_DISTANCE_FROM_EDGE; // 12.75
-
-	const offsets = [
-		[holeOffset, holeOffset],
-		[-holeOffset, holeOffset],
-		[holeOffset, -holeOffset],
-		[-holeOffset, -holeOffset]
-	];
-
 	// Each corner's magnet + screw holes are concentric (they overlap), so they
 	// must be fused before cutting — cutting unfused overlapping tools leaves
 	// artifacts. Corners never overlap each other, so the per-corner cutters are
@@ -121,9 +73,9 @@ function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Sol
 			const cx = x * GRID_UNIT - gridOffsetX;
 			const cy = y * GRID_UNIT - gridOffsetY;
 
-			for (const [ox, oy] of offsets as [number, number][]) {
+			for (const [ox, oy] of HOLE_OFFSETS) {
 				let cutter: Solid | null = null;
-				if (p.magnetHoles && (!p.magnetCornersOnly || isBinCorner(p, x, y, ox, oy))) {
+				if (p.magnetHoles && (!p.magnetCornersOnly || isOuterGridCorner(p.width, p.length, x, y, ox, oy))) {
 					const magnet = (
 						drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
 					).extrude(MAGNET_HOLE_DEPTH) as Solid;
@@ -169,27 +121,7 @@ function buildStackingLip(
 
 	if (lipHeight >= BASE_PROFILE_HEIGHT) {
 		// Standard full lip
-		const cavityLevels = [
-			{
-				z: topZ,
-				w: bodyW - 2 * LIP_OFFSET_BOTTOM,
-				l: bodyL - 2 * LIP_OFFSET_BOTTOM,
-				r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_BOTTOM)
-			},
-			{
-				z: topZ + 0.8,
-				w: bodyW - 2 * LIP_OFFSET_MID,
-				l: bodyL - 2 * LIP_OFFSET_MID,
-				r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID)
-			},
-			{
-				z: topZ + 2.6,
-				w: bodyW - 2 * LIP_OFFSET_MID,
-				l: bodyL - 2 * LIP_OFFSET_MID,
-				r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID)
-			},
-			{ z: topZ + BASE_PROFILE_HEIGHT, w: bodyW, l: bodyL, r: CORNER_FILLET_RADIUS }
-		];
+		const cavityLevels = standardLipCavityLevels(bodyW, bodyL, topZ);
 
 		function cavitySketchAt(idx: number): Sketch {
 			const l = cavityLevels[idx]!;
@@ -213,20 +145,9 @@ function buildStackingLip(
 		return outer.cut(cavity) as Solid;
 	} else {
 		// Reduced lip — single chamfer section
-		const bottomLevel = {
-			w: bodyW - 2 * LIP_OFFSET_MID,
-			l: bodyL - 2 * LIP_OFFSET_MID,
-			r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID)
-		};
-		const bottomSketch = drawRoundedRectangle(
-			bottomLevel.w,
-			bottomLevel.l,
-			bottomLevel.r
-		).sketchOnPlane('XY', topZ) as Sketch;
-		const topSketch = drawRoundedRectangle(bodyW, bodyL, CORNER_FILLET_RADIUS).sketchOnPlane(
-			'XY',
-			topZ + lipHeight
-		) as Sketch;
+		const [bottomLevel, topLevel] = reducedLipCavityLevels(bodyW, bodyL, topZ, lipHeight);
+		const bottomSketch = drawRoundedRectangle(bottomLevel.w, bottomLevel.l, bottomLevel.r).sketchOnPlane('XY', bottomLevel.z) as Sketch;
+		const topSketch = drawRoundedRectangle(topLevel.w, topLevel.l, topLevel.r).sketchOnPlane('XY', topLevel.z) as Sketch;
 
 		const cavity = bottomSketch.loftWith(topSketch, { ruled: true }) as Solid;
 		return outer.cut(cavity) as Solid;
@@ -426,12 +347,12 @@ function buildWallCut(
 	bodyL: number,
 	wallBottom: number,
 	wallHeight: number,
-	lipProtrusion: number
+	lipExtension: number
 ): Solid {
 	// Diagonal planar cut: walls/dividers stay full height on one side and
 	// slope down to `wallCutLowFraction` of wall height on the opposite side.
 	const margin = 1; // overshoot footprint so outer walls cut cleanly through
-	const topMostZ = wallBottom + wallHeight + lipProtrusion;
+	const topMostZ = wallBottom + wallHeight + lipExtension;
 	const ceilingZ = topMostZ + 5;
 	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
 
@@ -466,10 +387,10 @@ export function buildBin(p: BinParams): Solid {
 	const h = p.height * HEIGHT_UNIT;
 	const bodyW = bodySize(p.width);
 	const bodyL = bodySize(p.length);
-	const innerFillet = Math.max(0.2, CORNER_FILLET_RADIUS - p.wallThickness);
+	const cavityFillet = innerFillet(p.wallThickness);
 
-	const gridOffsetX = ((p.width - 1) * GRID_UNIT) / 2;
-	const gridOffsetY = ((p.length - 1) * GRID_UNIT) / 2;
+	const gridOffsetX = gridOffset(p.width);
+	const gridOffsetY = gridOffset(p.length);
 
 	// 1. Grid of unit bases. Every cell is the same lofted foot, so build it once
 	// and clone+translate per cell — reconstructing the loft per cell costs
@@ -478,18 +399,17 @@ export function buildBin(p: BinParams): Solid {
 	const unitProto = buildUnitBase();
 	for (let x = 0; x < p.width; x++) {
 		for (let y = 0; y < p.length; y++) {
-			const cx = x * GRID_UNIT - gridOffsetX;
-			const cy = y * GRID_UNIT - gridOffsetY;
+			const cx = cellCenter(x, p.width);
+			const cy = cellCenter(y, p.length);
 			const unit = (unitProto.clone() as Solid).translate(cx, cy, 0) as Solid;
 			base = base ? (base.fuse(unit) as Solid) : unit;
 		}
 	}
 
 	// 2. Floor connecting all bases at BASE_PROFILE_HEIGHT
-	const floorThickness = 2.25;
 	const floor = drawRoundedRectangle(bodyW, bodyL, CORNER_FILLET_RADIUS)
 		.sketchOnPlane('XY', BASE_PROFILE_HEIGHT)
-		.extrude(floorThickness) as Solid;
+		.extrude(FLOOR_THICKNESS) as Solid;
 
 	let bin = base!.fuse(floor) as Solid;
 
@@ -504,20 +424,10 @@ export function buildBin(p: BinParams): Solid {
 	// 3. Lip + wall dimensions. Walls fill the full nominal height; the stacking
 	// lip protrudes above it (gridfinity-rebuilt convention), so a lipped bin's
 	// total height is units×7 + lipProtrusion.
-	const lipProfileHeight =
-		p.stackingLip === 'standard'
-			? BASE_PROFILE_HEIGHT
-			: p.stackingLip === 'reduced'
-				? REDUCED_LIP_PROTRUSION
-				: 0;
-	const lipProtrusion =
-		p.stackingLip === 'standard'
-			? STACKING_LIP_PROTRUSION
-			: p.stackingLip === 'reduced'
-				? REDUCED_LIP_PROTRUSION
-				: 0;
+	const lipHeight = lipProfileHeight(p.stackingLip);
+	const protrusion = lipProtrusion(p.stackingLip);
 
-	const wallBottom = BASE_PROFILE_HEIGHT + floorThickness;
+	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
 	const wallHeight = h - wallBottom;
 
 	if (wallHeight <= 0) return bin;
@@ -529,7 +439,7 @@ export function buildBin(p: BinParams): Solid {
 
 	const innerW = bodyW - 2 * p.wallThickness;
 	const innerL = bodyL - 2 * p.wallThickness;
-	const cavity = drawRoundedRectangle(innerW, innerL, innerFillet)
+	const cavity = drawRoundedRectangle(innerW, innerL, cavityFillet)
 		.sketchOnPlane('XY', wallBottom)
 		.extrude(wallHeight) as Solid;
 
@@ -555,15 +465,15 @@ export function buildBin(p: BinParams): Solid {
 	}
 
 	// 7. Stacking lip — protrudes above the wall; its base overlaps the rim as a support.
-	if (lipProfileHeight > 0) {
-		const lipBaseZ = h + lipProtrusion - lipProfileHeight;
-		const lip = buildStackingLip(bodyW, bodyL, lipBaseZ, lipProfileHeight);
+	if (lipHeight > 0) {
+		const lipBaseZ = h + protrusion - lipHeight;
+		const lip = buildStackingLip(bodyW, bodyL, lipBaseZ, lipHeight);
 		bin = bin.fuse(lip) as Solid;
 	}
 
 	// 8. Diagonal wall cut (slope walls/dividers down toward one side)
 	if (p.wallCut) {
-		const cut = buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipProtrusion);
+		const cut = buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, protrusion);
 		bin = bin.cut(cut) as Solid;
 	}
 

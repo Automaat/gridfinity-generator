@@ -7,8 +7,9 @@
 // bin builder). All positions returned here are in that assembled mm space; the
 // geometry builder localizes each tile for per-tile export.
 import type { Align, BaseplateParams } from '$lib/stores/params';
+import { GRID_UNIT } from './gridfinity-spec';
 
-export const PITCH = 42;
+export const PITCH = GRID_UNIT;
 
 export interface Span {
 	start: number; // first cell index (inclusive)

@@ -7,15 +7,18 @@ import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url
 import { buildUnitBase } from './gridfinity';
 import type { BaseplateParams } from '$lib/stores/params';
 import { planBaseplate, PITCH, seamCellCenters, type BaseplateTile, type Seam } from './baseplate-layout';
+import {
+	BASE_PROFILE_HEIGHT,
+	HOLE_DISTANCE_FROM_EDGE,
+	MAGNET_HOLE_DEPTH,
+	MAGNET_HOLE_DIAMETER,
+	SCREW_HOLE_DIAMETER
+} from './gridfinity-spec';
 
 // Mirror baseplate-manifold.ts constants.
-const SOCKET_DEPTH = 4.75;
+const SOCKET_DEPTH = BASE_PROFILE_HEIGHT;
 const THICKNESS_SIMPLE = SOCKET_DEPTH + 1.25; // 6.0
-const THICKNESS_MAGNET = SOCKET_DEPTH + 2.4 + 0.8; // 7.95
-const MAGNET_HOLE_DIAMETER = 6.5;
-const MAGNET_HOLE_DEPTH = 2.4;
-const SCREW_HOLE_DIAMETER = 3;
-const HOLE_DISTANCE_FROM_EDGE = 8;
+const THICKNESS_MAGNET = SOCKET_DEPTH + MAGNET_HOLE_DEPTH + 0.8; // 7.95
 // Skeletonization (mirror baseplate-manifold.ts).
 const SKEL_OPENING = 33;
 const SKEL_CORNER_R = 7;

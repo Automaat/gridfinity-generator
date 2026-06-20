@@ -3,33 +3,47 @@
 // manifold mesh CSG: ~3-5× faster rebuilds and a ~0.2MB engine vs OCCT's 4.6MB.
 //
 // Parity with gridfinity.ts is verified by volume + bounding box (manifold-parity
-// harness). Constants below MUST match gridfinity.ts.
+// harness). Shared Gridfinity spec values live in gridfinity-spec.ts.
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import { dividerCoords, compartmentEdges } from './divider-layout';
 import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
+import {
+	BASE_PROFILE_HEIGHT,
+	BASE_PROFILE_LEVELS,
+	CORNER_FILLET_RADIUS,
+	FLOOR_THICKNESS,
+	GRID_UNIT,
+	HEIGHT_UNIT,
+	HOLE_OFFSETS,
+	LABEL_TAB_DEPTH,
+	LABEL_TAB_HEIGHT,
+	MAGNET_HOLE_DEPTH,
+	MAGNET_HOLE_DIAMETER,
+	SCREW_HOLE_DEPTH,
+	SCREW_HOLE_DIAMETER,
+	bodySize,
+	cellCenter,
+	gridOffset,
+	innerFillet,
+	isOuterGridCorner,
+	lipProfileHeight,
+	lipProtrusion,
+	reducedLipCavityLevels,
+	standardLipCavityLevels
+} from './gridfinity-spec';
 
-export const GRID_UNIT = 42;
-const HEIGHT_UNIT = 7;
-export const TOLERANCE = 0.5;
-export const BASE_PROFILE_HEIGHT = 4.75;
-export const CORNER_FILLET_RADIUS = 3.75;
-export const MAGNET_HOLE_DIAMETER = 6.5;
-export const MAGNET_HOLE_DEPTH = 2.4;
-export const SCREW_HOLE_DIAMETER = 3;
-export const SCREW_HOLE_DEPTH = 6;
-export const HOLE_DISTANCE_FROM_EDGE = 8;
-const LIP_OFFSET_BOTTOM = 2.95;
-const LIP_OFFSET_MID = 0.8;
-// The standard stacking lip protrudes above the nominal units×7 height — a
-// 6-unit lipped bin is 45.55mm, not 42mm (gridfinity-rebuilt convention). 3.551
-// is the canonical STACKING_LIP_HEIGHT less its wall-overlap support, measured
-// from the reference STLs. The reduced lip sits flush on the rim (our variant).
-const STACKING_LIP_PROTRUSION = 3.551;
-const REDUCED_LIP_PROTRUSION = 2.15;
-const FLOOR_THICKNESS = 2.25;
-const LABEL_TAB_HEIGHT = 14;
-const LABEL_TAB_DEPTH = 4.5;
+export {
+	BASE_PROFILE_HEIGHT,
+	CORNER_FILLET_RADIUS,
+	GRID_UNIT,
+	HOLE_DISTANCE_FROM_EDGE,
+	MAGNET_HOLE_DEPTH,
+	MAGNET_HOLE_DIAMETER,
+	SCREW_HOLE_DEPTH,
+	SCREW_HOLE_DIAMETER,
+	TOLERANCE
+} from './gridfinity-spec';
 
 // Circle/arc tessellation. 32 segments keeps holes and corner fillets smooth at
 // screen scale for the preview; exports pass a higher count via buildBinManifold.
@@ -49,10 +63,6 @@ export function oc(): ManifoldToplevel {
 // cylinders, etc). The baseplate builder sets it the same way the bin builder does.
 export function setSegments(n: number): void {
 	circleSegments = n;
-}
-
-function bodySize(units: number): number {
-	return units * GRID_UNIT - TOLERANCE;
 }
 
 // A rounded rectangle cross-section centered at the origin (w×l, corner radius r).
@@ -121,39 +131,27 @@ function cylinderAlongY(radius: number, length: number): Manifold {
 }
 
 export function unitBase(): Manifold {
-	const ub = GRID_UNIT - TOLERANCE; // 41.5
 	// levels: (z0,35.6,0.8)(z0.8,37.2,1.6)(z2.6,37.2,1.6)(z4.75,41.5,3.75)
-	const c1 = chamfer(35.6, 35.6, 0.8, 0, 37.2, 37.2, 1.6, 0.8);
-	const vertical = roundedPrism(37.2, 37.2, 1.6, 2.6 - 0.8, 0.8);
-	const c2 = chamfer(37.2, 37.2, 1.6, 2.6, ub, ub, CORNER_FILLET_RADIUS, BASE_PROFILE_HEIGHT);
+	const b0 = BASE_PROFILE_LEVELS[0]!;
+	const b1 = BASE_PROFILE_LEVELS[1]!;
+	const b2 = BASE_PROFILE_LEVELS[2]!;
+	const b3 = BASE_PROFILE_LEVELS[3]!;
+	const c1 = chamfer(b0.size, b0.size, b0.r, b0.z, b1.size, b1.size, b1.r, b1.z);
+	const vertical = roundedPrism(b1.size, b1.size, b1.r, b2.z - b1.z, b1.z);
+	const c2 = chamfer(b2.size, b2.size, b2.r, b2.z, b3.size, b3.size, b3.r, b3.z);
 	return oc().Manifold.union([c1, vertical, c2]);
-}
-
-// Mirrors gridfinity.ts: a corner is on the bin's outer footprint when its tile
-// is on the grid edge and its offset points outward. Restricts magnets to the
-// bin's 4 outer corners (magnetCornersOnly).
-function isBinCorner(p: BinParams, x: number, y: number, ox: number, oy: number): boolean {
-	const outerX = (x === 0 && ox < 0) || (x === p.width - 1 && ox > 0);
-	const outerY = (y === 0 && oy < 0) || (y === p.length - 1 && oy > 0);
-	return outerX && outerY;
 }
 
 function buildHoles(p: BinParams, gridOffsetX: number, gridOffsetY: number): Manifold | null {
 	const { Manifold } = oc();
-	const unitBody = GRID_UNIT - TOLERANCE;
-	const holeOffset = unitBody / 2 - HOLE_DISTANCE_FROM_EDGE;
-	const offsets: [number, number][] = [
-		[holeOffset, holeOffset], [-holeOffset, holeOffset],
-		[holeOffset, -holeOffset], [-holeOffset, -holeOffset]
-	];
 	const cutters: Manifold[] = [];
 	for (let x = 0; x < p.width; x++) {
 		for (let y = 0; y < p.length; y++) {
 			const cx = x * GRID_UNIT - gridOffsetX;
 			const cy = y * GRID_UNIT - gridOffsetY;
-			for (const [ox, oy] of offsets) {
+			for (const [ox, oy] of HOLE_OFFSETS) {
 				const parts: Manifold[] = [];
-				if (p.magnetHoles && (!p.magnetCornersOnly || isBinCorner(p, x, y, ox, oy))) {
+				if (p.magnetHoles && (!p.magnetCornersOnly || isOuterGridCorner(p.width, p.length, x, y, ox, oy))) {
 					parts.push(Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, circleSegments));
 				}
 				if (p.screwHoles) {
@@ -174,21 +172,16 @@ function buildStackingLip(bodyW: number, bodyL: number, topZ: number, lipHeight:
 	const outer = roundedPrism(bodyW, bodyL, CORNER_FILLET_RADIUS, lipHeight, topZ);
 
 	if (lipHeight >= BASE_PROFILE_HEIGHT) {
-		const lv = [
-			{ z: topZ, w: bodyW - 2 * LIP_OFFSET_BOTTOM, l: bodyL - 2 * LIP_OFFSET_BOTTOM, r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_BOTTOM) },
-			{ z: topZ + 0.8, w: bodyW - 2 * LIP_OFFSET_MID, l: bodyL - 2 * LIP_OFFSET_MID, r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID) },
-			{ z: topZ + 2.6, w: bodyW - 2 * LIP_OFFSET_MID, l: bodyL - 2 * LIP_OFFSET_MID, r: Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID) },
-			{ z: topZ + BASE_PROFILE_HEIGHT, w: bodyW, l: bodyL, r: CORNER_FILLET_RADIUS }
-		];
+		const lv = standardLipCavityLevels(bodyW, bodyL, topZ);
 		const c1 = chamfer(lv[0]!.w, lv[0]!.l, lv[0]!.r, lv[0]!.z, lv[1]!.w, lv[1]!.l, lv[1]!.r, lv[1]!.z);
 		const c2 = roundedPrism(lv[1]!.w, lv[1]!.l, lv[1]!.r, lv[2]!.z - lv[1]!.z, lv[1]!.z);
 		const c3 = chamfer(lv[2]!.w, lv[2]!.l, lv[2]!.r, lv[2]!.z, lv[3]!.w, lv[3]!.l, lv[3]!.r, lv[3]!.z);
 		return outer.subtract(Manifold.union([c1, c2, c3]));
 	}
-	const bottomR = Math.max(0.2, CORNER_FILLET_RADIUS - LIP_OFFSET_MID);
+	const [bottom, top] = reducedLipCavityLevels(bodyW, bodyL, topZ, lipHeight);
 	const cavity = chamfer(
-		bodyW - 2 * LIP_OFFSET_MID, bodyL - 2 * LIP_OFFSET_MID, bottomR, topZ,
-		bodyW, bodyL, CORNER_FILLET_RADIUS, topZ + lipHeight
+		bottom.w, bottom.l, bottom.r, bottom.z,
+		top.w, top.l, top.r, top.z
 	);
 	return outer.subtract(cavity);
 }
@@ -312,10 +305,10 @@ function buildScoops(
 }
 
 function buildWallCut(
-	p: BinParams, bodyW: number, bodyL: number, wallBottom: number, wallHeight: number, lipProtrusion: number
+	p: BinParams, bodyW: number, bodyL: number, wallBottom: number, wallHeight: number, lipExtension: number
 ): Manifold {
 	const margin = 1;
-	const topMostZ = wallBottom + wallHeight + lipProtrusion;
+	const topMostZ = wallBottom + wallHeight + lipExtension;
 	const ceilingZ = topMostZ + 5;
 	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
 	const axis: 'X' | 'Y' = p.wallCutSide === 'front' || p.wallCutSide === 'back' ? 'Y' : 'X';
@@ -343,16 +336,16 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 	const h = p.height * HEIGHT_UNIT;
 	const bodyW = bodySize(p.width);
 	const bodyL = bodySize(p.length);
-	const innerFillet = Math.max(0.2, CORNER_FILLET_RADIUS - p.wallThickness);
-	const gridOffsetX = ((p.width - 1) * GRID_UNIT) / 2;
-	const gridOffsetY = ((p.length - 1) * GRID_UNIT) / 2;
+	const cavityFillet = innerFillet(p.wallThickness);
+	const gridOffsetX = gridOffset(p.width);
+	const gridOffsetY = gridOffset(p.length);
 
 	// 1. Grid of unit bases (build once, translate copies)
 	const proto = unitBase();
 	const bases: Manifold[] = [];
 	for (let x = 0; x < p.width; x++) {
 		for (let y = 0; y < p.length; y++) {
-			bases.push(proto.translate([x * GRID_UNIT - gridOffsetX, y * GRID_UNIT - gridOffsetY, 0]));
+			bases.push(proto.translate([cellCenter(x, p.width), cellCenter(y, p.length), 0]));
 		}
 	}
 
@@ -369,8 +362,8 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 	// 3. Lip + wall dimensions. Walls fill the full nominal height; the stacking
 	// lip protrudes above it (gridfinity-rebuilt convention), so a lipped bin's
 	// total height is units×7 + lipProtrusion.
-	const lipProfileHeight = p.stackingLip === 'standard' ? BASE_PROFILE_HEIGHT : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
-	const lipProtrusion = p.stackingLip === 'standard' ? STACKING_LIP_PROTRUSION : p.stackingLip === 'reduced' ? REDUCED_LIP_PROTRUSION : 0;
+	const lipHeight = lipProfileHeight(p.stackingLip);
+	const protrusion = lipProtrusion(p.stackingLip);
 	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
 	const wallHeight = h - wallBottom;
 
@@ -380,7 +373,7 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 	const outerWalls = roundedPrism(bodyW, bodyL, CORNER_FILLET_RADIUS, wallHeight, wallBottom);
 	const innerW = bodyW - 2 * p.wallThickness;
 	const innerL = bodyL - 2 * p.wallThickness;
-	const cavity = roundedPrism(innerW, innerL, innerFillet, wallHeight, wallBottom);
+	const cavity = roundedPrism(innerW, innerL, cavityFillet, wallHeight, wallBottom);
 	bin = bin.add(outerWalls.subtract(cavity));
 
 	// 5. Dividers
@@ -402,13 +395,13 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 	}
 
 	// 7. Stacking lip — protrudes above the wall; its base overlaps the rim as a support.
-	if (lipProfileHeight > 0) {
-		bin = bin.add(buildStackingLip(bodyW, bodyL, h + lipProtrusion - lipProfileHeight, lipProfileHeight));
+	if (lipHeight > 0) {
+		bin = bin.add(buildStackingLip(bodyW, bodyL, h + protrusion - lipHeight, lipHeight));
 	}
 
 	// 8. Diagonal wall cut
 	if (p.wallCut) {
-		bin = bin.subtract(buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, lipProtrusion));
+		bin = bin.subtract(buildWallCut(p, bodyW, bodyL, wallBottom, wallHeight, protrusion));
 	}
 
 	return bin;
