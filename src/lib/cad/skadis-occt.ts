@@ -5,22 +5,14 @@ import { draw, drawCircle, drawRoundedRectangle, makeCompound, setOC, type Solid
 import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import type { SkadisParams } from '$lib/stores/params';
-import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ, BOARD_THICKNESS } from './skadis-layout';
+import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ } from './skadis-layout';
 import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
-
-// Conventional Skadis hook geometry (mm) — MUST match skadis-manifold.ts (see the
-// mechanism note there). Arm through the slot + lip down behind the board; print with
-// supports.
-const HOOK_W = 4.4;
-const ARM_OVERLAP = 1.2;
-const ARM_TOP = 2;
-const ARM_THICK = 3;
-const CATCH_FRONT_Y = BOARD_THICKNESS + 0.4;
-const LIP_THICK = 2;
-const LIP_DROP = 8;
-
-// M5 screw-mount geometry (mm) — MUST match skadis-manifold.ts. Plain flush hole.
-const SCREW_CLEAR_R = 2.75;
+import {
+	SKADIS_HOOK_WIDTH,
+	SKADIS_MOUNT_BAND,
+	skadisHookProfile,
+	skadisScrewHoleSpec
+} from './skadis-mounts';
 
 let ready: Promise<void> | null = null;
 function init(): Promise<void> {
@@ -38,8 +30,6 @@ function init(): Promise<void> {
 function boxSolid(w: number, l: number, h: number, cx: number, cy: number, zBase: number): Solid {
 	return (drawRoundedRectangle(w, l, 0).sketchOnPlane('XY', zBase) as Sketch).extrude(h).translate(cx, cy, 0) as Solid;
 }
-
-const MOUNT_BAND = 12;
 
 // Hex lattice cutters for one panel (mirror skadis-manifold.ts wallHexCutters).
 // axis: X = side wall, Y = back/front wall, Z = floor.
@@ -59,22 +49,12 @@ function wallHexCuttersSolid(axis: 'X' | 'Y' | 'Z', faceW: number, faceH: number
 }
 
 // Conventional Skadis hook (mirror skadis-manifold.ts buildHook): a Y-Z profile
-// extruded HOOK_W along X (sketched on the YZ plane like the side-wall hex cutters).
+// extruded along X (sketched on the YZ plane like the side-wall hex cutters).
 function buildHookSolid(x: number, z: number): Solid {
-	const top = z + ARM_TOP;
-	const armBottom = top - ARM_THICK;
-	const armReach = CATCH_FRONT_Y + LIP_THICK;
-	const profile: [number, number][] = [
-		[ARM_OVERLAP, top],
-		[-armReach, top],
-		[-armReach, z - LIP_DROP],
-		[-CATCH_FRONT_Y, z - LIP_DROP],
-		[-CATCH_FRONT_Y, armBottom],
-		[ARM_OVERLAP, armBottom]
-	];
+	const profile = skadisHookProfile(z);
 	let dw = draw(profile[0]);
 	for (let i = 1; i < profile.length; i++) dw = dw.lineTo(profile[i]!);
-	return (dw.close().sketchOnPlane('YZ', x - HOOK_W / 2) as Sketch).extrude(HOOK_W) as Solid;
+	return (dw.close().sketchOnPlane('YZ', x - SKADIS_HOOK_WIDTH / 2) as Sketch).extrude(SKADIS_HOOK_WIDTH) as Solid;
 }
 
 // A cylinder whose axis runs along world +Y: a circle on the XZ plane at yStart,
@@ -86,7 +66,8 @@ function cylinderAlongY(radius: number, yStart: number, length: number, x: numbe
 // M5 clearance hole at (x, z): a plain bore through the back wall, flush (mirror
 // skadis-manifold.ts buildScrewHole).
 function buildScrewHoleSolid(x: number, z: number, t: number): Solid {
-	return cylinderAlongY(SCREW_CLEAR_R, -1, t + 2, x, z);
+	const spec = skadisScrewHoleSpec(x, z, t);
+	return cylinderAlongY(spec.radius, spec.yStart, spec.length, spec.x, spec.z);
 }
 
 export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
@@ -126,7 +107,7 @@ export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
 	if (p.lightweightWalls) {
 		const frontFaceH = frontH - t, sideFaceH = sideZ - t; // exposed wall heights (== outerH-t when closed)
 		const lowestHookZ = layout.hooks.length > 0 ? Math.min(...layout.hooks.map((h) => h.z)) : outerH;
-		const backFaceH = lowestHookZ - MOUNT_BAND - t;
+		const backFaceH = lowestHookZ - SKADIS_MOUNT_BAND - t;
 		const cutters = [
 			...wallHexCuttersSolid('X', p.depth, sideFaceH, t, -outerW / 2 + t / 2, outerD / 2, t + sideFaceH / 2),
 			...wallHexCuttersSolid('X', p.depth, sideFaceH, t, outerW / 2 - t / 2, outerD / 2, t + sideFaceH / 2),
