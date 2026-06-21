@@ -21,6 +21,16 @@ export interface HexCell {
 	v: number; // vertical offset from the panel center
 }
 
+export type HexPanelAxis = 'X' | 'Y' | 'Z';
+
+export interface HexPanelCutter {
+	axis: HexPanelAxis;
+	x: number;
+	y: number;
+	z: number;
+	cutDepth: number;
+}
+
 // Flat-top hexagon vertices centered at the origin (circumradius HEX_RADIUS): a flat
 // edge top and bottom, points left and right. `drawPolysides(HEX_RADIUS, 6)` (no
 // rotation) produces the same hexagon for the replicad paths.
@@ -57,4 +67,21 @@ export function hexCells(faceW: number, faceH: number): HexCell[] {
 		}
 	}
 	return cells;
+}
+
+export function hexPanelCutters(
+	axis: HexPanelAxis,
+	faceW: number,
+	faceH: number,
+	thickness: number,
+	cx: number,
+	cy: number,
+	cz: number
+): HexPanelCutter[] {
+	const cutDepth = thickness + 2 * HEX_CUT_OVERSHOOT;
+	return hexCells(faceW, faceH).map(({ u, v }) => {
+		if (axis === 'X') return { axis, x: cx - cutDepth / 2, y: cy + u, z: cz + v, cutDepth };
+		if (axis === 'Y') return { axis, x: cx + u, y: cy - cutDepth / 2, z: cz + v, cutDepth };
+		return { axis, x: cx + u, y: cy + v, z: cz - cutDepth / 2, cutDepth };
+	});
 }

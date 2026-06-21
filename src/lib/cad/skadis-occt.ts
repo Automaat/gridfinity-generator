@@ -6,7 +6,7 @@ import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import type { SkadisParams } from '$lib/stores/params';
 import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ } from './skadis-layout';
-import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
+import { hexPanelCutters, hexPolygon, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	SKADIS_HOOK_WIDTH,
 	SKADIS_MOUNT_BAND,
@@ -33,19 +33,20 @@ function boxSolid(w: number, l: number, h: number, cx: number, cy: number, zBase
 
 // Hex lattice cutters for one panel (mirror skadis-manifold.ts wallHexCutters).
 // axis: X = side wall, Y = back/front wall, Z = floor.
-function wallHexCuttersSolid(axis: 'X' | 'Y' | 'Z', faceW: number, faceH: number, thickness: number, cx: number, cy: number, cz: number): Solid[] {
-	const cells = hexCells(faceW, faceH);
-	if (cells.length === 0) return [];
+function buildHexCutterSolid(hex: [number, number][], cutter: HexPanelCutter): Solid {
+	let dw = draw(hex[0]);
+	for (let i = 1; i < hex.length; i++) dw = dw.lineTo(hex[i]!);
+	const sketch = dw.close();
+	if (cutter.axis === 'X') return (sketch.sketchOnPlane('YZ', cutter.x) as Sketch).extrude(cutter.cutDepth).translate(0, cutter.y, cutter.z) as Solid;
+	if (cutter.axis === 'Y') return (sketch.sketchOnPlane('XZ', cutter.y) as Sketch).extrude(cutter.cutDepth).translate(cutter.x, 0, cutter.z) as Solid;
+	return (sketch.sketchOnPlane('XY', cutter.z) as Sketch).extrude(cutter.cutDepth).translate(cutter.x, cutter.y, 0) as Solid;
+}
+
+function wallHexCuttersSolid(axis: HexPanelAxis, faceW: number, faceH: number, thickness: number, cx: number, cy: number, cz: number): Solid[] {
+	const cutterSpecs = hexPanelCutters(axis, faceW, faceH, thickness, cx, cy, cz);
+	if (cutterSpecs.length === 0) return [];
 	const hex = hexPolygon();
-	const cutDepth = thickness + 2 * HEX_CUT_OVERSHOOT;
-	return cells.map(({ u, v }) => {
-		let dw = draw(hex[0]);
-		for (let i = 1; i < hex.length; i++) dw = dw.lineTo(hex[i]!);
-		const sketch = dw.close();
-		if (axis === 'X') return (sketch.sketchOnPlane('YZ', cx - cutDepth / 2) as Sketch).extrude(cutDepth).translate(0, cy + u, cz + v) as Solid;
-		if (axis === 'Y') return (sketch.sketchOnPlane('XZ', cy - cutDepth / 2) as Sketch).extrude(cutDepth).translate(cx + u, 0, cz + v) as Solid;
-		return (sketch.sketchOnPlane('XY', cz - cutDepth / 2) as Sketch).extrude(cutDepth).translate(cx + u, cy + v, 0) as Solid;
-	});
+	return cutterSpecs.map((cutter) => buildHexCutterSolid(hex, cutter));
 }
 
 // Conventional Skadis hook (mirror skadis-manifold.ts buildHook): a Y-Z profile
