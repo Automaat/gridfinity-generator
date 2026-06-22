@@ -8,21 +8,19 @@ import {
 	type Sketch
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
-import { dividerCoords, compartmentEdges } from './divider-layout';
+import { compartmentEdges, dividerCoords, interiorBox } from './divider-layout';
 import { HEX_RADIUS, hexPanelCutters, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	BASE_PROFILE_HEIGHT,
 	BASE_PROFILE_LEVELS,
 	CORNER_FILLET_RADIUS,
 	FLOOR_THICKNESS,
-	HEIGHT_UNIT,
 	LABEL_TAB_DEPTH,
 	LABEL_TAB_HEIGHT,
 	MAGNET_HOLE_DEPTH,
 	MAGNET_HOLE_DIAMETER,
 	SCREW_HOLE_DEPTH,
 	SCREW_HOLE_DIAMETER,
-	bodySize,
 	cellCenter,
 	gridHoleSites,
 	innerFillet,
@@ -369,9 +367,7 @@ function buildWallCut(
 }
 
 export function buildBin(p: BinParams): Solid {
-	const h = p.height * HEIGHT_UNIT;
-	const bodyW = bodySize(p.width);
-	const bodyL = bodySize(p.length);
+	const { bodyW, bodyL, innerW, innerL, wallBottom, wallHeight, topZ } = interiorBox(p);
 	const cavityFillet = innerFillet(p.wallThickness);
 
 	// 1. Grid of unit bases. Every cell is the same lofted foot, so build it once
@@ -409,9 +405,6 @@ export function buildBin(p: BinParams): Solid {
 	const lipHeight = lipProfileHeight(p.stackingLip);
 	const protrusion = lipProtrusion(p.stackingLip);
 
-	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
-	const wallHeight = h - wallBottom;
-
 	if (wallHeight <= 0) return bin;
 
 	// 4. Outer walls + inner cavity → hollow walls
@@ -419,8 +412,6 @@ export function buildBin(p: BinParams): Solid {
 		.sketchOnPlane('XY', wallBottom)
 		.extrude(wallHeight) as Solid;
 
-	const innerW = bodyW - 2 * p.wallThickness;
-	const innerL = bodyL - 2 * p.wallThickness;
 	const cavity = drawRoundedRectangle(innerW, innerL, cavityFillet)
 		.sketchOnPlane('XY', wallBottom)
 		.extrude(wallHeight) as Solid;
@@ -448,7 +439,7 @@ export function buildBin(p: BinParams): Solid {
 
 	// 7. Stacking lip — protrudes above the wall; its base overlaps the rim as a support.
 	if (lipHeight > 0) {
-		const lipBaseZ = h + protrusion - lipHeight;
+		const lipBaseZ = topZ + protrusion - lipHeight;
 		const lip = buildStackingLip(bodyW, bodyL, lipBaseZ, lipHeight);
 		bin = bin.fuse(lip) as Solid;
 	}

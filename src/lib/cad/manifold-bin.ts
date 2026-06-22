@@ -6,7 +6,7 @@
 // harness). Shared Gridfinity spec values live in gridfinity-spec.ts.
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
-import { dividerCoords, compartmentEdges } from './divider-layout';
+import { compartmentEdges, dividerCoords, interiorBox } from './divider-layout';
 import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import { ensureCounterClockwise } from './polygon';
 import {
@@ -14,14 +14,12 @@ import {
 	BASE_PROFILE_LEVELS,
 	CORNER_FILLET_RADIUS,
 	FLOOR_THICKNESS,
-	HEIGHT_UNIT,
 	LABEL_TAB_DEPTH,
 	LABEL_TAB_HEIGHT,
 	MAGNET_HOLE_DEPTH,
 	MAGNET_HOLE_DIAMETER,
 	SCREW_HOLE_DEPTH,
 	SCREW_HOLE_DIAMETER,
-	bodySize,
 	cellCenter,
 	gridHoleSites,
 	innerFillet,
@@ -326,9 +324,7 @@ function buildWallCut(
 export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: { segments?: number } = {}): Manifold {
 	circleSegments = segments;
 	const { Manifold } = oc();
-	const h = p.height * HEIGHT_UNIT;
-	const bodyW = bodySize(p.width);
-	const bodyL = bodySize(p.length);
+	const { bodyW, bodyL, innerW, innerL, wallBottom, wallHeight, topZ } = interiorBox(p);
 	const cavityFillet = innerFillet(p.wallThickness);
 
 	// 1. Grid of unit bases (build once, translate copies)
@@ -355,15 +351,11 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 	// total height is units×7 + lipProtrusion.
 	const lipHeight = lipProfileHeight(p.stackingLip);
 	const protrusion = lipProtrusion(p.stackingLip);
-	const wallBottom = BASE_PROFILE_HEIGHT + FLOOR_THICKNESS;
-	const wallHeight = h - wallBottom;
 
 	if (wallHeight <= 0) return bin;
 
 	// 4. Hollow walls
 	const outerWalls = roundedPrism(bodyW, bodyL, CORNER_FILLET_RADIUS, wallHeight, wallBottom);
-	const innerW = bodyW - 2 * p.wallThickness;
-	const innerL = bodyL - 2 * p.wallThickness;
 	const cavity = roundedPrism(innerW, innerL, cavityFillet, wallHeight, wallBottom);
 	bin = bin.add(outerWalls.subtract(cavity));
 
@@ -387,7 +379,7 @@ export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: 
 
 	// 7. Stacking lip — protrudes above the wall; its base overlaps the rim as a support.
 	if (lipHeight > 0) {
-		bin = bin.add(buildStackingLip(bodyW, bodyL, h + protrusion - lipHeight, lipHeight));
+		bin = bin.add(buildStackingLip(bodyW, bodyL, topZ + protrusion - lipHeight, lipHeight));
 	}
 
 	// 8. Diagonal wall cut

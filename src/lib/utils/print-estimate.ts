@@ -1,10 +1,9 @@
 import type { BinParams } from '$lib/stores/params';
+import { interiorBox } from '$lib/cad/divider-layout';
 import {
 	BASE_PROFILE_HEIGHT,
 	FLOOR_THICKNESS,
 	LIP_OFFSET_BOTTOM,
-	WALL_BOTTOM,
-	bodySize,
 	lipProfileHeight,
 	lipProtrusion,
 	nominalHeight
@@ -22,18 +21,14 @@ export interface PrintEstimate {
 }
 
 export function estimatePrint(p: BinParams): PrintEstimate {
-	const bodyW = bodySize(p.width);
-	const bodyL = bodySize(p.length);
+	const { bodyW, bodyL, innerW, innerL, wallHeight } = interiorBox(p);
 	const heightMm = nominalHeight(p.height);
-	const innerW = bodyW - 2 * p.wallThickness;
-	const innerL = bodyL - 2 * p.wallThickness;
 
 	const lipHeight = lipProfileHeight(p.stackingLip);
 	const protrusion = lipProtrusion(p.stackingLip);
 
 	// Walls fill the nominal height; the lip protrudes above it. When the wall
 	// collapses (e.g. height=1) the CAD builders emit base + floor only — no lip.
-	const wallHeight = Math.max(0, heightMm - WALL_BOTTOM);
 	const hasLip = lipHeight > 0 && wallHeight > 0;
 	const effectiveProtrusion = hasLip ? protrusion : 0;
 
