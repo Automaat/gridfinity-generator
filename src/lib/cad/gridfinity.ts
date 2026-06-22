@@ -8,7 +8,15 @@ import {
 	type Sketch
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
-import { dividerCoords, interiorBox, labelTabLayouts, scoopLayouts, wallCutLayout } from './divider-layout';
+import {
+	dividerCoords,
+	interiorBox,
+	labelTabLayouts,
+	scoopLayouts,
+	scoopPrimitiveLayout,
+	type ScoopLayout,
+	wallCutLayout
+} from './divider-layout';
 import { HEX_RADIUS, hexPanelCutters, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	BASE_PROFILE_HEIGHT,
@@ -225,39 +233,29 @@ function buildLabelTabs(
 }
 
 function buildSingleScoop(
-	R: number,
-	extrudeLen: number,
-	wallPos: number,
-	wallBottom: number,
-	extrudeStart: number,
-	axis: 'X' | 'Y',
-	flip: boolean
+	layout: ScoopLayout,
+	wallBottom: number
 ): Solid {
 	// Quarter-circle ramp: block in floor-wall corner, cylinder subtracted.
 	// axis='X': scoop along a Y-wall (back/front), extrude in X
 	// axis='Y': scoop along an X-wall (left/right), extrude in Y
 	// flip=false: ramp extends from wallPos toward +axis (back/left)
 	// flip=true: ramp extends from wallPos toward -axis (front/right)
-	const dir = flip ? -1 : 1;
-	const blockW = axis === 'X' ? extrudeLen : R;
-	const blockL = axis === 'X' ? R : extrudeLen;
+	const primitive = scoopPrimitiveLayout(layout, wallBottom);
 
 	const block = (
-		drawRoundedRectangle(blockW, blockL, 0).sketchOnPlane('XY', wallBottom) as Sketch
-	).extrude(R) as Solid;
+		drawRoundedRectangle(primitive.blockW, primitive.blockL, 0).sketchOnPlane('XY', primitive.blockZ) as Sketch
+	).extrude(primitive.radius) as Solid;
 
-	const blockX = axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + (dir * R) / 2;
-	const blockY = axis === 'X' ? wallPos + (dir * R) / 2 : extrudeStart + extrudeLen / 2;
-	const blockPos = block.translate(blockX, blockY, 0) as Solid;
+	const blockPos = block.translate(primitive.blockX, primitive.blockY, 0) as Solid;
 
-	const plane = axis === 'X' ? 'YZ' : 'XZ';
 	const cyl = (
-		drawCircle(R).sketchOnPlane(plane, extrudeStart) as Sketch
-	).extrude(extrudeLen) as Solid;
-
-	const cylX = axis === 'X' ? 0 : wallPos + dir * R;
-	const cylY = axis === 'X' ? wallPos + dir * R : 0;
-	const cylPos = cyl.translate(cylX, cylY, wallBottom + R) as Solid;
+		drawCircle(primitive.radius).sketchOnPlane(primitive.cylinderPlane, primitive.cylinderAlongStart) as Sketch
+	).extrude(primitive.extrudeLen) as Solid;
+	const cylPos =
+		primitive.axis === 'X'
+			? (cyl.translate(0, primitive.cylinderCrossPos, primitive.cylinderZ) as Solid)
+			: (cyl.translate(primitive.cylinderCrossPos, 0, primitive.cylinderZ) as Solid);
 
 	return blockPos.cut(cylPos) as Solid;
 }
@@ -275,15 +273,7 @@ function buildScoops(
 	let scoops: Solid | null = null;
 
 	for (const layout of layouts) {
-		const ramp = buildSingleScoop(
-			layout.radius,
-			layout.extrudeLen,
-			layout.wallPos,
-			wallBottom,
-			layout.extrudeStart,
-			layout.axis,
-			layout.flip
-		);
+		const ramp = buildSingleScoop(layout, wallBottom);
 		scoops = scoops ? (scoops.fuse(ramp) as Solid) : ramp;
 	}
 

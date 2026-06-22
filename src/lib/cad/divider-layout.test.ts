@@ -8,6 +8,7 @@ import {
 	interiorBox,
 	labelTabLayouts,
 	scoopLayouts,
+	scoopPrimitiveLayout,
 	wallCutLayout
 } from './divider-layout';
 
@@ -192,6 +193,46 @@ describe('scoopLayouts', () => {
 		expect(layouts[0]?.wallPos).toBeCloseTo(-box.innerL / 2, 5);
 		expect(layouts[3]?.extrudeStart).toBeCloseTo(0, 5);
 		expect(layouts[3]?.wallPos).toBeCloseTo(0, 5);
+	});
+
+	it('computes X-axis primitive placement for back/front scoops', () => {
+		const [layout] = scoopLayouts(
+			{ ...defaultParams, scoopWalls: ['back'] },
+			box.innerW,
+			box.innerL,
+			box.wallHeight
+		);
+		const primitive = scoopPrimitiveLayout(layout!, box.wallBottom);
+
+		expect(primitive.axis).toBe('X');
+		expect(primitive.blockW).toBeCloseTo(box.innerW, 5);
+		expect(primitive.blockL).toBe(7);
+		expect(primitive.blockX).toBeCloseTo(0, 5);
+		expect(primitive.blockY).toBeCloseTo(-box.innerL / 2 + 3.5, 5);
+		expect(primitive.cylinderPlane).toBe('YZ');
+		expect(primitive.cylinderAlongStart).toBeCloseTo(-box.innerW / 2, 5);
+		expect(primitive.cylinderCrossPos).toBeCloseTo(-box.innerL / 2 + 7, 5);
+		expect(primitive.cylinderZ).toBe(14);
+	});
+
+	it('computes Y-axis primitive placement for left/right scoops', () => {
+		const [layout] = scoopLayouts(
+			{ ...defaultParams, scoopWalls: ['right'] },
+			box.innerW,
+			box.innerL,
+			box.wallHeight
+		);
+		const primitive = scoopPrimitiveLayout(layout!, box.wallBottom);
+
+		expect(primitive.axis).toBe('Y');
+		expect(primitive.blockW).toBe(7);
+		expect(primitive.blockL).toBeCloseTo(box.innerL, 5);
+		expect(primitive.blockX).toBeCloseTo(box.innerW / 2 - 3.5, 5);
+		expect(primitive.blockY).toBeCloseTo(0, 5);
+		expect(primitive.cylinderPlane).toBe('XZ');
+		expect(primitive.cylinderAlongStart).toBeCloseTo(-box.innerL / 2, 5);
+		expect(primitive.cylinderCrossPos).toBeCloseTo(box.innerW / 2 - 7, 5);
+		expect(primitive.cylinderZ).toBe(14);
 	});
 });
 
