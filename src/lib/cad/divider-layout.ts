@@ -7,7 +7,13 @@
 // from the low wall (left for X, back for Y). Fractions stay correct when the bin
 // is resized; the geometry converts them to centered model coordinates.
 import type { BinParams } from '$lib/stores/params';
-import { WALL_BOTTOM, bodySize, nominalHeight } from './gridfinity-spec';
+import {
+	LABEL_TAB_DEPTH,
+	LABEL_TAB_HEIGHT,
+	WALL_BOTTOM,
+	bodySize,
+	nominalHeight
+} from './gridfinity-spec';
 
 export {
 	BASE_PROFILE_HEIGHT,
@@ -183,6 +189,45 @@ export function scoopLayouts(
 				}
 			}
 		}
+	}
+
+	return layouts;
+}
+
+export type LabelTabProfile = [[number, number], [number, number], [number, number]];
+
+export interface LabelTabLayout {
+	xStart: number;
+	width: number;
+	frontY: number;
+	topZ: number;
+	profile: LabelTabProfile;
+}
+
+// Label tabs span each X compartment along the front wall. The profile is local
+// to (frontY, topZ) in the YZ plane so CAD backends can place it directly.
+export function labelTabLayouts(
+	p: BinParams,
+	innerW: number,
+	innerL: number,
+	wallBottom: number,
+	wallHeight: number
+): LabelTabLayout[] {
+	const topZ = wallBottom + wallHeight;
+	const tabHeight = Math.min(LABEL_TAB_HEIGHT, wallHeight);
+	const tabDepth = Math.min(LABEL_TAB_DEPTH, innerL - 1);
+	const edges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
+	const frontY = innerL / 2;
+	const layouts: LabelTabLayout[] = [];
+
+	for (let i = 0; i < edges.length - 1; i++) {
+		const e0 = edges[i]!;
+		const e1 = edges[i + 1]!;
+		const width = e1 - e0 - (i > 0 ? p.wallThickness : 0);
+		if (width < 1) continue;
+		const cx = (e0 + e1) / 2;
+		const profile: LabelTabProfile = [[0, 0], [-tabDepth, 0], [0, -tabHeight]];
+		layouts.push({ xStart: cx - width / 2, width, frontY, topZ, profile });
 	}
 
 	return layouts;

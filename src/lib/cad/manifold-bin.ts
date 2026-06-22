@@ -6,7 +6,7 @@
 // harness). Shared Gridfinity spec values live in gridfinity-spec.ts.
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
-import { compartmentEdges, dividerCoords, interiorBox, scoopLayouts, wallCutLayout } from './divider-layout';
+import { dividerCoords, interiorBox, labelTabLayouts, scoopLayouts, wallCutLayout } from './divider-layout';
 import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import { ensureCounterClockwise } from './polygon';
 import {
@@ -14,7 +14,6 @@ import {
 	BASE_PROFILE_LEVELS,
 	CORNER_FILLET_RADIUS,
 	FLOOR_THICKNESS,
-	LABEL_TAB_DEPTH,
 	LABEL_TAB_HEIGHT,
 	MAGNET_HOLE_DEPTH,
 	MAGNET_HOLE_DIAMETER,
@@ -220,22 +219,12 @@ function buildLabelTabs(
 	p: BinParams, innerW: number, innerL: number, wallBottom: number, wallHeight: number
 ): Manifold | null {
 	const { Manifold } = oc();
-	const topZ = wallBottom + wallHeight;
-	const tabHeight = Math.min(LABEL_TAB_HEIGHT, wallHeight);
-	const tabDepth = Math.min(LABEL_TAB_DEPTH, innerL - 1);
-	const edges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
-	const frontY = innerL / 2;
-	const tabs: Manifold[] = [];
-	for (let i = 0; i < edges.length - 1; i++) {
-		const cx = (edges[i]! + edges[i + 1]!) / 2;
-		const tabW = edges[i + 1]! - edges[i]! - (i > 0 ? p.wallThickness : 0);
-		if (tabW < 1) continue; // compartment too narrow for a usable tab
-		// Right-triangle ledge in the Y-Z plane, extruded along X by the tab width.
-		const tri: [number, number][] = [
-			[frontY, topZ], [frontY - tabDepth, topZ], [frontY, topZ - tabHeight]
-		];
-		tabs.push(prismAlongX(tri, tabW).translate([cx - tabW / 2, 0, 0]));
-	}
+	const tabs = labelTabLayouts(p, innerW, innerL, wallBottom, wallHeight).map((layout) => {
+		const profile = layout.profile.map(
+			([dy, dz]): [number, number] => [layout.frontY + dy, layout.topZ + dz]
+		);
+		return prismAlongX(profile, layout.width).translate([layout.xStart, 0, 0]);
+	});
 	if (tabs.length === 0) return null;
 	return tabs.length === 1 ? tabs[0]! : Manifold.union(tabs);
 }

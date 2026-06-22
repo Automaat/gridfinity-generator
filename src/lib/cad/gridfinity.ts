@@ -8,14 +8,13 @@ import {
 	type Sketch
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
-import { compartmentEdges, dividerCoords, interiorBox, scoopLayouts, wallCutLayout } from './divider-layout';
+import { dividerCoords, interiorBox, labelTabLayouts, scoopLayouts, wallCutLayout } from './divider-layout';
 import { HEX_RADIUS, hexPanelCutters, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	BASE_PROFILE_HEIGHT,
 	BASE_PROFILE_LEVELS,
 	CORNER_FILLET_RADIUS,
 	FLOOR_THICKNESS,
-	LABEL_TAB_DEPTH,
 	LABEL_TAB_HEIGHT,
 	MAGNET_HOLE_DEPTH,
 	MAGNET_HOLE_DIAMETER,
@@ -207,32 +206,18 @@ function buildLabelTabs(
 	wallBottom: number,
 	wallHeight: number
 ): Solid | null {
-	const topZ = wallBottom + wallHeight;
-	const tabHeight = Math.min(LABEL_TAB_HEIGHT, wallHeight);
-	const tabDepth = Math.min(LABEL_TAB_DEPTH, innerL - 1);
-	// One tab per compartment, spanning between consecutive walls/dividers.
-	const edges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
-	const frontY = innerL / 2; // front face (+Y side)
-
+	const layouts = labelTabLayouts(p, innerW, innerL, wallBottom, wallHeight);
 	let tabs: Solid | null = null;
 
-	for (let i = 0; i < edges.length - 1; i++) {
-		const e0 = edges[i]!;
-		const e1 = edges[i + 1]!;
-		const cx = (e0 + e1) / 2;
-		const tabW = e1 - e0 - (i > 0 ? p.wallThickness : 0);
-		if (tabW < 1) continue; // compartment too narrow for a usable tab
-
-		// Triangle cross-section in YZ plane: right triangle
-		// top-front corner → top-back (inward) → bottom-front → close
-		const profile = draw([0, 0])
-			.lineTo([-tabDepth, 0])
-			.lineTo([0, -tabHeight])
-			.close()
-			.sketchOnPlane('YZ', cx - tabW / 2) as Sketch;
-
-		const tab = profile.extrude(tabW) as Solid;
-		const positioned = tab.translate(0, frontY, topZ) as Solid;
+	for (const layout of layouts) {
+		const [start, ...rest] = layout.profile;
+		let drawing = draw(start);
+		for (const point of rest) {
+			drawing = drawing.lineTo(point);
+		}
+		const profile = drawing.close().sketchOnPlane('YZ', layout.xStart) as Sketch;
+		const tab = profile.extrude(layout.width) as Solid;
+		const positioned = tab.translate(0, layout.frontY, layout.topZ) as Solid;
 		tabs = tabs ? (tabs.fuse(positioned) as Solid) : positioned;
 	}
 

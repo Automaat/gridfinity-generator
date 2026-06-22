@@ -6,6 +6,7 @@ import {
 	compartmentEdges,
 	redistributeGaps,
 	interiorBox,
+	labelTabLayouts,
 	scoopLayouts,
 	wallCutLayout
 } from './divider-layout';
@@ -191,6 +192,67 @@ describe('scoopLayouts', () => {
 		expect(layouts[0]?.wallPos).toBeCloseTo(-box.innerL / 2, 5);
 		expect(layouts[3]?.extrudeStart).toBeCloseTo(0, 5);
 		expect(layouts[3]?.wallPos).toBeCloseTo(0, 5);
+	});
+});
+
+describe('labelTabLayouts', () => {
+	const box = interiorBox(defaultParams);
+
+	it('builds one front-wall tab for a bin without X dividers', () => {
+		const layouts = labelTabLayouts(defaultParams, box.innerW, box.innerL, box.wallBottom, box.wallHeight);
+
+		expect(layouts).toHaveLength(1);
+		expect(layouts[0]).toEqual({
+			xStart: -box.innerW / 2,
+			width: box.innerW,
+			frontY: box.innerL / 2,
+			topZ: box.topZ,
+			profile: [[0, 0], [-4.5, 0], [0, -14]]
+		});
+	});
+
+	it('subtracts divider thickness from tabs after the first compartment', () => {
+		const layouts = labelTabLayouts(
+			{ ...defaultParams, dividersX: 2 },
+			box.innerW,
+			box.innerL,
+			box.wallBottom,
+			box.wallHeight
+		);
+
+		expect(layouts).toHaveLength(3);
+		expect(layouts[0]?.width).toBeCloseTo(box.innerW / 3, 5);
+		expect(layouts[1]?.width).toBeCloseTo(box.innerW / 3 - defaultParams.wallThickness, 5);
+		expect(layouts[1]?.xStart).toBeCloseTo(-box.innerW / 6 + defaultParams.wallThickness / 2, 5);
+	});
+
+	it('returns independent profile tuples for each tab', () => {
+		const layouts = labelTabLayouts(
+			{ ...defaultParams, dividersX: 1 },
+			box.innerW,
+			box.innerL,
+			box.wallBottom,
+			box.wallHeight
+		);
+
+		expect(layouts).toHaveLength(2);
+		expect(layouts[0]?.profile).not.toBe(layouts[1]?.profile);
+		expect(layouts[0]?.profile[1]).not.toBe(layouts[1]?.profile[1]);
+	});
+
+	it('skips compartments too narrow for a usable tab and caps profile depth', () => {
+		const layouts = labelTabLayouts(
+			{ ...defaultParams, dividersX: 2, wallThickness: 1.2 },
+			2,
+			4,
+			box.wallBottom,
+			10
+		);
+
+		expect(layouts).toEqual([]);
+
+		const [layout] = labelTabLayouts(defaultParams, box.innerW, 4, box.wallBottom, 10);
+		expect(layout?.profile).toEqual([[0, 0], [-3, 0], [0, -10]]);
 	});
 });
 
