@@ -3,6 +3,9 @@ import { defaultParams, type BinParams } from '$lib/stores/params';
 import {
 	resolveFractions,
 	dividerCoords,
+	dividerWallFaceWidth,
+	dividerWallLayouts,
+	dividerWallThickness,
 	compartmentEdges,
 	redistributeGaps,
 	interiorBox,
@@ -159,6 +162,73 @@ describe('holeLayouts', () => {
 		const [layout] = holeLayouts({ ...defaultParams, magnetHoles: true, screwHoles: true });
 
 		expect(layout?.parts).toEqual(['magnet', 'screw']);
+	});
+});
+
+describe('dividerWallLayouts', () => {
+	const box = interiorBox(defaultParams);
+
+	it('returns no layouts when dividers are disabled', () => {
+		expect(dividerWallLayouts(defaultParams, box.innerW, box.innerL, box.wallBottom, box.wallHeight)).toEqual([]);
+	});
+
+	it('maps X and Y dividers to backend-neutral wall layouts', () => {
+		const layouts = dividerWallLayouts(
+			{ ...defaultParams, dividersX: 2, dividersY: 1 },
+			box.innerW,
+			box.innerL,
+			box.wallBottom,
+			box.wallHeight
+		);
+
+		expect(layouts).toHaveLength(3);
+		expect(layouts[0]).toEqual({
+			axis: 'X',
+			width: defaultParams.wallThickness,
+			length: box.innerL,
+			height: box.wallHeight,
+			x: -box.innerW / 2 + (1 / 3) * box.innerW,
+			y: 0,
+			z: box.wallBottom
+		});
+		expect(layouts[1]?.x).toBeCloseTo(-box.innerW / 2 + (2 / 3) * box.innerW, 5);
+		expect(layouts[2]).toEqual({
+			axis: 'Y',
+			width: box.innerW,
+			length: defaultParams.wallThickness,
+			height: box.wallHeight,
+			x: 0,
+			y: 0,
+			z: box.wallBottom
+		});
+	});
+
+	it('derives hex face width and wall thickness from the layout axis', () => {
+		const [xWall, yWall] = dividerWallLayouts(
+			{ ...defaultParams, dividersX: 1, dividersY: 1 },
+			box.innerW,
+			box.innerL,
+			box.wallBottom,
+			box.wallHeight
+		);
+
+		expect(dividerWallThickness(xWall!)).toBe(defaultParams.wallThickness);
+		expect(dividerWallFaceWidth(xWall!)).toBe(box.innerL);
+		expect(dividerWallThickness(yWall!)).toBe(defaultParams.wallThickness);
+		expect(dividerWallFaceWidth(yWall!)).toBe(box.innerW);
+	});
+
+	it('honors custom divider fractions', () => {
+		const [layout] = dividerWallLayouts(
+			{ ...defaultParams, dividersX: 1, dividerPosX: [0.25] },
+			box.innerW,
+			box.innerL,
+			box.wallBottom,
+			box.wallHeight
+		);
+
+		expect(layout?.axis).toBe('X');
+		expect(layout?.x).toBeCloseTo(-box.innerW / 4, 5);
 	});
 });
 

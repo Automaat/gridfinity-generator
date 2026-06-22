@@ -7,7 +7,9 @@
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import {
-	dividerCoords,
+	dividerWallFaceWidth,
+	dividerWallLayouts,
+	dividerWallThickness,
 	holeLayouts,
 	interiorBox,
 	labelTabLayouts,
@@ -208,15 +210,19 @@ function buildDividers(
 ): Manifold | null {
 	const { Manifold } = oc();
 	const walls: Manifold[] = [];
-	for (const xPos of dividerCoords(p.dividersX, p.dividerPosX, innerW)) {
-		let wall = roundedPrism(p.wallThickness, innerL, 0, wallHeight, wallBottom);
-		if (p.lightweightDividers) wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'X', wallBottom);
-		walls.push(wall.translate([xPos, 0, 0]));
-	}
-	for (const yPos of dividerCoords(p.dividersY, p.dividerPosY, innerL)) {
-		let wall = roundedPrism(innerW, p.wallThickness, 0, wallHeight, wallBottom);
-		if (p.lightweightDividers) wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'Y', wallBottom);
-		walls.push(wall.translate([0, yPos, 0]));
+	for (const layout of dividerWallLayouts(p, innerW, innerL, wallBottom, wallHeight)) {
+		let wall = roundedPrism(layout.width, layout.length, 0, layout.height, layout.z);
+		if (p.lightweightDividers) {
+			wall = cutHexPattern(
+				wall,
+				dividerWallFaceWidth(layout),
+				layout.height,
+				dividerWallThickness(layout),
+				layout.axis,
+				layout.z
+			);
+		}
+		walls.push(wall.translate([layout.x, layout.y, 0]));
 	}
 	if (walls.length === 0) return null;
 	return walls.length === 1 ? walls[0]! : Manifold.union(walls);
