@@ -182,10 +182,9 @@ function buildStackingLip(bodyW: number, bodyL: number, topZ: number, lipHeight:
 
 // Punch the shared flat-top hex lattice through a divider wall (built at the origin,
 // cut along its thickness axis before it is translated into position).
-function buildHexCutter(hex: [number, number][], cutter: HexPanelCutter): Manifold {
-	if (cutter.axis === 'X') return prismAlongX(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
-	if (cutter.axis === 'Y') return prismAlongY(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
-	throw new Error(`Unsupported bin hex cutter axis: ${cutter.axis}`);
+function buildHexCutter(axis: 'X' | 'Y', hex: [number, number][], cutter: HexPanelCutter): Manifold {
+	if (axis === 'X') return prismAlongX(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
+	return prismAlongY(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
 }
 
 function cutHexPattern(
@@ -196,7 +195,7 @@ function cutHexPattern(
 	if (cutterSpecs.length === 0) return wall;
 	const { Manifold } = oc();
 	const hex = hexPolygon();
-	const cutters = cutterSpecs.map((cutter) => buildHexCutter(hex, cutter));
+	const cutters = cutterSpecs.map((cutter) => buildHexCutter(axis, hex, cutter));
 	return wall.subtract(Manifold.union(cutters));
 }
 

@@ -141,16 +141,13 @@ function buildStackingLip(
 
 // Punch the shared flat-top hex lattice through a divider wall. `drawPolysides(R, 6)`
 // without rotation is the flat-top hexagon matching hex-lattice's hexPolygon().
-function buildHexCutter(cutter: HexPanelCutter): Solid {
-	if (cutter.axis === 'X') {
+function buildHexCutter(axis: HexPanelAxis, cutter: HexPanelCutter): Solid {
+	if (axis === 'X') {
 		const hex = (drawPolysides(HEX_RADIUS, 6).sketchOnPlane('YZ', cutter.x) as Sketch).extrude(cutter.cutDepth) as Solid;
 		return hex.translate(0, cutter.y, cutter.z) as Solid;
 	}
-	if (cutter.axis === 'Y') {
-		const hex = (drawPolysides(HEX_RADIUS, 6).sketchOnPlane('XZ', cutter.y) as Sketch).extrude(cutter.cutDepth) as Solid;
-		return hex.translate(cutter.x, 0, cutter.z) as Solid;
-	}
-	throw new Error(`Unsupported bin hex cutter axis: ${cutter.axis}`);
+	const hex = (drawPolysides(HEX_RADIUS, 6).sketchOnPlane('XZ', cutter.y) as Sketch).extrude(cutter.cutDepth) as Solid;
+	return hex.translate(cutter.x, 0, cutter.z) as Solid;
 }
 
 function cutHexPattern(
@@ -162,7 +159,7 @@ function cutHexPattern(
 	wallBottom: number
 ): Solid {
 	const axis: HexPanelAxis = plane === 'YZ' ? 'X' : 'Y';
-	const cutters = hexPanelCutters(axis, faceWidth, faceHeight, wallThickness, 0, 0, wallBottom + faceHeight / 2).map(buildHexCutter);
+	const cutters = hexPanelCutters(axis, faceWidth, faceHeight, wallThickness, 0, 0, wallBottom + faceHeight / 2).map((cutter) => buildHexCutter(axis, cutter));
 	if (cutters.length === 0) return wall;
 
 	// Single compound cut instead of fusing every hex first.
