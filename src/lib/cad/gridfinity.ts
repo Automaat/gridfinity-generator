@@ -10,10 +10,12 @@ import {
 import type { BinParams } from '$lib/stores/params';
 import {
 	dividerCoords,
+	holeLayouts,
 	interiorBox,
 	labelTabLayouts,
 	scoopLayouts,
 	scoopPrimitiveLayout,
+	type HolePart,
 	type ScoopLayout,
 	wallCutLayout
 } from './divider-layout';
@@ -29,7 +31,6 @@ import {
 	SCREW_HOLE_DEPTH,
 	SCREW_HOLE_DIAMETER,
 	cellCenter,
-	gridHoleSites,
 	innerFillet,
 	lipProfileHeight,
 	lipProtrusion,
@@ -47,6 +48,12 @@ function squareProfileSketch(level: SquareProfileLevel): Sketch {
 
 function rectProfileSketch(level: RectProfileLevel): Sketch {
 	return drawRoundedRectangle(level.w, level.l, level.r).sketchOnPlane('XY', level.z) as Sketch;
+}
+
+function buildHolePart(part: HolePart): Solid {
+	const radius = part === 'magnet' ? MAGNET_HOLE_DIAMETER / 2 : SCREW_HOLE_DIAMETER / 2;
+	const depth = part === 'magnet' ? MAGNET_HOLE_DEPTH : SCREW_HOLE_DEPTH;
+	return (drawCircle(radius).sketchOnPlane('XY') as Sketch).extrude(depth) as Solid;
 }
 
 export function buildUnitBase(): Solid {
@@ -75,19 +82,10 @@ function buildHoles(p: BinParams): Solid | null {
 	// than fusing every cylinder pairwise (6×6 magnet+screw: ~2900ms → ~525ms).
 	const cutters: Solid[] = [];
 
-	for (const site of gridHoleSites(p.width, p.length)) {
+	for (const layout of holeLayouts(p)) {
 		let cutter: Solid | null = null;
-		if (p.magnetHoles && (!p.magnetCornersOnly || site.outerCorner)) {
-			const magnet = (
-				drawCircle(MAGNET_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
-			).extrude(MAGNET_HOLE_DEPTH) as Solid;
-			cutter = magnet.translate(site.x, site.y, 0) as Solid;
-		}
-		if (p.screwHoles) {
-			const screw = (
-				drawCircle(SCREW_HOLE_DIAMETER / 2).sketchOnPlane('XY') as Sketch
-			).extrude(SCREW_HOLE_DEPTH) as Solid;
-			const positioned = screw.translate(site.x, site.y, 0) as Solid;
+		for (const part of layout.parts) {
+			const positioned = buildHolePart(part).translate(layout.x, layout.y, 0) as Solid;
 			cutter = cutter ? (cutter.fuse(positioned) as Solid) : positioned;
 		}
 		if (cutter) cutters.push(cutter);

@@ -8,10 +8,12 @@ import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import {
 	dividerCoords,
+	holeLayouts,
 	interiorBox,
 	labelTabLayouts,
 	scoopLayouts,
 	scoopPrimitiveLayout,
+	type HolePart,
 	type ScoopLayout,
 	wallCutLayout
 } from './divider-layout';
@@ -28,7 +30,6 @@ import {
 	SCREW_HOLE_DEPTH,
 	SCREW_HOLE_DIAMETER,
 	cellCenter,
-	gridHoleSites,
 	innerFillet,
 	lipProfileHeight,
 	lipProtrusion,
@@ -150,21 +151,19 @@ export function unitBase(): Manifold {
 	return oc().Manifold.union([c1, vertical, c2]);
 }
 
+function buildHolePart(ManifoldCtor: ManifoldToplevel['Manifold'], part: HolePart): Manifold {
+	const radius = part === 'magnet' ? MAGNET_HOLE_DIAMETER / 2 : SCREW_HOLE_DIAMETER / 2;
+	const depth = part === 'magnet' ? MAGNET_HOLE_DEPTH : SCREW_HOLE_DEPTH;
+	return ManifoldCtor.cylinder(depth, radius, radius, circleSegments);
+}
+
 function buildHoles(p: BinParams): Manifold | null {
 	const { Manifold } = oc();
-	const cutters: Manifold[] = [];
-	for (const site of gridHoleSites(p.width, p.length)) {
-		const parts: Manifold[] = [];
-		if (p.magnetHoles && (!p.magnetCornersOnly || site.outerCorner)) {
-			parts.push(Manifold.cylinder(MAGNET_HOLE_DEPTH, MAGNET_HOLE_DIAMETER / 2, MAGNET_HOLE_DIAMETER / 2, circleSegments));
-		}
-		if (p.screwHoles) {
-			parts.push(Manifold.cylinder(SCREW_HOLE_DEPTH, SCREW_HOLE_DIAMETER / 2, SCREW_HOLE_DIAMETER / 2, circleSegments));
-		}
-		if (parts.length === 0) continue;
+	const cutters = holeLayouts(p).map((layout) => {
+		const parts = layout.parts.map((part) => buildHolePart(Manifold, part));
 		const cutter = (parts.length === 1 ? parts[0]! : Manifold.union(parts));
-		cutters.push(cutter.translate([site.x, site.y, 0]));
-	}
+		return cutter.translate([layout.x, layout.y, 0]);
+	});
 	if (cutters.length === 0) return null;
 	return Manifold.union(cutters);
 }

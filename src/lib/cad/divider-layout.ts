@@ -12,6 +12,7 @@ import {
 	LABEL_TAB_HEIGHT,
 	WALL_BOTTOM,
 	bodySize,
+	gridHoleSites,
 	nominalHeight
 } from './gridfinity-spec';
 
@@ -109,6 +110,33 @@ export function interiorBox(p: BinParams): InteriorBox {
 		wallHeight,
 		topZ: wallBottom + wallHeight
 	};
+}
+
+export type HolePart = 'magnet' | 'screw';
+
+export interface HoleLayout {
+	x: number;
+	y: number;
+	parts: HolePart[];
+}
+
+// Bottom hole placement and enabled cutter parts. Geometry backends create the
+// actual cylinders, but the feature selection is shared.
+export function holeLayouts(p: BinParams): HoleLayout[] {
+	const layouts: HoleLayout[] = [];
+
+	for (const site of gridHoleSites(p.width, p.length)) {
+		const parts: HolePart[] = [];
+		if (p.magnetHoles && (!p.magnetCornersOnly || site.outerCorner)) {
+			parts.push('magnet');
+		}
+		if (p.screwHoles) {
+			parts.push('screw');
+		}
+		if (parts.length > 0) layouts.push({ x: site.x, y: site.y, parts });
+	}
+
+	return layouts;
 }
 
 export type ScoopAxis = 'X' | 'Y';
