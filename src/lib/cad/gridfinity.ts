@@ -335,9 +335,11 @@ function buildWallCut(
 	const { axis, crossHalf, points } = wallCutLayout(p, bodyW, bodyL, wallBottom, wallHeight, lipExtension);
 	const plane = axis === 'Y' ? 'YZ' : 'XZ';
 
-	const [start, ...rest] = points;
-	let cutter = draw(start!);
-	for (const point of rest) {
+	const start = points[0];
+	/* v8 ignore next */
+	if (!start) throw new Error('wall cut layout must include at least one profile point');
+	let cutter = draw(start);
+	for (const point of points.slice(1)) {
 		cutter = cutter.lineTo(point);
 	}
 
