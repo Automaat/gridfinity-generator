@@ -51,16 +51,16 @@ vi.mock('replicad', () => ({
 }));
 vi.mock('replicad-opencascadejs/src/replicad_single.js', () => ({ default: vi.fn<() => Promise<object>>(async () => ({})) }));
 vi.mock('replicad-opencascadejs/src/replicad_single.wasm?url', () => ({ default: 'replicad.wasm' }));
-// Keep the real hex math but spy on hexCells so a test can assert the faceH passed
+// Keep the real hex math but spy on hexPanelCutters so a test can assert the faceH passed
 // for each panel (the structural replicad mock can't measure geometry).
 vi.mock('./hex-lattice', async (importOriginal) => {
 	const actual = await importOriginal<typeof import('./hex-lattice')>();
-	return { ...actual, hexCells: vi.fn<typeof actual.hexCells>(actual.hexCells) };
+	return { ...actual, hexPanelCutters: vi.fn<typeof actual.hexPanelCutters>(actual.hexPanelCutters) };
 });
 
 const { buildOcctSkadis } = await import('./skadis-occt');
 const replicad = await import('replicad');
-const { hexCells } = await import('./hex-lattice');
+const { hexPanelCutters } = await import('./hex-lattice');
 const { frontWallCutZ, sideWallCutZ } = await import('./skadis-layout');
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
@@ -117,12 +117,12 @@ describe('buildOcctSkadis', () => {
 	it('sizes lowered front/side hex panels to the exposed wall height (not full interior)', async () => {
 		const p = makeSk({ width: 120, height: 80, depth: 50, wallThickness: 2, openFront: true, frontWallHeight: 30, openSides: true, sideWallHeight: 25, lightweightWalls: true });
 		await buildOcctSkadis(p);
-		const calls = vi.mocked(hexCells).mock.calls;
+		const calls = vi.mocked(hexPanelCutters).mock.calls;
 		// front panel: faceW = interior width, faceH = exposed front height; sides: depth + exposed side height.
-		expect(calls).toContainEqual([p.width, frontWallCutZ(p) - p.wallThickness]);
-		expect(calls).toContainEqual([p.depth, sideWallCutZ(p) - p.wallThickness]);
+		expect(calls.some(([axis, faceW, faceH]) => axis === 'Y' && faceW === p.width && faceH === frontWallCutZ(p) - p.wallThickness)).toBe(true);
+		expect(calls.some(([axis, faceW, faceH]) => axis === 'X' && faceW === p.depth && faceH === sideWallCutZ(p) - p.wallThickness)).toBe(true);
 		// Guard against reverting to full interior height (the sliced-rim bug).
-		expect(calls).not.toContainEqual([p.width, p.height]);
-		expect(calls).not.toContainEqual([p.depth, p.height]);
+		expect(calls.some(([, faceW, faceH]) => faceW === p.width && faceH === p.height)).toBe(false);
+		expect(calls.some(([, faceW, faceH]) => faceW === p.depth && faceH === p.height)).toBe(false);
 	});
 });

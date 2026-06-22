@@ -13,7 +13,7 @@ import type { Manifold } from 'manifold-3d';
 import type { SkadisParams } from '$lib/stores/params';
 import { oc, box, prismAlongX, prismAlongY } from './manifold-bin';
 import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ } from './skadis-layout';
-import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
+import { hexPanelCutters, hexPolygon, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	SKADIS_HOOK_WIDTH,
 	SKADIS_MOUNT_BAND,
@@ -26,17 +26,17 @@ import {
 // (X = side wall, Y = back/front wall, Z = floor); (cx, cy, cz) is the panel center
 // in world space; faceW/faceH are its in-plane extents (faceH is the cell `v` axis:
 // Z for walls, Y for the floor). Returns null when the panel is too small for a hex.
-function wallHexCutters(axis: 'X' | 'Y' | 'Z', faceW: number, faceH: number, thickness: number, cx: number, cy: number, cz: number): Manifold | null {
-	const cells = hexCells(faceW, faceH);
-	if (cells.length === 0) return null;
+function buildHexCutter(hex: [number, number][], cutter: HexPanelCutter): Manifold {
+	if (cutter.axis === 'X') return prismAlongX(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
+	if (cutter.axis === 'Y') return prismAlongY(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
+	return oc().Manifold.extrude(new (oc().CrossSection)(hex), cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
+}
+
+function wallHexCutters(axis: HexPanelAxis, faceW: number, faceH: number, thickness: number, cx: number, cy: number, cz: number): Manifold | null {
+	const cutterSpecs = hexPanelCutters(axis, faceW, faceH, thickness, cx, cy, cz);
+	if (cutterSpecs.length === 0) return null;
 	const hex = hexPolygon();
-	const cutDepth = thickness + 2 * HEX_CUT_OVERSHOOT;
-	const cutters = cells.map(({ u, v }) => {
-		if (axis === 'X') return prismAlongX(hex, cutDepth).translate([cx - cutDepth / 2, cy + u, cz + v]);
-		if (axis === 'Y') return prismAlongY(hex, cutDepth).translate([cx + u, cy - cutDepth / 2, cz + v]);
-		// Z: hex lies in the X-Y plane, extruded down through the floor (v maps to Y).
-		return oc().Manifold.extrude(new (oc().CrossSection)(hex), cutDepth).translate([cx + u, cy + v, cz - cutDepth / 2]);
-	});
+	const cutters = cutterSpecs.map((cutter) => buildHexCutter(hex, cutter));
 	return oc().Manifold.union(cutters);
 }
 

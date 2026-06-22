@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { hexCells, hexPolygon, HEX_RADIUS } from './hex-lattice';
+import { HEX_CUT_OVERSHOOT, hexCells, hexPanelCutters, hexPolygon, HEX_RADIUS } from './hex-lattice';
 
 describe('hex lattice', () => {
 	it('returns no cells for a panel too small for one hex', () => {
@@ -31,5 +31,30 @@ describe('hex lattice', () => {
 		// (printability hinges on this orientation, so guard it).
 		const maxY = Math.max(...pts.map(([, y]) => y));
 		expect(pts.filter(([, y]) => Math.abs(y - maxY) < 1e-9)).toHaveLength(2);
+	});
+
+	it('maps panel cutters into each panel axis coordinate frame', () => {
+		const [cell] = hexCells(60, 40);
+		expect(cell).toBeDefined();
+		const cutDepth = 2 + 2 * HEX_CUT_OVERSHOOT;
+
+		const [x] = hexPanelCutters('X', 60, 40, 2, 10, 20, 30);
+		expect(x!.axis).toBe('X');
+		expect(x!.cutDepth).toBeCloseTo(cutDepth);
+		expect(x!.x).toBeCloseTo(10 - cutDepth / 2);
+		expect(x!.y).toBeCloseTo(20 + cell!.u);
+		expect(x!.z).toBeCloseTo(30 + cell!.v);
+
+		const [y] = hexPanelCutters('Y', 60, 40, 2, 10, 20, 30);
+		expect(y!.axis).toBe('Y');
+		expect(y!.x).toBeCloseTo(10 + cell!.u);
+		expect(y!.y).toBeCloseTo(20 - cutDepth / 2);
+		expect(y!.z).toBeCloseTo(30 + cell!.v);
+
+		const [z] = hexPanelCutters('Z', 60, 40, 2, 10, 20, 30);
+		expect(z!.axis).toBe('Z');
+		expect(z!.x).toBeCloseTo(10 + cell!.u);
+		expect(z!.y).toBeCloseTo(20 + cell!.v);
+		expect(z!.z).toBeCloseTo(30 - cutDepth / 2);
 	});
 });
