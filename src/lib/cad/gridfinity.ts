@@ -9,12 +9,13 @@ import {
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
 import {
-	dividerCoords,
+	dividerWallLayouts,
 	holeLayouts,
 	interiorBox,
 	labelTabLayouts,
 	scoopLayouts,
 	scoopPrimitiveLayout,
+	type DividerWallAxis,
 	type HolePart,
 	type ScoopLayout,
 	wallCutLayout
@@ -158,10 +159,9 @@ function cutHexPattern(
 	faceWidth: number,
 	faceHeight: number,
 	wallThickness: number,
-	plane: 'YZ' | 'XZ',
+	axis: DividerWallAxis,
 	wallBottom: number
 ): Solid {
-	const axis: HexPanelAxis = plane === 'YZ' ? 'X' : 'Y';
 	const cutters = hexPanelCutters(axis, faceWidth, faceHeight, wallThickness, 0, 0, wallBottom + faceHeight / 2).map((cutter) => buildHexCutter(axis, cutter));
 	if (cutters.length === 0) return wall;
 
@@ -178,27 +178,14 @@ function buildDividers(
 ): Solid | null {
 	let dividers: Solid | null = null;
 
-	// X dividers: walls parallel to Y axis, at each resolved position across width
-	for (const xPos of dividerCoords(p.dividersX, p.dividerPosX, innerW)) {
+	for (const layout of dividerWallLayouts(p, innerW, innerL, wallBottom, wallHeight)) {
 		let wall = (
-			drawRoundedRectangle(p.wallThickness, innerL, 0).sketchOnPlane('XY', wallBottom) as Sketch
-		).extrude(wallHeight) as Solid;
+			drawRoundedRectangle(layout.width, layout.length, 0).sketchOnPlane('XY', layout.z) as Sketch
+		).extrude(layout.height) as Solid;
 		if (p.lightweightDividers) {
-			wall = cutHexPattern(wall, innerL, wallHeight, p.wallThickness, 'YZ', wallBottom);
+			wall = cutHexPattern(wall, layout.faceWidth, layout.height, layout.thickness, layout.axis, layout.z);
 		}
-		const positioned = wall.translate(xPos, 0, 0) as Solid;
-		dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
-	}
-
-	// Y dividers: walls parallel to X axis, at each resolved position across length
-	for (const yPos of dividerCoords(p.dividersY, p.dividerPosY, innerL)) {
-		let wall = (
-			drawRoundedRectangle(innerW, p.wallThickness, 0).sketchOnPlane('XY', wallBottom) as Sketch
-		).extrude(wallHeight) as Solid;
-		if (p.lightweightDividers) {
-			wall = cutHexPattern(wall, innerW, wallHeight, p.wallThickness, 'XZ', wallBottom);
-		}
-		const positioned = wall.translate(0, yPos, 0) as Solid;
+		const positioned = wall.translate(layout.x, layout.y, 0) as Solid;
 		dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;
 	}
 

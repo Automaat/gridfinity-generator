@@ -139,6 +139,62 @@ export function holeLayouts(p: BinParams): HoleLayout[] {
 	return layouts;
 }
 
+export type DividerWallAxis = 'X' | 'Y';
+
+export interface DividerWallLayout {
+	axis: DividerWallAxis;
+	width: number;
+	length: number;
+	height: number;
+	x: number;
+	y: number;
+	z: number;
+	thickness: number;
+	faceWidth: number;
+}
+
+// Divider wall placement and dimensions. Builders turn these layouts into
+// backend-specific wall solids and optional lightweight hex cuts.
+export function dividerWallLayouts(
+	p: BinParams,
+	innerW: number,
+	innerL: number,
+	wallBottom: number,
+	wallHeight: number
+): DividerWallLayout[] {
+	const layouts: DividerWallLayout[] = [];
+
+	for (const xPos of dividerCoords(p.dividersX, p.dividerPosX, innerW)) {
+		layouts.push({
+			axis: 'X',
+			width: p.wallThickness,
+			length: innerL,
+			height: wallHeight,
+			x: xPos,
+			y: 0,
+			z: wallBottom,
+			thickness: p.wallThickness,
+			faceWidth: innerL
+		});
+	}
+
+	for (const yPos of dividerCoords(p.dividersY, p.dividerPosY, innerL)) {
+		layouts.push({
+			axis: 'Y',
+			width: innerW,
+			length: p.wallThickness,
+			height: wallHeight,
+			x: 0,
+			y: yPos,
+			z: wallBottom,
+			thickness: p.wallThickness,
+			faceWidth: innerW
+		});
+	}
+
+	return layouts;
+}
+
 export type ScoopAxis = 'X' | 'Y';
 
 export interface ScoopLayout {
