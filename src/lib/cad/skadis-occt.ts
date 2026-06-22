@@ -6,12 +6,13 @@ import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import type { SkadisParams } from '$lib/stores/params';
 import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ } from './skadis-layout';
-import { hexPanelCutters, hexPolygon, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
+import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import {
 	SKADIS_HOOK_WIDTH,
-	SKADIS_MOUNT_BAND,
+	skadisHexPanels,
 	skadisHookProfile,
-	skadisScrewHoleSpec
+	skadisScrewHoleSpec,
+	type SkadisHexPanel
 } from './skadis-mounts';
 
 let ready: Promise<void> | null = null;
@@ -42,8 +43,8 @@ function buildHexCutterSolid(hex: [number, number][], cutter: HexPanelCutter): S
 	return (sketch.sketchOnPlane('XY', cutter.z) as Sketch).extrude(cutter.cutDepth).translate(cutter.x, cutter.y, 0) as Solid;
 }
 
-function wallHexCuttersSolid(axis: HexPanelAxis, faceW: number, faceH: number, thickness: number, cx: number, cy: number, cz: number): Solid[] {
-	const cutterSpecs = hexPanelCutters(axis, faceW, faceH, thickness, cx, cy, cz);
+function wallHexCuttersSolid(panel: SkadisHexPanel): Solid[] {
+	const cutterSpecs = hexPanelCutters(panel.axis, panel.faceW, panel.faceH, panel.thickness, panel.cx, panel.cy, panel.cz);
 	if (cutterSpecs.length === 0) return [];
 	const hex = hexPolygon();
 	return cutterSpecs.map((cutter) => buildHexCutterSolid(hex, cutter));
@@ -106,16 +107,7 @@ export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
 	// Hex lattice through every wall + the floor; the back wall keeps a solid mount
 	// band around the hook rows.
 	if (p.lightweightWalls) {
-		const frontFaceH = frontH - t, sideFaceH = sideZ - t; // exposed wall heights (== outerH-t when closed)
-		const lowestHookZ = layout.hooks.length > 0 ? Math.min(...layout.hooks.map((h) => h.z)) : outerH;
-		const backFaceH = lowestHookZ - SKADIS_MOUNT_BAND - t;
-		const cutters = [
-			...wallHexCuttersSolid('X', p.depth, sideFaceH, t, -outerW / 2 + t / 2, outerD / 2, t + sideFaceH / 2),
-			...wallHexCuttersSolid('X', p.depth, sideFaceH, t, outerW / 2 - t / 2, outerD / 2, t + sideFaceH / 2),
-			...wallHexCuttersSolid('Y', p.width, frontFaceH, t, 0, outerD - t / 2, t + frontFaceH / 2),
-			...wallHexCuttersSolid('Y', p.width, backFaceH, t, 0, t / 2, t + backFaceH / 2),
-			...wallHexCuttersSolid('Z', p.width, p.depth, t, 0, outerD / 2, t / 2)
-		];
+		const cutters = skadisHexPanels(p, layout).flatMap((panel) => wallHexCuttersSolid(panel));
 		if (cutters.length > 0) solid = solid.cut(makeCompound(cutters) as Solid) as Solid;
 	}
 

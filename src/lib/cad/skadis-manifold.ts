@@ -13,13 +13,14 @@ import type { Manifold } from 'manifold-3d';
 import type { SkadisParams } from '$lib/stores/params';
 import { oc, box, prismAlongX, prismAlongY } from './manifold-bin';
 import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ } from './skadis-layout';
-import { hexPanelCutters, hexPolygon, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
+import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import {
 	SKADIS_HOOK_WIDTH,
-	SKADIS_MOUNT_BAND,
 	SKADIS_SCREW_SEGMENTS,
+	skadisHexPanels,
 	skadisHookProfile,
-	skadisScrewHoleSpec
+	skadisScrewHoleSpec,
+	type SkadisHexPanel
 } from './skadis-mounts';
 
 // Hex lattice cut through one panel. `axis` is the panel's thickness direction
@@ -32,8 +33,8 @@ function buildHexCutter(hex: [number, number][], cutter: HexPanelCutter): Manifo
 	return oc().Manifold.extrude(new (oc().CrossSection)(hex), cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
 }
 
-function wallHexCutters(axis: HexPanelAxis, faceW: number, faceH: number, thickness: number, cx: number, cy: number, cz: number): Manifold | null {
-	const cutterSpecs = hexPanelCutters(axis, faceW, faceH, thickness, cx, cy, cz);
+function wallHexCutters(panel: SkadisHexPanel): Manifold | null {
+	const cutterSpecs = hexPanelCutters(panel.axis, panel.faceW, panel.faceH, panel.thickness, panel.cx, panel.cy, panel.cz);
 	if (cutterSpecs.length === 0) return null;
 	const hex = hexPolygon();
 	const cutters = cutterSpecs.map((cutter) => buildHexCutter(hex, cutter));
@@ -102,16 +103,7 @@ export function buildSkadisManifold(p: SkadisParams): Manifold {
 	// centered within it, so the lattice keeps a solid band at the top edge: a clean
 	// straight finish, never a hex sliced by the lowered rim.
 	if (p.lightweightWalls) {
-		const frontFaceH = frontH - t, sideFaceH = sideZ - t; // exposed wall heights (== outerH-t when closed)
-		const lowestHookZ = layout.hooks.length > 0 ? Math.min(...layout.hooks.map((h) => h.z)) : outerH;
-		const backFaceH = lowestHookZ - SKADIS_MOUNT_BAND - t; // floor up to just below the lowest hook
-		const panels = [
-			wallHexCutters('X', p.depth, sideFaceH, t, -outerW / 2 + t / 2, outerD / 2, t + sideFaceH / 2), // left
-			wallHexCutters('X', p.depth, sideFaceH, t, outerW / 2 - t / 2, outerD / 2, t + sideFaceH / 2), // right
-			wallHexCutters('Y', p.width, frontFaceH, t, 0, outerD - t / 2, t + frontFaceH / 2), // front
-			wallHexCutters('Y', p.width, backFaceH, t, 0, t / 2, t + backFaceH / 2), // back (below the mount band)
-			wallHexCutters('Z', p.width, p.depth, t, 0, outerD / 2, t / 2) // floor
-		];
+		const panels = skadisHexPanels(p, layout).map((panel) => wallHexCutters(panel));
 		for (const cutters of panels) if (cutters) solid = solid.subtract(cutters);
 	}
 
