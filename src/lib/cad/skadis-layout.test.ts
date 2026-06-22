@@ -1,9 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import type { SkadisParams } from '$lib/stores/params';
-import { planSkadis, frontWallCutZ, sideWallCutZ, SKADIS_PITCH } from './skadis-layout';
+import { defaultSkadis, type SkadisParams } from '$lib/stores/params';
+import { planSkadis, frontWallCutZ, sideWallCutZ, skadisAccessCutBoxes, SKADIS_PITCH } from './skadis-layout';
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
+	return { ...defaultSkadis, ...overrides };
 }
 
 describe('planSkadis', () => {
@@ -77,5 +77,68 @@ describe('wall cut height', () => {
 			expect(frontWallCutZ(makeSk({ frontWallHeight: bad }))).toBe(5);
 			expect(sideWallCutZ(makeSk({ sideWallHeight: bad }))).toBe(5);
 		}
+	});
+});
+
+describe('skadisAccessCutBoxes', () => {
+	it('returns no cuts for a closed box', () => {
+		expect(skadisAccessCutBoxes(makeSk())).toEqual([]);
+	});
+
+	it('describes the front access cut', () => {
+		expect(skadisAccessCutBoxes(makeSk({ openFront: true, frontWallHeight: 30 }))).toEqual([
+			{
+				name: 'front',
+				width: 120,
+				depth: 4,
+				height: 82,
+				x: 0,
+				y: 53,
+				z: 30
+			}
+		]);
+	});
+
+	it('describes side access cuts', () => {
+		const cuts = skadisAccessCutBoxes(makeSk({ openSides: true, sideWallHeight: 25 }));
+
+		expect(cuts).toEqual([
+			{
+				name: 'left',
+				width: 4,
+				depth: 50,
+				height: 82,
+				x: -61,
+				y: 27,
+				z: 25
+			},
+			{
+				name: 'right',
+				width: 4,
+				depth: 50,
+				height: 82,
+				x: 61,
+				y: 27,
+				z: 25
+			}
+		]);
+	});
+
+	it('adds front corner cuts when front and sides are open', () => {
+		const cuts = skadisAccessCutBoxes(
+			makeSk({ openFront: true, frontWallHeight: 30, openSides: true, sideWallHeight: 25 })
+		);
+
+		expect(cuts.map((cut) => cut.name)).toEqual(['front', 'left', 'right', 'front-left-corner', 'front-right-corner']);
+		expect(cuts.find((cut) => cut.name === 'front-left-corner')).toEqual({
+			name: 'front-left-corner',
+			width: 4,
+			depth: 4,
+			height: 82,
+			x: -61,
+			y: 53,
+			z: 30
+		});
+		expect(cuts.find((cut) => cut.name === 'front-right-corner')?.z).toBe(30);
 	});
 });

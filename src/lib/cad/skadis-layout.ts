@@ -37,6 +37,18 @@ export interface OuterDims {
 	outerH: number; // Z
 }
 
+export type SkadisAccessCutName = 'front' | 'left' | 'right' | 'front-left-corner' | 'front-right-corner';
+
+export interface SkadisAccessCutBox {
+	name: SkadisAccessCutName;
+	width: number;
+	depth: number;
+	height: number;
+	x: number;
+	y: number;
+	z: number;
+}
+
 // The box width/height/depth are INTERIOR (usable) sizes; the printed envelope
 // adds a wall on each side and a floor below. Hooks and geometry both work in this
 // outer space, so this is the single conversion both consume.
@@ -63,6 +75,77 @@ export function frontWallCutZ(p: SkadisParams): number {
 }
 export function sideWallCutZ(p: SkadisParams): number {
 	return wallCutZ(p.sideWallHeight, outerDims(p).outerH);
+}
+
+// Backend-neutral access cut boxes for open-front/open-side Skadis boxes.
+// Geometry builders turn each layout into their own box primitive and subtract it.
+export function skadisAccessCutBoxes(p: SkadisParams): SkadisAccessCutBox[] {
+	const t = p.wallThickness;
+	const { outerW, outerD, outerH } = outerDims(p);
+	const frontH = p.openFront ? frontWallCutZ(p) : outerH;
+	const sideZ = p.openSides ? sideWallCutZ(p) : outerH;
+	const cuts: SkadisAccessCutBox[] = [];
+
+	if (p.openFront) {
+		cuts.push({
+			name: 'front',
+			width: p.width,
+			depth: t + 2,
+			height: outerH,
+			x: 0,
+			y: outerD - t / 2,
+			z: frontH
+		});
+	}
+
+	if (p.openSides) {
+		cuts.push(
+			{
+				name: 'left',
+				width: t + 2,
+				depth: p.depth,
+				height: outerH,
+				x: -outerW / 2 + t / 2,
+				y: outerD / 2,
+				z: sideZ
+			},
+			{
+				name: 'right',
+				width: t + 2,
+				depth: p.depth,
+				height: outerH,
+				x: outerW / 2 - t / 2,
+				y: outerD / 2,
+				z: sideZ
+			}
+		);
+	}
+
+	if (p.openFront && p.openSides) {
+		const cornerZ = Math.max(frontH, sideZ);
+		cuts.push(
+			{
+				name: 'front-left-corner',
+				width: t + 2,
+				depth: t + 2,
+				height: outerH,
+				x: -outerW / 2 + t / 2,
+				y: outerD - t / 2,
+				z: cornerZ
+			},
+			{
+				name: 'front-right-corner',
+				width: t + 2,
+				depth: t + 2,
+				height: outerH,
+				x: outerW / 2 - t / 2,
+				y: outerD - t / 2,
+				z: cornerZ
+			}
+		);
+	}
+
+	return cuts;
 }
 
 // Columns are spaced exactly one pitch apart and centered across the outer width;

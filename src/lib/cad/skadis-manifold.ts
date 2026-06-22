@@ -12,7 +12,7 @@
 import type { Manifold } from 'manifold-3d';
 import type { SkadisParams } from '$lib/stores/params';
 import { oc, box, prismAlongX, prismAlongY } from './manifold-bin';
-import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ } from './skadis-layout';
+import { planSkadis, outerDims, skadisAccessCutBoxes } from './skadis-layout';
 import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import {
 	SKADIS_HOOK_WIDTH,
@@ -71,29 +71,9 @@ export function buildSkadisManifold(p: SkadisParams): Manifold {
 	const cavity = box(p.width, p.depth, p.height + 1, 0, outerD / 2, t);
 	let solid = shell.subtract(cavity);
 
-	// Optional access cuts. The front cut spans only the interior width and each side
-	// cut only the interior depth, so a closed neighbour keeps its shared corner full
-	// height. Cut height ≥ outerH is a no-op (the cutter clears the rim).
-	const frontH = p.openFront ? frontWallCutZ(p) : outerH;
-	const sideZ = p.openSides ? sideWallCutZ(p) : outerH;
-	if (p.openFront) {
-		const cut = box(p.width, t + 2, outerH, 0, outerD - t / 2, frontH);
-		solid = solid.subtract(cut);
-	}
-	if (p.openSides) {
-		const cutL = box(t + 2, p.depth, outerH, -outerW / 2 + t / 2, outerD / 2, sideZ);
-		const cutR = box(t + 2, p.depth, outerH, outerW / 2 - t / 2, outerD / 2, sideZ);
-		solid = solid.subtract(cutL).subtract(cutR);
-	}
-	// With both front and sides open the two FRONT corner posts are bounded only by
-	// lowered walls, so they'd stand alone — drop them to the taller neighbour so they
-	// blend in instead of becoming poles. The back corners belong to the full-height
-	// back wall, so they're left intact.
-	if (p.openFront && p.openSides) {
-		const cornerZ = Math.max(frontH, sideZ);
-		const cornerL = box(t + 2, t + 2, outerH, -outerW / 2 + t / 2, outerD - t / 2, cornerZ);
-		const cornerR = box(t + 2, t + 2, outerH, outerW / 2 - t / 2, outerD - t / 2, cornerZ);
-		solid = solid.subtract(cornerL).subtract(cornerR);
+	// Optional access cuts lower front/side walls and remove isolated front corner posts.
+	for (const cut of skadisAccessCutBoxes(p)) {
+		solid = solid.subtract(box(cut.width, cut.depth, cut.height, cut.x, cut.y, cut.z));
 	}
 
 	// Optional hex lattice through every wall + the floor. The back wall is hexed only
