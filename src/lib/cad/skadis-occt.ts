@@ -5,7 +5,7 @@ import { draw, drawCircle, drawRoundedRectangle, makeCompound, setOC, type Solid
 import opencascade from 'replicad-opencascadejs/src/replicad_single.js';
 import opencascadeWasm from 'replicad-opencascadejs/src/replicad_single.wasm?url';
 import type { SkadisParams } from '$lib/stores/params';
-import { planSkadis, outerDims, frontWallCutZ, sideWallCutZ } from './skadis-layout';
+import { planSkadis, outerDims, skadisAccessCutBoxes } from './skadis-layout';
 import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import {
 	SKADIS_HOOK_WIDTH,
@@ -82,26 +82,9 @@ export async function buildOcctSkadis(p: SkadisParams): Promise<Solid> {
 	const cavity = boxSolid(p.width, p.depth, p.height + 1, 0, outerD / 2, t);
 	solid = solid.cut(cavity) as Solid;
 
-	// Access cuts (mirror skadis-manifold.ts): front cut spans interior width, side cuts
-	// span interior depth, so a closed neighbour keeps its shared corner full height.
-	const frontH = p.openFront ? frontWallCutZ(p) : outerH;
-	const sideZ = p.openSides ? sideWallCutZ(p) : outerH;
-	if (p.openFront) {
-		const cut = boxSolid(p.width, t + 2, outerH, 0, outerD - t / 2, frontH);
-		solid = solid.cut(cut) as Solid;
-	}
-	if (p.openSides) {
-		const cutL = boxSolid(t + 2, p.depth, outerH, -outerW / 2 + t / 2, outerD / 2, sideZ);
-		const cutR = boxSolid(t + 2, p.depth, outerH, outerW / 2 - t / 2, outerD / 2, sideZ);
-		solid = (solid.cut(cutL) as Solid).cut(cutR) as Solid;
-	}
-	// Drop the two front corner posts when both adjacent walls are open so they don't
-	// stand alone as poles; the back corners belong to the full-height back wall.
-	if (p.openFront && p.openSides) {
-		const cornerZ = Math.max(frontH, sideZ);
-		const cornerL = boxSolid(t + 2, t + 2, outerH, -outerW / 2 + t / 2, outerD - t / 2, cornerZ);
-		const cornerR = boxSolid(t + 2, t + 2, outerH, outerW / 2 - t / 2, outerD - t / 2, cornerZ);
-		solid = (solid.cut(cornerL) as Solid).cut(cornerR) as Solid;
+	// Access cuts lower front/side walls and remove isolated front corner posts.
+	for (const cut of skadisAccessCutBoxes(p)) {
+		solid = solid.cut(boxSolid(cut.width, cut.depth, cut.height, cut.x, cut.y, cut.z)) as Solid;
 	}
 
 	// Hex lattice through every wall + the floor; the back wall keeps a solid mount
