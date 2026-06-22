@@ -3,7 +3,9 @@ import { defaultParams, type BinParams } from '$lib/stores/params';
 import {
 	resolveFractions,
 	dividerCoords,
+	dividerWallFaceWidth,
 	dividerWallLayouts,
+	dividerWallThickness,
 	compartmentEdges,
 	redistributeGaps,
 	interiorBox,
@@ -187,9 +189,7 @@ describe('dividerWallLayouts', () => {
 			height: box.wallHeight,
 			x: -box.innerW / 2 + (1 / 3) * box.innerW,
 			y: 0,
-			z: box.wallBottom,
-			thickness: defaultParams.wallThickness,
-			faceWidth: box.innerL
+			z: box.wallBottom
 		});
 		expect(layouts[1]?.x).toBeCloseTo(-box.innerW / 2 + (2 / 3) * box.innerW, 5);
 		expect(layouts[2]).toEqual({
@@ -199,10 +199,23 @@ describe('dividerWallLayouts', () => {
 			height: box.wallHeight,
 			x: 0,
 			y: 0,
-			z: box.wallBottom,
-			thickness: defaultParams.wallThickness,
-			faceWidth: box.innerW
+			z: box.wallBottom
 		});
+	});
+
+	it('derives hex face width and wall thickness from the layout axis', () => {
+		const [xWall, yWall] = dividerWallLayouts(
+			{ ...defaultParams, dividersX: 1, dividersY: 1 },
+			box.innerW,
+			box.innerL,
+			box.wallBottom,
+			box.wallHeight
+		);
+
+		expect(dividerWallThickness(xWall!)).toBe(defaultParams.wallThickness);
+		expect(dividerWallFaceWidth(xWall!)).toBe(box.innerL);
+		expect(dividerWallThickness(yWall!)).toBe(defaultParams.wallThickness);
+		expect(dividerWallFaceWidth(yWall!)).toBe(box.innerW);
 	});
 
 	it('honors custom divider fractions', () => {

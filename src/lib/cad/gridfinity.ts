@@ -9,7 +9,9 @@ import {
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
 import {
+	dividerWallFaceWidth,
 	dividerWallLayouts,
+	dividerWallThickness,
 	holeLayouts,
 	interiorBox,
 	labelTabLayouts,
@@ -183,7 +185,14 @@ function buildDividers(
 			drawRoundedRectangle(layout.width, layout.length, 0).sketchOnPlane('XY', layout.z) as Sketch
 		).extrude(layout.height) as Solid;
 		if (p.lightweightDividers) {
-			wall = cutHexPattern(wall, layout.faceWidth, layout.height, layout.thickness, layout.axis, layout.z);
+			wall = cutHexPattern(
+				wall,
+				dividerWallFaceWidth(layout),
+				layout.height,
+				dividerWallThickness(layout),
+				layout.axis,
+				layout.z
+			);
 		}
 		const positioned = wall.translate(layout.x, layout.y, 0) as Solid;
 		dividers = dividers ? (dividers.fuse(positioned) as Solid) : positioned;

@@ -149,8 +149,6 @@ export interface DividerWallLayout {
 	x: number;
 	y: number;
 	z: number;
-	thickness: number;
-	faceWidth: number;
 }
 
 // Divider wall placement and dimensions. Builders turn these layouts into
@@ -172,9 +170,7 @@ export function dividerWallLayouts(
 			height: wallHeight,
 			x: xPos,
 			y: 0,
-			z: wallBottom,
-			thickness: p.wallThickness,
-			faceWidth: innerL
+			z: wallBottom
 		});
 	}
 
@@ -186,13 +182,19 @@ export function dividerWallLayouts(
 			height: wallHeight,
 			x: 0,
 			y: yPos,
-			z: wallBottom,
-			thickness: p.wallThickness,
-			faceWidth: innerW
+			z: wallBottom
 		});
 	}
 
 	return layouts;
+}
+
+export function dividerWallThickness(layout: DividerWallLayout): number {
+	return layout.axis === 'X' ? layout.width : layout.length;
+}
+
+export function dividerWallFaceWidth(layout: DividerWallLayout): number {
+	return layout.axis === 'X' ? layout.length : layout.width;
 }
 
 export type ScoopAxis = 'X' | 'Y';

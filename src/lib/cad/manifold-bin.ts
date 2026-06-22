@@ -7,7 +7,9 @@
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import {
+	dividerWallFaceWidth,
 	dividerWallLayouts,
+	dividerWallThickness,
 	holeLayouts,
 	interiorBox,
 	labelTabLayouts,
@@ -211,7 +213,14 @@ function buildDividers(
 	for (const layout of dividerWallLayouts(p, innerW, innerL, wallBottom, wallHeight)) {
 		let wall = roundedPrism(layout.width, layout.length, 0, layout.height, layout.z);
 		if (p.lightweightDividers) {
-			wall = cutHexPattern(wall, layout.faceWidth, layout.height, layout.thickness, layout.axis, layout.z);
+			wall = cutHexPattern(
+				wall,
+				dividerWallFaceWidth(layout),
+				layout.height,
+				dividerWallThickness(layout),
+				layout.axis,
+				layout.z
+			);
 		}
 		walls.push(wall.translate([layout.x, layout.y, 0]));
 	}
