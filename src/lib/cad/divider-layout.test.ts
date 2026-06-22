@@ -6,6 +6,7 @@ import {
 	compartmentEdges,
 	redistributeGaps,
 	interiorBox,
+	scoopLayouts,
 	wallCutLayout
 } from './divider-layout';
 
@@ -121,6 +122,75 @@ describe('interiorBox', () => {
 	it('clamps wall height to zero for collapsed bins', () => {
 		const p: BinParams = { ...defaultParams, height: 1 }; // 7mm <= wallBottom 7
 		expect(interiorBox(p).wallHeight).toBe(0);
+	});
+});
+
+describe('scoopLayouts', () => {
+	const box = interiorBox(defaultParams);
+
+	it('returns no layouts when the resolved radius is too small', () => {
+		expect(
+			scoopLayouts({ ...defaultParams, scoopWalls: ['back'], scoopRadius: 0 }, box.innerW, box.innerL, 3)
+		).toEqual([]);
+	});
+
+	it('maps each selected wall to a backend-neutral scoop layout', () => {
+		const layouts = scoopLayouts(
+			{ ...defaultParams, scoopWalls: ['back', 'front', 'left', 'right'] },
+			box.innerW,
+			box.innerL,
+			box.wallHeight
+		);
+
+		expect(layouts).toHaveLength(4);
+		expect(layouts[0]).toEqual({
+			radius: 7,
+			extrudeLen: box.innerW,
+			wallPos: -box.innerL / 2,
+			extrudeStart: -box.innerW / 2,
+			axis: 'X',
+			flip: false
+		});
+		expect(layouts[1]).toEqual({
+			radius: 7,
+			extrudeLen: box.innerW,
+			wallPos: box.innerL / 2,
+			extrudeStart: -box.innerW / 2,
+			axis: 'X',
+			flip: true
+		});
+		expect(layouts[2]).toEqual({
+			radius: 7,
+			extrudeLen: box.innerL,
+			wallPos: -box.innerW / 2,
+			extrudeStart: -box.innerL / 2,
+			axis: 'Y',
+			flip: false
+		});
+		expect(layouts[3]).toEqual({
+			radius: 7,
+			extrudeLen: box.innerL,
+			wallPos: box.innerW / 2,
+			extrudeStart: -box.innerL / 2,
+			axis: 'Y',
+			flip: true
+		});
+	});
+
+	it('expands across divider compartments and caps custom radius to wall height', () => {
+		const layouts = scoopLayouts(
+			{ ...defaultParams, dividersX: 1, dividersY: 1, scoopWalls: ['back'], scoopRadius: 20 },
+			box.innerW,
+			box.innerL,
+			box.wallHeight
+		);
+
+		expect(layouts).toHaveLength(4);
+		expect(layouts.every((layout) => layout.radius === box.wallHeight)).toBe(true);
+		expect(layouts[0]?.extrudeLen).toBeCloseTo(box.innerW / 2, 5);
+		expect(layouts[0]?.wallPos).toBeCloseTo(-box.innerL / 2, 5);
+		expect(layouts[3]?.extrudeStart).toBeCloseTo(0, 5);
+		expect(layouts[3]?.wallPos).toBeCloseTo(0, 5);
 	});
 });
 
