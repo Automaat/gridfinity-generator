@@ -6,7 +6,7 @@
 // harness). Shared Gridfinity spec values live in gridfinity-spec.ts.
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
-import { compartmentEdges, dividerCoords, interiorBox } from './divider-layout';
+import { compartmentEdges, dividerCoords, interiorBox, wallCutLayout } from './divider-layout';
 import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import { ensureCounterClockwise } from './polygon';
 import {
@@ -298,27 +298,12 @@ function buildScoops(
 function buildWallCut(
 	p: BinParams, bodyW: number, bodyL: number, wallBottom: number, wallHeight: number, lipExtension: number
 ): Manifold {
-	const margin = 1;
-	const topMostZ = wallBottom + wallHeight + lipExtension;
-	const ceilingZ = topMostZ + 5;
-	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
-	const axis: 'X' | 'Y' = p.wallCutSide === 'front' || p.wallCutSide === 'back' ? 'Y' : 'X';
-	const lowAtPositive = p.wallCutSide === 'front' || p.wallCutSide === 'right';
-	const spanHalf = (axis === 'Y' ? bodyL : bodyW) / 2 + margin;
-	const crossHalf = (axis === 'Y' ? bodyW : bodyL) / 2 + margin;
-	const lowS = lowAtPositive ? spanHalf : -spanHalf;
-	const highS = lowAtPositive ? -spanHalf : spanHalf;
-	const slopeEndS = highS + p.wallCutRun * (lowS - highS);
-
-	// Polygon = everything above the sloped profile, capped at the ceiling.
-	const pts: [number, number][] = [[highS, topMostZ], [slopeEndS, lowZ]];
-	if (p.wallCutRun < 1) pts.push([lowS, lowZ]);
-	pts.push([lowS, ceilingZ], [highS, ceilingZ]);
+	const { axis, crossHalf, points } = wallCutLayout(p, bodyW, bodyL, wallBottom, wallHeight, lipExtension);
 
 	// Extrude the (s, z) profile across the full cross-axis.
 	return axis === 'Y'
-		? prismAlongX(pts, 2 * crossHalf).translate([-crossHalf, 0, 0])
-		: prismAlongY(pts, 2 * crossHalf).translate([0, -crossHalf, 0]);
+		? prismAlongX(points, 2 * crossHalf).translate([-crossHalf, 0, 0])
+		: prismAlongY(points, 2 * crossHalf).translate([0, -crossHalf, 0]);
 }
 
 export function buildBinManifold(p: BinParams, { segments = PREVIEW_SEGMENTS }: { segments?: number } = {}): Manifold {

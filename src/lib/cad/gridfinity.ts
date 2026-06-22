@@ -8,7 +8,7 @@ import {
 	type Sketch
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
-import { compartmentEdges, dividerCoords, interiorBox } from './divider-layout';
+import { compartmentEdges, dividerCoords, interiorBox, wallCutLayout } from './divider-layout';
 import { HEX_RADIUS, hexPanelCutters, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	BASE_PROFILE_HEIGHT,
@@ -332,35 +332,16 @@ function buildWallCut(
 	wallHeight: number,
 	lipExtension: number
 ): Solid {
-	// Diagonal planar cut: walls/dividers stay full height on one side and
-	// slope down to `wallCutLowFraction` of wall height on the opposite side.
-	const margin = 1; // overshoot footprint so outer walls cut cleanly through
-	const topMostZ = wallBottom + wallHeight + lipExtension;
-	const ceilingZ = topMostZ + 5;
-	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
-
-	const axis: 'Y' | 'X' =
-		p.wallCutSide === 'front' || p.wallCutSide === 'back' ? 'Y' : 'X';
-	// Slope descends toward the selected side; opposite side keeps full height.
-	const lowAtPositive = p.wallCutSide === 'front' || p.wallCutSide === 'right';
-
-	const spanHalf = (axis === 'Y' ? bodyL : bodyW) / 2 + margin;
-	const crossHalf = (axis === 'Y' ? bodyW : bodyL) / 2 + margin;
-	const lowS = lowAtPositive ? spanHalf : -spanHalf;
-	const highS = lowAtPositive ? -spanHalf : spanHalf;
+	const { axis, crossHalf, points } = wallCutLayout(p, bodyW, bodyL, wallBottom, wallHeight, lipExtension);
 	const plane = axis === 'Y' ? 'YZ' : 'XZ';
 
-	// Slope descends over `wallCutRun` of the span from the high side, then runs
-	// flat at lowZ to the low edge (base-only beyond the slope when lowZ is the
-	// floor). Polygon = everything above that profile, capped at the ceiling.
-	const slopeEndS = highS + p.wallCutRun * (lowS - highS);
+	const [start, ...rest] = points;
+	let cutter = draw(start!);
+	for (const point of rest) {
+		cutter = cutter.lineTo(point);
+	}
 
-	const pen = draw([highS, topMostZ]).lineTo([slopeEndS, lowZ]);
-	const withFlat = p.wallCutRun < 1 ? pen.lineTo([lowS, lowZ]) : pen;
-
-	return withFlat
-		.lineTo([lowS, ceilingZ])
-		.lineTo([highS, ceilingZ])
+	return cutter
 		.close()
 		.sketchOnPlane(plane, -crossHalf)
 		.extrude(2 * crossHalf) as Solid;
