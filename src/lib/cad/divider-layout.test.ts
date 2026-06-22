@@ -5,10 +5,15 @@ import {
 	dividerCoords,
 	compartmentEdges,
 	redistributeGaps,
-	interiorBox
+	interiorBox,
+	wallCutLayout
 } from './divider-layout';
 
 const sum = (a: number[]) => a.reduce((s, v) => s + v, 0);
+const expectPoint = (actual: [number, number], expected: [number, number]) => {
+	expect(actual[0]).toBeCloseTo(expected[0], 5);
+	expect(actual[1]).toBeCloseTo(expected[1], 5);
+};
 
 describe('resolveFractions', () => {
 	it('returns empty for zero count', () => {
@@ -116,5 +121,70 @@ describe('interiorBox', () => {
 	it('clamps wall height to zero for collapsed bins', () => {
 		const p: BinParams = { ...defaultParams, height: 1 }; // 7mm <= wallBottom 7
 		expect(interiorBox(p).wallHeight).toBe(0);
+	});
+});
+
+describe('wallCutLayout', () => {
+	const box = interiorBox(defaultParams);
+
+	it('builds a front-facing partial-run cut profile', () => {
+		const layout = wallCutLayout(
+			{ ...defaultParams, wallCutSide: 'front', wallCutLowFraction: 0.25, wallCutRun: 0.5 },
+			box.bodyW,
+			box.bodyL,
+			box.wallBottom,
+			box.wallHeight,
+			0
+		);
+
+		expect(layout.axis).toBe('Y');
+		expect(layout.crossHalf).toBeCloseTo(box.bodyW / 2 + 1, 5);
+		expect(layout.points).toHaveLength(5);
+
+		const spanHalf = box.bodyL / 2 + 1;
+		const lowZ = box.wallBottom + box.wallHeight * 0.25;
+		expectPoint(layout.points[0]!, [-spanHalf, box.topZ]);
+		expectPoint(layout.points[1]!, [0, lowZ]);
+		expectPoint(layout.points[2]!, [spanHalf, lowZ]);
+		expectPoint(layout.points[3]!, [spanHalf, box.topZ + 5]);
+		expectPoint(layout.points[4]!, [-spanHalf, box.topZ + 5]);
+	});
+
+	it('omits the low flat segment for full-run cuts', () => {
+		const layout = wallCutLayout(
+			{ ...defaultParams, wallCutSide: 'back', wallCutLowFraction: 0.5, wallCutRun: 1 },
+			box.bodyW,
+			box.bodyL,
+			box.wallBottom,
+			box.wallHeight,
+			2
+		);
+
+		const spanHalf = box.bodyL / 2 + 1;
+		const lowZ = box.wallBottom + box.wallHeight * 0.5;
+		expect(layout.axis).toBe('Y');
+		expect(layout.points).toHaveLength(4);
+		expectPoint(layout.points[0]!, [spanHalf, box.topZ + 2]);
+		expectPoint(layout.points[1]!, [-spanHalf, lowZ]);
+	});
+
+	it('uses the X span for left and right cuts', () => {
+		for (const [side, expectedLow] of [
+			['left', -1],
+			['right', 1]
+		] as const) {
+			const layout = wallCutLayout(
+				{ ...defaultParams, wallCutSide: side },
+				box.bodyW,
+				box.bodyL,
+				box.wallBottom,
+				box.wallHeight,
+				0
+			);
+			const spanHalf = box.bodyW / 2 + 1;
+			expect(layout.axis).toBe('X');
+			expect(layout.crossHalf).toBeCloseTo(box.bodyL / 2 + 1, 5);
+			expect(layout.points[1]![0]).toBeCloseTo(expectedLow * spanHalf, 5);
+		}
 	});
 });

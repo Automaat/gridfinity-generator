@@ -104,3 +104,43 @@ export function interiorBox(p: BinParams): InteriorBox {
 		topZ: wallBottom + wallHeight
 	};
 }
+
+export type WallCutAxis = 'X' | 'Y';
+
+export interface WallCutLayout {
+	axis: WallCutAxis;
+	crossHalf: number;
+	points: [number, number][];
+}
+
+// Diagonal wall cut profile in (span, z) space. Builders extrude this polygon
+// across the cross-axis using their own CAD backend.
+export function wallCutLayout(
+	p: BinParams,
+	bodyW: number,
+	bodyL: number,
+	wallBottom: number,
+	wallHeight: number,
+	lipExtension: number
+): WallCutLayout {
+	const margin = 1; // overshoot footprint so outer walls cut cleanly through
+	const topMostZ = wallBottom + wallHeight + lipExtension;
+	const ceilingZ = topMostZ + 5;
+	const lowZ = wallBottom + wallHeight * p.wallCutLowFraction;
+
+	const axis: WallCutAxis =
+		p.wallCutSide === 'front' || p.wallCutSide === 'back' ? 'Y' : 'X';
+	const lowAtPositive = p.wallCutSide === 'front' || p.wallCutSide === 'right';
+
+	const spanHalf = (axis === 'Y' ? bodyL : bodyW) / 2 + margin;
+	const crossHalf = (axis === 'Y' ? bodyW : bodyL) / 2 + margin;
+	const lowS = lowAtPositive ? spanHalf : -spanHalf;
+	const highS = lowAtPositive ? -spanHalf : spanHalf;
+	const slopeEndS = highS + p.wallCutRun * (lowS - highS);
+
+	const points: [number, number][] = [[highS, topMostZ], [slopeEndS, lowZ]];
+	if (p.wallCutRun < 1) points.push([lowS, lowZ]);
+	points.push([lowS, ceilingZ], [highS, ceilingZ]);
+
+	return { axis, crossHalf, points };
+}
