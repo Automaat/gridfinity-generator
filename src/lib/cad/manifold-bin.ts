@@ -151,17 +151,16 @@ export function unitBase(): Manifold {
 	return oc().Manifold.union([c1, vertical, c2]);
 }
 
-function buildHolePart(part: HolePart): Manifold {
-	const { Manifold } = oc();
+function buildHolePart(ManifoldCtor: ManifoldToplevel['Manifold'], part: HolePart): Manifold {
 	const radius = part === 'magnet' ? MAGNET_HOLE_DIAMETER / 2 : SCREW_HOLE_DIAMETER / 2;
 	const depth = part === 'magnet' ? MAGNET_HOLE_DEPTH : SCREW_HOLE_DEPTH;
-	return Manifold.cylinder(depth, radius, radius, circleSegments);
+	return ManifoldCtor.cylinder(depth, radius, radius, circleSegments);
 }
 
 function buildHoles(p: BinParams): Manifold | null {
 	const { Manifold } = oc();
 	const cutters = holeLayouts(p).map((layout) => {
-		const parts = layout.parts.map((part) => buildHolePart(part));
+		const parts = layout.parts.map((part) => buildHolePart(Manifold, part));
 		const cutter = (parts.length === 1 ? parts[0]! : Manifold.union(parts));
 		return cutter.translate([layout.x, layout.y, 0]);
 	});
