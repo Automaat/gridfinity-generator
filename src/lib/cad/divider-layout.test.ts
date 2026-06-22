@@ -226,6 +226,20 @@ describe('labelTabLayouts', () => {
 		expect(layouts[1]?.xStart).toBeCloseTo(-box.innerW / 6 + defaultParams.wallThickness / 2, 5);
 	});
 
+	it('returns independent profile tuples for each tab', () => {
+		const layouts = labelTabLayouts(
+			{ ...defaultParams, dividersX: 1 },
+			box.innerW,
+			box.innerL,
+			box.wallBottom,
+			box.wallHeight
+		);
+
+		expect(layouts).toHaveLength(2);
+		expect(layouts[0]?.profile).not.toBe(layouts[1]?.profile);
+		expect(layouts[0]?.profile[1]).not.toBe(layouts[1]?.profile[1]);
+	});
+
 	it('skips compartments too narrow for a usable tab and caps profile depth', () => {
 		const layouts = labelTabLayouts(
 			{ ...defaultParams, dividersX: 2, wallThickness: 1.2 },

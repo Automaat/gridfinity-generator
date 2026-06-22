@@ -216,7 +216,6 @@ export function labelTabLayouts(
 	const topZ = wallBottom + wallHeight;
 	const tabHeight = Math.min(LABEL_TAB_HEIGHT, wallHeight);
 	const tabDepth = Math.min(LABEL_TAB_DEPTH, innerL - 1);
-	const profile: LabelTabProfile = [[0, 0], [-tabDepth, 0], [0, -tabHeight]];
 	const edges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
 	const frontY = innerL / 2;
 	const layouts: LabelTabLayout[] = [];
@@ -227,6 +226,7 @@ export function labelTabLayouts(
 		const width = e1 - e0 - (i > 0 ? p.wallThickness : 0);
 		if (width < 1) continue;
 		const cx = (e0 + e1) / 2;
+		const profile: LabelTabProfile = [[0, 0], [-tabDepth, 0], [0, -tabHeight]];
 		layouts.push({ xStart: cx - width / 2, width, frontY, topZ, profile });
 	}
 
