@@ -9,7 +9,7 @@ import {
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
 import { dividerCoords, compartmentEdges } from './divider-layout';
-import { HEX_RADIUS, HEX_CUT_OVERSHOOT, hexCells } from './hex-lattice';
+import { HEX_RADIUS, hexPanelCutters, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	BASE_PROFILE_HEIGHT,
 	BASE_PROFILE_LEVELS,
@@ -141,6 +141,18 @@ function buildStackingLip(
 
 // Punch the shared flat-top hex lattice through a divider wall. `drawPolysides(R, 6)`
 // without rotation is the flat-top hexagon matching hex-lattice's hexPolygon().
+function buildHexCutter(cutter: HexPanelCutter): Solid {
+	if (cutter.axis === 'X') {
+		const hex = (drawPolysides(HEX_RADIUS, 6).sketchOnPlane('YZ', cutter.x) as Sketch).extrude(cutter.cutDepth) as Solid;
+		return hex.translate(0, cutter.y, cutter.z) as Solid;
+	}
+	if (cutter.axis === 'Y') {
+		const hex = (drawPolysides(HEX_RADIUS, 6).sketchOnPlane('XZ', cutter.y) as Sketch).extrude(cutter.cutDepth) as Solid;
+		return hex.translate(cutter.x, 0, cutter.z) as Solid;
+	}
+	throw new Error(`Unsupported bin hex cutter axis: ${cutter.axis}`);
+}
+
 function cutHexPattern(
 	wall: Solid,
 	faceWidth: number,
@@ -149,18 +161,9 @@ function cutHexPattern(
 	plane: 'YZ' | 'XZ',
 	wallBottom: number
 ): Solid {
-	const cells = hexCells(faceWidth, faceHeight);
-	if (cells.length === 0) return wall;
-
-	// Oversize the cutter past both wall faces — coincident faces make the
-	// OCCT boolean leave the wall uncut (no through-hole forms).
-	const cutDepth = wallThickness + 2 * HEX_CUT_OVERSHOOT;
-
-	const cutters = cells.map(({ u, v }) => {
-		const zCenter = wallBottom + faceHeight / 2 + v;
-		const hex = (drawPolysides(HEX_RADIUS, 6).sketchOnPlane(plane, -cutDepth / 2) as Sketch).extrude(cutDepth) as Solid;
-		return plane === 'YZ' ? (hex.translate(0, u, zCenter) as Solid) : (hex.translate(u, 0, zCenter) as Solid);
-	});
+	const axis: HexPanelAxis = plane === 'YZ' ? 'X' : 'Y';
+	const cutters = hexPanelCutters(axis, faceWidth, faceHeight, wallThickness, 0, 0, wallBottom + faceHeight / 2).map(buildHexCutter);
+	if (cutters.length === 0) return wall;
 
 	// Single compound cut instead of fusing every hex first.
 	return wall.cut(makeCompound(cutters) as Solid) as Solid;

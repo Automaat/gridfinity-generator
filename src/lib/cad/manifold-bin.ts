@@ -7,7 +7,7 @@
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
 import { dividerCoords, compartmentEdges } from './divider-layout';
-import { hexPolygon, hexCells, HEX_CUT_OVERSHOOT } from './hex-lattice';
+import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import { ensureCounterClockwise } from './polygon';
 import {
 	BASE_PROFILE_HEIGHT,
@@ -182,21 +182,21 @@ function buildStackingLip(bodyW: number, bodyL: number, topZ: number, lipHeight:
 
 // Punch the shared flat-top hex lattice through a divider wall (built at the origin,
 // cut along its thickness axis before it is translated into position).
+function buildHexCutter(hex: [number, number][], cutter: HexPanelCutter): Manifold {
+	if (cutter.axis === 'X') return prismAlongX(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
+	if (cutter.axis === 'Y') return prismAlongY(hex, cutter.cutDepth).translate([cutter.x, cutter.y, cutter.z]);
+	throw new Error(`Unsupported bin hex cutter axis: ${cutter.axis}`);
+}
+
 function cutHexPattern(
 	wall: Manifold, faceWidth: number, faceHeight: number, wallThickness: number,
 	axis: 'X' | 'Y', wallBottom: number
 ): Manifold {
-	const cells = hexCells(faceWidth, faceHeight);
-	if (cells.length === 0) return wall;
+	const cutterSpecs = hexPanelCutters(axis, faceWidth, faceHeight, wallThickness, 0, 0, wallBottom + faceHeight / 2);
+	if (cutterSpecs.length === 0) return wall;
 	const { Manifold } = oc();
-	const cutDepth = wallThickness + 2 * HEX_CUT_OVERSHOOT;
 	const hex = hexPolygon();
-	const cutters = cells.map(({ u, v }) => {
-		const zCenter = wallBottom + faceHeight / 2 + v;
-		return axis === 'X'
-			? prismAlongX(hex, cutDepth).translate([-cutDepth / 2, u, zCenter])
-			: prismAlongY(hex, cutDepth).translate([u, -cutDepth / 2, zCenter]);
-	});
+	const cutters = cutterSpecs.map((cutter) => buildHexCutter(hex, cutter));
 	return wall.subtract(Manifold.union(cutters));
 }
 
