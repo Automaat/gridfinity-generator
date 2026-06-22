@@ -306,6 +306,13 @@ describe('buildBin', () => {
 		expect(spy).not.toHaveBeenCalled();
 	});
 
+	it('skips scoop when auto radius is below the minimum', () => {
+		const spy = vi.mocked(replicad.drawCircle);
+		// height=10/7 -> 10mm total, wallHeight=3mm; auto radius=1.5mm (<2)
+		buildBin(makeParams({ scoopWalls: ['back'], scoopRadius: 0, height: 10 / 7 }));
+		expect(spy).not.toHaveBeenCalled();
+	});
+
 	it('creates front scoop', () => {
 		const result = buildBin(makeParams({ scoopWalls: ['front'], scoopRadius: 0 }));
 		expect(result).toBeDefined();
