@@ -8,7 +8,7 @@ import {
 	type Sketch
 } from 'replicad';
 import type { BinParams } from '$lib/stores/params';
-import { compartmentEdges, dividerCoords, interiorBox, wallCutLayout } from './divider-layout';
+import { compartmentEdges, dividerCoords, interiorBox, scoopLayouts, wallCutLayout } from './divider-layout';
 import { HEX_RADIUS, hexPanelCutters, type HexPanelAxis, type HexPanelCutter } from './hex-lattice';
 import {
 	BASE_PROFILE_HEIGHT,
@@ -284,41 +284,22 @@ function buildScoops(
 	wallBottom: number,
 	wallHeight: number
 ): Solid | null {
-	const xEdges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
-	const yEdges = compartmentEdges(dividerCoords(p.dividersY, p.dividerPosY, innerL), innerL);
-
-	const autoR = wallHeight / 2;
-	const R = p.scoopRadius > 0 ? Math.min(p.scoopRadius, wallHeight) : autoR;
-	if (R < 2) return null;
+	const layouts = scoopLayouts(p, innerW, innerL, wallHeight);
+	if (layouts.length === 0) return null;
 
 	let scoops: Solid | null = null;
 
-	for (let ix = 0; ix < xEdges.length - 1; ix++) {
-		for (let iy = 0; iy < yEdges.length - 1; iy++) {
-			const xStart = xEdges[ix]!;
-			const yStart = yEdges[iy]!;
-			const compartmentW = xEdges[ix + 1]! - xStart;
-			const compartmentL = yEdges[iy + 1]! - yStart;
-
-			for (const wall of p.scoopWalls) {
-				let ramp: Solid;
-				switch (wall) {
-					case 'back':
-						ramp = buildSingleScoop(R, compartmentW, yStart, wallBottom, xStart, 'X', false);
-						break;
-					case 'front':
-						ramp = buildSingleScoop(R, compartmentW, yStart + compartmentL, wallBottom, xStart, 'X', true);
-						break;
-					case 'left':
-						ramp = buildSingleScoop(R, compartmentL, xStart, wallBottom, yStart, 'Y', false);
-						break;
-					case 'right':
-						ramp = buildSingleScoop(R, compartmentL, xStart + compartmentW, wallBottom, yStart, 'Y', true);
-						break;
-				}
-				scoops = scoops ? (scoops.fuse(ramp!) as Solid) : ramp!;
-			}
-		}
+	for (const layout of layouts) {
+		const ramp = buildSingleScoop(
+			layout.radius,
+			layout.extrudeLen,
+			layout.wallPos,
+			wallBottom,
+			layout.extrudeStart,
+			layout.axis,
+			layout.flip
+		);
+		scoops = scoops ? (scoops.fuse(ramp) as Solid) : ramp;
 	}
 
 	return scoops;

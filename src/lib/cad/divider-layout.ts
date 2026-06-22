@@ -105,6 +105,89 @@ export function interiorBox(p: BinParams): InteriorBox {
 	};
 }
 
+export type ScoopAxis = 'X' | 'Y';
+
+export interface ScoopLayout {
+	radius: number;
+	extrudeLen: number;
+	wallPos: number;
+	extrudeStart: number;
+	axis: ScoopAxis;
+	flip: boolean;
+}
+
+// Bottom scoop placement for every selected wall in every compartment. Builders
+// turn each layout into a quarter-cylinder ramp with their own CAD backend.
+export function scoopLayouts(
+	p: BinParams,
+	innerW: number,
+	innerL: number,
+	wallHeight: number
+): ScoopLayout[] {
+	const radius = p.scoopRadius > 0 ? Math.min(p.scoopRadius, wallHeight) : wallHeight / 2;
+	if (radius < 2) return [];
+
+	const xEdges = compartmentEdges(dividerCoords(p.dividersX, p.dividerPosX, innerW), innerW);
+	const yEdges = compartmentEdges(dividerCoords(p.dividersY, p.dividerPosY, innerL), innerL);
+	const layouts: ScoopLayout[] = [];
+
+	for (let ix = 0; ix < xEdges.length - 1; ix++) {
+		for (let iy = 0; iy < yEdges.length - 1; iy++) {
+			const xStart = xEdges[ix]!;
+			const yStart = yEdges[iy]!;
+			const compartmentW = xEdges[ix + 1]! - xStart;
+			const compartmentL = yEdges[iy + 1]! - yStart;
+
+			for (const wall of p.scoopWalls) {
+				switch (wall) {
+					case 'back':
+						layouts.push({
+							radius,
+							extrudeLen: compartmentW,
+							wallPos: yStart,
+							extrudeStart: xStart,
+							axis: 'X',
+							flip: false
+						});
+						break;
+					case 'front':
+						layouts.push({
+							radius,
+							extrudeLen: compartmentW,
+							wallPos: yStart + compartmentL,
+							extrudeStart: xStart,
+							axis: 'X',
+							flip: true
+						});
+						break;
+					case 'left':
+						layouts.push({
+							radius,
+							extrudeLen: compartmentL,
+							wallPos: xStart,
+							extrudeStart: yStart,
+							axis: 'Y',
+							flip: false
+						});
+						break;
+					case 'right':
+						layouts.push({
+							radius,
+							extrudeLen: compartmentL,
+							wallPos: xStart + compartmentW,
+							extrudeStart: yStart,
+							axis: 'Y',
+							flip: true
+						});
+						break;
+				}
+			}
+		}
+	}
+
+	return layouts;
+}
+
 export type WallCutAxis = 'X' | 'Y';
 
 export interface WallCutLayout {
