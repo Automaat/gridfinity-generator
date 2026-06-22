@@ -6,6 +6,7 @@ import {
 	compartmentEdges,
 	redistributeGaps,
 	interiorBox,
+	holeLayouts,
 	labelTabLayouts,
 	scoopLayouts,
 	scoopPrimitiveLayout,
@@ -124,6 +125,40 @@ describe('interiorBox', () => {
 	it('clamps wall height to zero for collapsed bins', () => {
 		const p: BinParams = { ...defaultParams, height: 1 }; // 7mm <= wallBottom 7
 		expect(interiorBox(p).wallHeight).toBe(0);
+	});
+});
+
+describe('holeLayouts', () => {
+	it('returns no layouts when bottom holes are disabled', () => {
+		expect(holeLayouts(defaultParams)).toEqual([]);
+	});
+
+	it('includes screw-only layouts for every grid hole site', () => {
+		const layouts = holeLayouts({ ...defaultParams, width: 2, length: 1, screwHoles: true });
+
+		expect(layouts).toHaveLength(8);
+		expect(layouts.every((layout) => layout.parts.join(',') === 'screw')).toBe(true);
+	});
+
+	it('filters magnets to the four outer corners when requested', () => {
+		const layouts = holeLayouts({
+			...defaultParams,
+			width: 2,
+			length: 2,
+			magnetHoles: true,
+			magnetCornersOnly: true
+		});
+		const cornerSigns = layouts.map(({ x, y }) => `${Math.sign(x)},${Math.sign(y)}`).toSorted();
+
+		expect(layouts).toHaveLength(4);
+		expect(layouts.every((layout) => layout.parts.join(',') === 'magnet')).toBe(true);
+		expect(cornerSigns).toEqual(['-1,-1', '-1,1', '1,-1', '1,1']);
+	});
+
+	it('combines magnet and screw parts at enabled sites in stable order', () => {
+		const [layout] = holeLayouts({ ...defaultParams, magnetHoles: true, screwHoles: true });
+
+		expect(layout?.parts).toEqual(['magnet', 'screw']);
 	});
 });
 
