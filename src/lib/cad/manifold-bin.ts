@@ -6,7 +6,15 @@
 // harness). Shared Gridfinity spec values live in gridfinity-spec.ts.
 import type { BinParams } from '$lib/stores/params';
 import type { ManifoldToplevel, Manifold } from 'manifold-3d';
-import { dividerCoords, interiorBox, labelTabLayouts, scoopLayouts, wallCutLayout } from './divider-layout';
+import {
+	dividerCoords,
+	interiorBox,
+	labelTabLayouts,
+	scoopLayouts,
+	scoopPrimitiveLayout,
+	type ScoopLayout,
+	wallCutLayout
+} from './divider-layout';
 import { hexPanelCutters, hexPolygon, type HexPanelCutter } from './hex-lattice';
 import { ensureCounterClockwise } from './polygon';
 import {
@@ -230,19 +238,30 @@ function buildLabelTabs(
 }
 
 function buildSingleScoop(
-	R: number, extrudeLen: number, wallPos: number, wallBottom: number,
-	extrudeStart: number, axis: 'X' | 'Y', flip: boolean
+	layout: ScoopLayout,
+	wallBottom: number
 ): Manifold {
-	const dir = flip ? -1 : 1;
-	const blockW = axis === 'X' ? extrudeLen : R;
-	const blockL = axis === 'X' ? R : extrudeLen;
-	const blockX = axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + (dir * R) / 2;
-	const blockY = axis === 'X' ? wallPos + (dir * R) / 2 : extrudeStart + extrudeLen / 2;
-	const block = box(blockW, blockL, R, blockX, blockY, wallBottom);
+	const primitive = scoopPrimitiveLayout(layout, wallBottom);
+	const block = box(
+		primitive.blockW,
+		primitive.blockL,
+		primitive.radius,
+		primitive.blockX,
+		primitive.blockY,
+		primitive.blockZ
+	);
 	const cyl =
-		axis === 'X'
-			? cylinderAlongX(R, extrudeLen).translate([extrudeStart, wallPos + dir * R, wallBottom + R])
-			: cylinderAlongY(R, extrudeLen).translate([wallPos + dir * R, extrudeStart, wallBottom + R]);
+		primitive.axis === 'X'
+			? cylinderAlongX(primitive.radius, primitive.extrudeLen).translate([
+					primitive.cylinderAlongStart,
+					primitive.cylinderCrossPos,
+					primitive.cylinderZ
+				])
+			: cylinderAlongY(primitive.radius, primitive.extrudeLen).translate([
+					primitive.cylinderCrossPos,
+					primitive.cylinderAlongStart,
+					primitive.cylinderZ
+				]);
 	return block.subtract(cyl);
 }
 
@@ -251,15 +270,7 @@ function buildScoops(
 ): Manifold | null {
 	const { Manifold } = oc();
 	const scoops = scoopLayouts(p, innerW, innerL, wallHeight).map((layout) =>
-		buildSingleScoop(
-			layout.radius,
-			layout.extrudeLen,
-			layout.wallPos,
-			wallBottom,
-			layout.extrudeStart,
-			layout.axis,
-			layout.flip
-		)
+		buildSingleScoop(layout, wallBottom)
 	);
 	if (scoops.length === 0) return null;
 	return scoops.length === 1 ? scoops[0]! : Manifold.union(scoops);

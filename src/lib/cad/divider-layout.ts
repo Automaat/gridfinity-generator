@@ -194,6 +194,43 @@ export function scoopLayouts(
 	return layouts;
 }
 
+export interface ScoopPrimitiveLayout {
+	radius: number;
+	extrudeLen: number;
+	axis: ScoopAxis;
+	blockW: number;
+	blockL: number;
+	blockX: number;
+	blockY: number;
+	blockZ: number;
+	cylinderPlane: 'YZ' | 'XZ';
+	cylinderAlongStart: number;
+	cylinderCrossPos: number;
+	cylinderZ: number;
+}
+
+// Shared primitive placement for a scoop ramp. Builders still create the block
+// and cylinder using their own CAD primitives, but the dimensions and offsets
+// stay identical between backends.
+export function scoopPrimitiveLayout(layout: ScoopLayout, wallBottom: number): ScoopPrimitiveLayout {
+	const { radius, extrudeLen, wallPos, extrudeStart, axis, flip } = layout;
+	const dir = flip ? -1 : 1;
+	return {
+		radius,
+		extrudeLen,
+		axis,
+		blockW: axis === 'X' ? extrudeLen : radius,
+		blockL: axis === 'X' ? radius : extrudeLen,
+		blockX: axis === 'X' ? extrudeStart + extrudeLen / 2 : wallPos + (dir * radius) / 2,
+		blockY: axis === 'X' ? wallPos + (dir * radius) / 2 : extrudeStart + extrudeLen / 2,
+		blockZ: wallBottom,
+		cylinderPlane: axis === 'X' ? 'YZ' : 'XZ',
+		cylinderAlongStart: extrudeStart,
+		cylinderCrossPos: wallPos + dir * radius,
+		cylinderZ: wallBottom + radius
+	};
+}
+
 export type LabelTabProfile = [[number, number], [number, number], [number, number]];
 
 export interface LabelTabLayout {
