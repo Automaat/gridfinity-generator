@@ -247,7 +247,7 @@ function buildSingleScoop(
 		drawRoundedRectangle(primitive.blockW, primitive.blockL, 0).sketchOnPlane('XY', primitive.blockZ) as Sketch
 	).extrude(primitive.radius) as Solid;
 
-	const blockPos = block.translate(primitive.blockX, primitive.blockY, primitive.blockZ) as Solid;
+	const blockPos = block.translate(primitive.blockX, primitive.blockY, 0) as Solid;
 
 	const cyl = (
 		drawCircle(primitive.radius).sketchOnPlane(primitive.cylinderPlane, primitive.cylinderAlongStart) as Sketch
