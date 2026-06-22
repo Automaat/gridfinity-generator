@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { SkadisParams } from '$lib/stores/params';
+import { defaultSkadis, type SkadisParams } from '$lib/stores/params';
 import { planSkadis } from './skadis-layout';
 import {
 	SKADIS_HOOK_WIDTH,
@@ -13,7 +13,7 @@ import {
 } from './skadis-mounts';
 
 function makeSk(overrides: Partial<SkadisParams> = {}): SkadisParams {
-	return { width: 120, height: 80, depth: 50, wallThickness: 2, mountType: 'hook', hookRows: 1, openFront: false, frontWallHeight: 30, openSides: false, sideWallHeight: 30, lightweightWalls: false, ...overrides };
+	return { ...defaultSkadis, width: 120, height: 80, depth: 50, wallThickness: 2, hookRows: 1, ...overrides };
 }
 
 function expectPointsClose(actual: MountProfilePoint[], expected: MountProfilePoint[]): void {
