@@ -2,6 +2,7 @@
 	import { skadisParams, defaultSkadis, type SkadisParams } from '$lib/stores/params';
 	import { skadisPresets } from '$lib/presets';
 	import { planSkadis, outerDims, SKADIS_PITCH } from '$lib/cad/skadis-layout';
+	import { language, text, type Text } from '$lib/i18n';
 
 	interface Props {
 		onexport: (format: 'step' | 'stl') => void;
@@ -9,6 +10,7 @@
 		loading?: boolean;
 	}
 	let { onexport, exporting, loading = false }: Props = $props();
+	let t = $derived(text[$language]);
 
 	let layout = $derived(planSkadis($skadisParams));
 	let outer = $derived(outerDims($skadisParams));
@@ -53,13 +55,19 @@
 		'mt-1.5 w-full appearance-none rounded-lg border border-zinc-700 bg-zinc-800/60 bg-[length:1rem] bg-[right_0.6rem_center] bg-no-repeat px-3 py-2 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none';
 	const chevron =
 		"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2371717a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")";
+	const presetTextKeys = [
+		{ name: 'smallBin', description: 'smallBinDesc' },
+		{ name: 'wideTray', description: 'wideTrayDesc' },
+		{ name: 'deepCup', description: 'deepCupDesc' },
+		{ name: 'hexCaddy', description: 'hexCaddyDesc' }
+	] as const satisfies { name: keyof Text['presets']; description: keyof Text['presets'] }[];
 </script>
 
 {#snippet numField(key: NumKey, label: string, min: number, max: number, by: number)}
 	<div>
 		<label class="mb-1.5 block {lbl}" for={`sk-${key}`}>{label}</label>
 		<div class="flex items-center gap-1.5">
-			<button type="button" aria-label={`Decrease ${label}`} onclick={() => step(key, -by, min, max)} disabled={$skadisParams[key] <= min} class={stepBtn}>&minus;</button>
+			<button type="button" aria-label={`${t.decrease} ${label}`} onclick={() => step(key, -by, min, max)} disabled={$skadisParams[key] <= min} class={stepBtn}>&minus;</button>
 			<input
 				id={`sk-${key}`}
 				type="number"
@@ -70,7 +78,7 @@
 				oninput={(e) => setNum(key, e.currentTarget.valueAsNumber, min, max)}
 				class={numInput}
 			/>
-			<button type="button" aria-label={`Increase ${label}`} onclick={() => step(key, by, min, max)} disabled={$skadisParams[key] >= max} class={stepBtn}>+</button>
+			<button type="button" aria-label={`${t.increase} ${label}`} onclick={() => step(key, by, min, max)} disabled={$skadisParams[key] >= max} class={stepBtn}>+</button>
 		</div>
 	</div>
 {/snippet}
@@ -78,111 +86,112 @@
 <div class="flex flex-col gap-6 p-4">
 	<!-- Presets -->
 	<section class="flex flex-col gap-2.5">
-		<span class={section}>Start from a preset</span>
+		<span class={section}>{t.startPreset}</span>
 		<div class="flex flex-wrap gap-1.5">
 			{#each skadisPresets as preset, i}
+				{@const presetText = presetTextKeys[i]}
 				<button
 					type="button"
-					title={preset.description}
+					title={presetText ? t.presets[presetText.description] : preset.description}
 					onclick={() => applyPreset(i)}
 					class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition {selectedPreset === i
 						? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
 						: 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'}"
 				>
-					{preset.name}
+					{presetText ? t.presets[presetText.name] : preset.name}
 				</button>
 			{/each}
 			{#if selectedPreset === -1}
-				<span class="rounded-lg border border-dashed border-zinc-700 px-2.5 py-1.5 text-xs font-medium text-zinc-500">Custom</span>
+				<span class="rounded-lg border border-dashed border-zinc-700 px-2.5 py-1.5 text-xs font-medium text-zinc-500">{t.custom}</span>
 			{/if}
 		</div>
 	</section>
 
 	<!-- Size -->
 	<section class="flex flex-col gap-3">
-		<h2 class={section}>Inside size (mm)</h2>
+		<h2 class={section}>{t.insideSizeMm}</h2>
 		<div class="grid grid-cols-2 gap-3">
-			{@render numField('width', 'Width', 20, 400, 5)}
-			{@render numField('height', 'Height', 20, 400, 5)}
+			{@render numField('width', t.width, 20, 400, 5)}
+			{@render numField('height', t.height, 20, 400, 5)}
 		</div>
 		<div class="grid grid-cols-2 gap-3">
-			{@render numField('depth', 'Depth', 10, 300, 5)}
-			{@render numField('wallThickness', 'Wall', 1, 5, 0.2)}
+			{@render numField('depth', t.depth, 10, 300, 5)}
+			{@render numField('wallThickness', t.wall, 1, 5, 0.2)}
 		</div>
 		<p class="rounded-lg bg-zinc-800/50 px-2.5 py-2 text-xs text-zinc-400">
-			Outer size <span class="font-semibold text-zinc-200">{round1(outer.outerW)}×{round1(outer.outerD)}×{round1(outer.outerH)}mm</span>
-			· dimensions are the usable interior
+			{t.outerSize} <span class="font-semibold text-zinc-200">{round1(outer.outerW)}×{round1(outer.outerD)}×{round1(outer.outerH)}mm</span>
+			· {t.usableInterior}
 		</p>
 	</section>
 
 	<!-- Mount -->
 	<section class="flex flex-col gap-3">
-		<h2 class={section}>Skadis mount</h2>
+		<h2 class={section}>{t.skadisMount}</h2>
 		<label class="block">
-			<span class={lbl}>Mount type</span>
+			<span class={lbl}>{t.mountType}</span>
 			<select bind:value={$skadisParams.mountType} class={selectInput} style:background-image={chevron}>
-				<option value="hook">Snap hooks (no screws)</option>
-				<option value="screw">M5 screw holes</option>
+				<option value="hook">{t.snapHooks}</option>
+				<option value="screw">{t.m5ScrewHoles}</option>
 			</select>
 		</label>
 		<label class="block">
-			<span class={lbl}>{$skadisParams.mountType === 'screw' ? 'Screw rows' : 'Hook rows'}</span>
+			<span class={lbl}>{$skadisParams.mountType === 'screw' ? t.screwRows : t.hookRows}</span>
 			<select bind:value={$skadisParams.hookRows} class={selectInput} style:background-image={chevron}>
-				<option value={1}>1 row</option>
-				<option value={2}>2 rows (heavier loads)</option>
+				<option value={1}>{t.oneRow}</option>
+				<option value={2}>{t.twoRowsHeavier}</option>
 			</select>
 		</label>
 		<label class="relative flex cursor-pointer items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/40 px-3 py-2.5 transition hover:border-zinc-700 has-[:checked]:border-blue-500/40 has-[:checked]:bg-blue-500/10">
-			<input type="checkbox" bind:checked={$skadisParams.openFront} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label="Open front" />
-			<span class="text-sm text-zinc-200">Open front (low wall)</span>
+			<input type="checkbox" bind:checked={$skadisParams.openFront} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label={t.openFront} />
+			<span class="text-sm text-zinc-200">{t.openFrontLowWall}</span>
 			<span class="relative h-5 w-9 shrink-0 rounded-full bg-zinc-600 transition-colors peer-checked:bg-blue-500">
 				<span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all peer-checked:left-4"></span>
 			</span>
 		</label>
 		{#if $skadisParams.openFront}
-			{@render numField('frontWallHeight', 'Front wall height (mm)', 5, 400, 5)}
+			{@render numField('frontWallHeight', t.frontWallHeight, 5, 400, 5)}
 		{/if}
 		<label class="relative flex cursor-pointer items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/40 px-3 py-2.5 transition hover:border-zinc-700 has-[:checked]:border-blue-500/40 has-[:checked]:bg-blue-500/10">
-			<input type="checkbox" bind:checked={$skadisParams.openSides} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label="Open side walls" />
-			<span class="text-sm text-zinc-200">Open side walls (low walls)</span>
+			<input type="checkbox" bind:checked={$skadisParams.openSides} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label={t.openSideWalls} />
+			<span class="text-sm text-zinc-200">{t.openSideWallsLow}</span>
 			<span class="relative h-5 w-9 shrink-0 rounded-full bg-zinc-600 transition-colors peer-checked:bg-blue-500">
 				<span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all peer-checked:left-4"></span>
 			</span>
 		</label>
 		{#if $skadisParams.openSides}
-			{@render numField('sideWallHeight', 'Side wall height (mm)', 5, 400, 5)}
+			{@render numField('sideWallHeight', t.sideWallHeight, 5, 400, 5)}
 		{/if}
 		<label class="relative flex cursor-pointer items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/40 px-3 py-2.5 transition hover:border-zinc-700 has-[:checked]:border-blue-500/40 has-[:checked]:bg-blue-500/10">
-			<input type="checkbox" bind:checked={$skadisParams.lightweightWalls} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label="Lightweight walls" />
-			<span class="text-sm text-zinc-200">Lightweight walls (hex cutouts)</span>
+			<input type="checkbox" bind:checked={$skadisParams.lightweightWalls} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label={t.lightweightWalls} />
+			<span class="text-sm text-zinc-200">{t.lightweightWallsHex}</span>
 			<span class="relative h-5 w-9 shrink-0 rounded-full bg-zinc-600 transition-colors peer-checked:bg-blue-500">
 				<span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all peer-checked:left-4"></span>
 			</span>
 		</label>
 		<p class="rounded-lg bg-zinc-800/50 px-2.5 py-2 text-xs text-zinc-400">
 			<span class="font-semibold text-zinc-200">{layout.cols}×{layout.rows}</span>
-			{$skadisParams.mountType === 'screw' ? 'M5 screw holes' : 'snap hooks'}
+			{$skadisParams.mountType === 'screw' ? t.m5ScrewHoles : t.snapHooksShort}
 			· {SKADIS_PITCH}mm pitch
 			{#if layout.cols < 2}
-				<span class="mt-1 block text-amber-300/90">Box is narrow — only one mount column; it may rotate on the board.</span>
+				<span class="mt-1 block text-amber-300/90">{t.narrowBoxWarning}</span>
 			{/if}
 		</p>
 	</section>
 
 	<!-- Export -->
 	<section class="flex flex-col gap-2">
-		<h2 class={section}>Export</h2>
+		<h2 class={section}>{t.export}</h2>
 		<button
 			onclick={() => onexport('stl')}
 			disabled={exporting || loading}
-			aria-label="Download STL"
+			aria-label={t.downloadStl}
 			class="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
 		>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
 			</svg>
-			{exporting ? 'Exporting…' : 'Download STL'}
-			<span class="text-xs font-normal text-blue-200/80">for printing</span>
+			{exporting ? t.exporting : t.downloadStl}
+			<span class="text-xs font-normal text-blue-200/80">{t.forPrinting}</span>
 		</button>
 		<button
 			onclick={() => onexport('step')}
@@ -190,8 +199,8 @@
 			aria-label="Download STEP"
 			class="flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 disabled:pointer-events-none disabled:opacity-50"
 		>
-			{exporting ? 'Exporting…' : 'STEP file'}
-			<span class="text-xs font-normal text-zinc-500">for CAD</span>
+			{exporting ? t.exporting : t.stepFile}
+			<span class="text-xs font-normal text-zinc-500">{t.forCad}</span>
 		</button>
 		<button
 			onclick={reset}
@@ -200,16 +209,16 @@
 			<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 9a7 7 0 0111.9-2.1L20 9M18.5 15a7 7 0 01-11.9 2.1L4 15" />
 			</svg>
-			Reset
+			{t.reset}
 		</button>
 	</section>
 
 	<p class="rounded-lg bg-sky-500/10 px-2.5 py-2 text-xs text-sky-200/90">
-		Print with the open top facing up.
+		{t.printOpenTop}
 		{#if $skadisParams.mountType === 'screw'}
-			Bolt the box to the board with M5 screws through the slots — washer + nut behind the board.
+			{t.screwPrintHint}
 		{:else}
-			Print the hooks with supports. Slide the hooks into the pegboard slots, then lower the box so the lips drop behind the board.
+			{t.hookPrintHint}
 		{/if}
 	</p>
 </div>
