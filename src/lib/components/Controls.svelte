@@ -226,13 +226,13 @@
 			{#each presets as preset, i}
 				<button
 					type="button"
-					title={t.presets[presetTextKeys[i]!.description]}
+					title={t.presets[presetTextKeys[i]!.description] || preset.description}
 					onclick={() => applyPreset(i)}
 					class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition {selectedPreset === i
 						? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
 						: 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'}"
 				>
-					{t.presets[presetTextKeys[i]!.name]}
+					{t.presets[presetTextKeys[i]!.name] || preset.name}
 				</button>
 			{/each}
 			{#if selectedPreset === -1}
