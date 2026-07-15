@@ -2,6 +2,7 @@
 	import { baseplateParams, type BaseplateParams } from '$lib/stores/params';
 	import { baseplatePresets, printerBeds } from '$lib/presets';
 	import { planBaseplate } from '$lib/cad/baseplate-layout';
+	import { language, text, type Text } from '$lib/i18n';
 
 	interface Props {
 		onexport: (format: 'step' | 'stl') => void;
@@ -9,6 +10,7 @@
 		loading?: boolean;
 	}
 	let { onexport, exporting, loading = false }: Props = $props();
+	let t = $derived(text[$language]);
 
 	let layout = $derived(planBaseplate($baseplateParams));
 	let tileCount = $derived(layout.tiles.length);
@@ -56,13 +58,17 @@
 		'mt-1.5 w-full appearance-none rounded-lg border border-zinc-700 bg-zinc-800/60 bg-[length:1rem] bg-[right_0.6rem_center] bg-no-repeat px-3 py-2 text-sm text-zinc-100 focus:border-blue-500 focus:outline-none';
 	const chevron =
 		"url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 24 24' stroke='%2371717a' stroke-width='2.5'%3E%3Cpath stroke-linecap='round' stroke-linejoin='round' d='M19 9l-7 7-7-7'/%3E%3C/svg%3E\")";
+	const presetTextKeys = [
+		{ name: 'ikeaAlex', description: 'ikeaAlexDesc' },
+		{ name: 'smallDrawer', description: 'smallDrawerDesc' }
+	] as const satisfies { name: keyof Text['presets']; description: keyof Text['presets'] }[];
 </script>
 
 {#snippet numField(key: NumKey, label: string, min: number, max: number, by: number)}
 	<div>
 		<label class="mb-1.5 block {lbl}" for={`bp-${key}`}>{label}</label>
 		<div class="flex items-center gap-1.5">
-			<button type="button" aria-label={`Decrease ${label}`} onclick={() => step(key, -by, min, max)} disabled={$baseplateParams[key] <= min} class={stepBtn}>&minus;</button>
+			<button type="button" aria-label={`- ${label}`} onclick={() => step(key, -by, min, max)} disabled={$baseplateParams[key] <= min} class={stepBtn}>&minus;</button>
 			<input
 				id={`bp-${key}`}
 				type="number"
@@ -73,7 +79,7 @@
 				oninput={(e) => setNum(key, e.currentTarget.valueAsNumber, min, max)}
 				class={numInput}
 			/>
-			<button type="button" aria-label={`Increase ${label}`} onclick={() => step(key, by, min, max)} disabled={$baseplateParams[key] >= max} class={stepBtn}>+</button>
+			<button type="button" aria-label={`+ ${label}`} onclick={() => step(key, by, min, max)} disabled={$baseplateParams[key] >= max} class={stepBtn}>+</button>
 		</div>
 	</div>
 {/snippet}
@@ -82,18 +88,18 @@
 	<!-- Presets -->
 	{#if baseplatePresets.length > 0}
 		<section class="flex flex-col gap-2.5">
-			<span class={section}>Start from a preset</span>
+			<span class={section}>{t.startPreset}</span>
 			<div class="flex flex-wrap gap-1.5">
 				{#each baseplatePresets as preset, i}
 					<button
 						type="button"
-						title={preset.description}
+						title={t.presets[presetTextKeys[i]!.description]}
 						onclick={() => applyPreset(i)}
 						class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition {selectedPreset === i
 							? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
 							: 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'}"
 					>
-						{preset.name}
+						{t.presets[presetTextKeys[i]!.name]}
 					</button>
 				{/each}
 			</div>
@@ -102,31 +108,31 @@
 
 	<!-- Drawer -->
 	<section class="flex flex-col gap-3">
-		<h2 class={section}>Drawer (interior mm)</h2>
+		<h2 class={section}>{t.drawerInteriorMm}</h2>
 		<div class="grid grid-cols-2 gap-3">
-			{@render numField('drawerWidth', 'Width', 42, 2000, 1)}
-			{@render numField('drawerDepth', 'Depth', 42, 2000, 1)}
+			{@render numField('drawerWidth', t.width, 42, 2000, 1)}
+			{@render numField('drawerDepth', t.depth, 42, 2000, 1)}
 		</div>
 		<p class="rounded-lg bg-zinc-800/50 px-2.5 py-2 text-xs text-zinc-400">
-			Grid <span class="font-semibold text-zinc-200">{layout.cols}×{layout.rows}</span> cells
-			· skirt {layout.skirt.x.toFixed(1)}×{layout.skirt.y.toFixed(1)}mm
-			· <span class="font-semibold text-zinc-200">{tileCount}</span> tile{tileCount === 1 ? '' : 's'}
+			{t.grid} <span class="font-semibold text-zinc-200">{layout.cols}×{layout.rows}</span> {t.cells}
+			· {t.skirt} {layout.skirt.x.toFixed(1)}×{layout.skirt.y.toFixed(1)}mm
+			· <span class="font-semibold text-zinc-200">{tileCount}</span> {tileCount === 1 ? t.tile : t.tiles}
 		</p>
 		<div class="grid grid-cols-2 gap-3">
 			<label class="block">
-				<span class={lbl}>Align X</span>
+				<span class={lbl}>{t.alignX}</span>
 				<select bind:value={$baseplateParams.alignX} class={selectInput} style:background-image={chevron}>
-					<option value="low">Left</option>
-					<option value="center">Center</option>
-					<option value="high">Right</option>
+					<option value="low">{t.left}</option>
+					<option value="center">{t.center}</option>
+					<option value="high">{t.right}</option>
 				</select>
 			</label>
 			<label class="block">
-				<span class={lbl}>Align Y</span>
+				<span class={lbl}>{t.alignY}</span>
 				<select bind:value={$baseplateParams.alignY} class={selectInput} style:background-image={chevron}>
-					<option value="low">Front</option>
-					<option value="center">Center</option>
-					<option value="high">Back</option>
+					<option value="low">{t.front}</option>
+					<option value="center">{t.center}</option>
+					<option value="high">{t.back}</option>
 				</select>
 			</label>
 		</div>
@@ -134,7 +140,7 @@
 
 	<!-- Style -->
 	<section class="flex flex-col gap-3">
-		<h2 class={section}>Style</h2>
+		<h2 class={section}>{t.style}</h2>
 		<div class="grid grid-cols-2 gap-1.5">
 			<button
 				type="button"
@@ -143,7 +149,7 @@
 					? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
 					: 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700'}"
 			>
-				Simple grid
+				{t.simpleGrid}
 			</button>
 			<button
 				type="button"
@@ -152,13 +158,13 @@
 					? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
 					: 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700'}"
 			>
-				Magnet
+				{t.magnet}
 			</button>
 		</div>
 		{#if $baseplateParams.style === 'magnet'}
 			<label class="relative flex cursor-pointer items-center justify-between rounded-lg border border-zinc-800 bg-zinc-800/40 px-3 py-2.5 transition hover:border-zinc-700 has-[:checked]:border-blue-500/40 has-[:checked]:bg-blue-500/10">
-				<input type="checkbox" bind:checked={$baseplateParams.screwHoles} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label="Screw holes" />
-				<span class="text-sm text-zinc-200">Screw holes (M3)</span>
+				<input type="checkbox" bind:checked={$baseplateParams.screwHoles} class="peer absolute inset-0 cursor-pointer opacity-0" aria-label={t.screwHoles} />
+				<span class="text-sm text-zinc-200">{t.screwHolesM3}</span>
 				<span class="relative h-5 w-9 shrink-0 rounded-full bg-zinc-600 transition-colors peer-checked:bg-blue-500">
 					<span class="absolute left-0.5 top-0.5 h-4 w-4 rounded-full bg-white shadow transition-all peer-checked:left-4"></span>
 				</span>
@@ -168,75 +174,75 @@
 
 	<!-- Tiling -->
 	<section class="flex flex-col gap-3">
-		<h2 class={section}>Printer bed & tiling</h2>
+		<h2 class={section}>{t.printerBedTiling}</h2>
 		<label class="block">
-			<span class={lbl}>Printer</span>
+			<span class={lbl}>{t.printer}</span>
 			<select
 				onchange={(e) => applyPrinter(e.currentTarget.value)}
 				class={selectInput}
 				style:background-image={chevron}
 			>
-				<option value="" selected={selectedPrinter === -1}>Custom</option>
+				<option value="" selected={selectedPrinter === -1}>{t.custom}</option>
 				{#each printerBeds as bed, i}
 					<option value={i} selected={i === selectedPrinter}>{bed.name} ({bed.w}×{bed.d})</option>
 				{/each}
 			</select>
 		</label>
 		<div class="grid grid-cols-2 gap-3">
-			{@render numField('bedWidth', 'Bed width', 42, 1000, 5)}
-			{@render numField('bedDepth', 'Bed depth', 42, 1000, 5)}
+			{@render numField('bedWidth', t.bedWidth, 42, 1000, 5)}
+			{@render numField('bedDepth', t.bedDepth, 42, 1000, 5)}
 		</div>
 		<label class="block">
-			<span class={lbl}>Split layout</span>
+			<span class={lbl}>{t.splitLayout}</span>
 			<select bind:value={$baseplateParams.splitAlgorithm} class={selectInput} style:background-image={chevron}>
-				<option value="ideal">Balanced (even tiles)</option>
-				<option value="incremental">Packed (max per tile)</option>
+				<option value="ideal">{t.balancedTiles}</option>
+				<option value="incremental">{t.packedTiles}</option>
 			</select>
 		</label>
 		{#if layout.multiTile}
 			<label class="block">
-				<span class={lbl}>Connector</span>
+				<span class={lbl}>{t.connector}</span>
 				<select bind:value={$baseplateParams.connector} class={selectInput} style:background-image={chevron}>
-					<option value="filament">Filament pin (1.75mm)</option>
-					<option value="dovetail">Dovetail (snap-fit)</option>
-					<option value="screw">Screw-together (M3)</option>
-					<option value="none">None (flush)</option>
+					<option value="filament">{t.filamentPin}</option>
+					<option value="dovetail">{t.dovetail}</option>
+					<option value="screw">{t.screwTogether}</option>
+					<option value="none">{t.noneFlush}</option>
 				</select>
 			</label>
 			{#if $baseplateParams.connector === 'filament'}
-				<p class="text-xs text-zinc-500">Push a 1.75mm filament scrap through the seam holes to pin tiles together — no hardware.</p>
+				<p class="text-xs text-zinc-500">{t.filamentHint}</p>
 			{:else if $baseplateParams.connector === 'screw'}
-				<p class="text-xs text-zinc-500">Bolt tiles edge-to-edge with M3 screws through the seam walls.</p>
+				<p class="text-xs text-zinc-500">{t.screwHint}</p>
 			{:else if $baseplateParams.connector === 'none'}
-				<p class="text-xs text-zinc-500">Tiles butt together — held by the drawer (or glue).</p>
+				<p class="text-xs text-zinc-500">{t.noneHint}</p>
 			{/if}
 		{:else}
-			<p class="text-xs text-zinc-500">Fits the bed in one piece — no connectors needed.</p>
+			<p class="text-xs text-zinc-500">{t.baseplateFitsOnePiece}</p>
 		{/if}
 	</section>
 
 	<!-- Export -->
 	<section class="flex flex-col gap-2">
-		<h2 class={section}>Export</h2>
+		<h2 class={section}>{t.export}</h2>
 		{#if layout.multiTile}
 			<label class="block">
-				<span class={lbl}>STL layout</span>
+				<span class={lbl}>{t.stlLayout}</span>
 				<select bind:value={$baseplateParams.exportLayout} class={selectInput} style:background-image={chevron}>
-					<option value="zip">ZIP — one file per tile</option>
-					<option value="combined">Combined — tiles spread on one plate</option>
+					<option value="zip">{t.zipPerTile}</option>
+					<option value="combined">{t.combinedTiles}</option>
 				</select>
 			</label>
 		{/if}
 		<button
 			onclick={() => onexport('stl')}
 			disabled={exporting || loading}
-			aria-label="Download STL"
+			aria-label={t.downloadStl}
 			class="mt-1 flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
 		>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
 			</svg>
-			{exporting ? 'Exporting…' : layout.multiTile && $baseplateParams.exportLayout === 'zip' ? 'Download STL (ZIP)' : 'Download STL'}
+			{exporting ? t.exporting : layout.multiTile && $baseplateParams.exportLayout === 'zip' ? t.downloadStlZip : t.downloadStl}
 		</button>
 		<button
 			onclick={() => onexport('step')}
@@ -244,8 +250,8 @@
 			aria-label="Download STEP"
 			class="flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 disabled:pointer-events-none disabled:opacity-50"
 		>
-			{exporting ? 'Exporting…' : 'STEP file'}
-			<span class="text-xs font-normal text-zinc-500">for CAD</span>
+			{exporting ? t.exporting : t.stepFile}
+			<span class="text-xs font-normal text-zinc-500">{t.forCad}</span>
 		</button>
 	</section>
 </div>

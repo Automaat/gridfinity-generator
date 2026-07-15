@@ -15,6 +15,15 @@ test.describe('page load', () => {
 		await page.goto('/');
 		await expect(page.getByRole('heading', { name: 'Size' })).toBeVisible();
 	});
+
+	test('can switch language to Polish', async ({ page }) => {
+		await page.goto('/');
+
+		await page.getByLabel('Language').selectOption('pl');
+
+		await expect(page.getByRole('heading', { name: 'Rozmiar' })).toBeVisible();
+		await expect(page.getByText('Otwory na magnesy')).toBeVisible();
+	});
 });
 
 test.describe('controls panel', () => {

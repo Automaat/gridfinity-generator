@@ -1,8 +1,10 @@
 <script lang="ts">
 	import { params, dimensions } from '$lib/stores/params';
+	import { language, text } from '$lib/i18n';
 
 	let dims = $derived($dimensions);
 	let p = $derived($params);
+	let t = $derived(text[$language]);
 </script>
 
 <div
@@ -11,5 +13,5 @@
 	<div class="text-sm font-semibold tracking-tight text-zinc-50">
 		{dims.widthMm} × {dims.lengthMm} × {dims.heightMm} <span class="text-zinc-500">mm</span>
 	</div>
-	<div class="mt-0.5 text-xs text-zinc-400">{p.width}×{p.length} grid · {p.height}U tall</div>
+	<div class="mt-0.5 text-xs text-zinc-400">{p.width}×{p.length} {t.gridTall} {p.height}U {t.tall}</div>
 </div>

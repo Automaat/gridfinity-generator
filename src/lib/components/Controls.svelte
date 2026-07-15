@@ -3,6 +3,7 @@
 	import { presets, printerBeds } from '$lib/presets';
 	import { planBinSplit } from '$lib/cad/bin-split';
 	import { estimatePrint } from '$lib/utils/print-estimate';
+	import { language, text, type Text } from '$lib/i18n';
 	import BaseplateControls from './BaseplateControls.svelte';
 	import SkadisControls from './SkadisControls.svelte';
 
@@ -13,6 +14,7 @@
 	}
 
 	let { onexport, exporting, loading = false }: Props = $props();
+	let t = $derived(text[$language]);
 	let dims = $derived($dimensions);
 	let estimate = $derived(estimatePrint($params));
 
@@ -109,6 +111,13 @@
 	}
 
 	const SCOOP_WALLS = ['back', 'front', 'left', 'right'] as const;
+	const presetTextKeys = [
+		{ name: 'smallParts', description: 'smallPartsDesc' },
+		{ name: 'hardwareOrganizer', description: 'hardwareOrganizerDesc' },
+		{ name: 'toolHolder', description: 'toolHolderDesc' },
+		{ name: 'deepBin', description: 'deepBinDesc' },
+		{ name: 'dividedTray', description: 'dividedTrayDesc' }
+	] as const satisfies { name: keyof Text['presets']; description: keyof Text['presets'] }[];
 
 	const lbl = 'text-[13px] font-medium text-zinc-300';
 	const section = 'text-[11px] font-semibold uppercase tracking-[0.08em] text-zinc-500';
@@ -129,7 +138,7 @@
 		<div class="flex items-center gap-1.5">
 			<button
 				type="button"
-				aria-label={`Decrease ${name}`}
+				aria-label={`- ${name}`}
 				onclick={() => step(key, -by, min, max)}
 				disabled={$params[key] <= min}
 				class={stepBtn}>&minus;</button
@@ -146,7 +155,7 @@
 			/>
 			<button
 				type="button"
-				aria-label={`Increase ${name}`}
+				aria-label={`+ ${name}`}
 				onclick={() => step(key, by, min, max)}
 				disabled={$params[key] >= max}
 				class={stepBtn}>+</button
@@ -185,21 +194,21 @@
 			onclick={() => ($mode = 'bin')}
 			class="rounded-md px-3 py-1.5 text-sm font-medium transition {$mode === 'bin' ? 'bg-blue-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}"
 		>
-			Bin
+			{t.bin}
 		</button>
 		<button
 			type="button"
 			onclick={() => ($mode = 'baseplate')}
 			class="rounded-md px-3 py-1.5 text-sm font-medium transition {$mode === 'baseplate' ? 'bg-blue-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}"
 		>
-			Baseplate
+			{t.baseplate}
 		</button>
 		<button
 			type="button"
 			onclick={() => ($mode = 'skadis')}
 			class="rounded-md px-3 py-1.5 text-sm font-medium transition {$mode === 'skadis' ? 'bg-blue-600 text-white shadow' : 'text-zinc-400 hover:text-zinc-200'}"
 		>
-			Skadis
+			{t.skadis}
 		</button>
 	</div>
 </div>
@@ -212,24 +221,24 @@
 <div class="flex flex-col gap-6 p-4 pt-3">
 	<!-- Presets -->
 	<section class="flex flex-col gap-2.5">
-		<span class={section}>Start from a preset</span>
+		<span class={section}>{t.startPreset}</span>
 		<div class="flex flex-wrap gap-1.5">
 			{#each presets as preset, i}
 				<button
 					type="button"
-					title={preset.description}
+					title={t.presets[presetTextKeys[i]!.description]}
 					onclick={() => applyPreset(i)}
 					class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition {selectedPreset === i
 						? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
 						: 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'}"
 				>
-					{preset.name}
+					{t.presets[presetTextKeys[i]!.name]}
 				</button>
 			{/each}
 			{#if selectedPreset === -1}
 				<span
 					class="rounded-lg border border-dashed border-zinc-700 px-2.5 py-1.5 text-xs font-medium text-zinc-500"
-					>Custom</span
+					>{t.custom}</span
 				>
 			{/if}
 		</div>
@@ -237,30 +246,30 @@
 
 	<!-- Size -->
 	<section class="flex flex-col gap-3">
-		<h2 class={section}>Size</h2>
+		<h2 class={section}>{t.size}</h2>
 		<div class="grid grid-cols-2 gap-3">
-			{@render numField('width', `Width (${dims.widthMm}mm)`, 'width', 1, 6, 1)}
-			{@render numField('length', `Length (${dims.lengthMm}mm)`, 'length', 1, 6, 1)}
+			{@render numField('width', `${t.width} (${dims.widthMm}mm)`, t.width, 1, 6, 1)}
+			{@render numField('length', `${t.length} (${dims.lengthMm}mm)`, t.length, 1, 6, 1)}
 		</div>
-		{@render numField('height', `Height (${dims.heightMm}mm)`, 'height', 1, 10, 1)}
-		{@render numField('wallThickness', 'Wall thickness (mm)', 'wall thickness', 0.8, 2, 0.1)}
+		{@render numField('height', `${t.height} (${dims.heightMm}mm)`, t.height, 1, 10, 1)}
+		{@render numField('wallThickness', t.wallThickness, t.wallThickness, 0.8, 2, 0.1)}
 	</section>
 
 	<!-- Features -->
 	<section class="flex flex-col gap-2">
-		<h2 class={section}>Features</h2>
-		{@render toggleRow($params.magnetHoles, 'Magnet holes', (v) => ($params.magnetHoles = v))}
+		<h2 class={section}>{t.features}</h2>
+		{@render toggleRow($params.magnetHoles, t.magnetHoles, (v) => ($params.magnetHoles = v))}
 		{#if $params.magnetHoles}
 			<div class="pl-3">
 				{@render toggleRow(
 					$params.magnetCornersOnly,
-					'Corner magnets only (4 outer corners)',
+					t.cornerMagnetsOnly,
 					(v) => ($params.magnetCornersOnly = v)
 				)}
 			</div>
 		{/if}
-		{@render toggleRow($params.screwHoles, 'Screw holes', (v) => ($params.screwHoles = v))}
-		{@render toggleRow($params.labelTab, 'Label tab', (v) => ($params.labelTab = v))}
+		{@render toggleRow($params.screwHoles, t.screwHoles, (v) => ($params.screwHoles = v))}
+		{@render toggleRow($params.labelTab, t.labelTab, (v) => ($params.labelTab = v))}
 	</section>
 
 	<!-- Advanced -->
@@ -269,7 +278,7 @@
 			class="flex cursor-pointer list-none items-center justify-between rounded-xl px-3.5 py-3 text-sm font-medium text-zinc-200 transition hover:bg-zinc-800/40"
 		>
 			<span class="flex items-center gap-2">
-				Advanced
+				{t.advanced}
 				{#if advancedActive}
 					<span class="h-1.5 w-1.5 rounded-full bg-blue-400" aria-hidden="true"></span>
 				{/if}
@@ -288,17 +297,17 @@
 		<div class="flex flex-col gap-5 border-t border-zinc-800 px-3.5 py-4">
 			<!-- Stacking lip -->
 			<label class="block">
-				<span class={lbl}>Stacking lip</span>
+				<span class={lbl}>{t.stackingLip}</span>
 				<select bind:value={$params.stackingLip} class={selectInput} style:background-image={chevron}>
-					<option value="standard">Standard</option>
-					<option value="reduced">Reduced</option>
-					<option value="none">None</option>
+					<option value="standard">{t.standard}</option>
+					<option value="reduced">{t.reduced}</option>
+					<option value="none">{t.none}</option>
 				</select>
 			</label>
 
 			<!-- Scoop walls -->
 			<div>
-				<span class={lbl}>Scoop walls</span>
+				<span class={lbl}>{t.scoopWalls}</span>
 				<div class="mt-1.5 grid grid-cols-4 gap-1.5">
 					{#each SCOOP_WALLS as wall}
 						<label
@@ -307,7 +316,7 @@
 							<input
 								type="checkbox"
 								checked={$params.scoopWalls.includes(wall)}
-								aria-label={`Scoop ${wall}`}
+								aria-label={`${t.scoop} ${t.walls[wall]}`}
 								onchange={(e) => {
 									$params.scoopWalls = e.currentTarget.checked
 										? [...$params.scoopWalls, wall]
@@ -315,13 +324,13 @@
 								}}
 								class="absolute inset-0 cursor-pointer opacity-0"
 							/>
-							{wall.charAt(0).toUpperCase() + wall.slice(1)}
+							{t.walls[wall]}
 						</label>
 					{/each}
 				</div>
 				{#if $params.scoopWalls.length > 0}
 					<label class="mt-2.5 block">
-						<span class="text-xs text-zinc-500">Scoop radius ({$params.scoopRadius || 'auto'}mm)</span>
+						<span class="text-xs text-zinc-500">{t.scoopRadius} ({$params.scoopRadius || t.auto}mm)</span>
 						<input
 							type="range"
 							min="0"
@@ -336,20 +345,20 @@
 
 			<!-- Wall cut -->
 			<div class="flex flex-col gap-2.5">
-				{@render toggleRow($params.wallCut, 'Wall cut (diagonal slope)', (v) => ($params.wallCut = v))}
+				{@render toggleRow($params.wallCut, t.wallCut, (v) => ($params.wallCut = v))}
 				{#if $params.wallCut}
 					<label class="block">
-						<span class="text-xs text-zinc-500">Slope down toward</span>
+						<span class="text-xs text-zinc-500">{t.slopeDownToward}</span>
 						<select bind:value={$params.wallCutSide} class={selectInput} style:background-image={chevron}>
-							<option value="front">Front</option>
-							<option value="back">Back</option>
-							<option value="left">Left</option>
-							<option value="right">Right</option>
+							<option value="front">{t.walls.front}</option>
+							<option value="back">{t.walls.back}</option>
+							<option value="left">{t.walls.left}</option>
+							<option value="right">{t.walls.right}</option>
 						</select>
 					</label>
 					<label class="block">
 						<span class="text-xs text-zinc-500"
-							>Low side height ({Math.round($params.wallCutLowFraction * 100)}%)</span
+							>{t.lowSideHeight} ({Math.round($params.wallCutLowFraction * 100)}%)</span
 						>
 						<input
 							type="range"
@@ -362,7 +371,7 @@
 					</label>
 					<label class="block">
 						<span class="text-xs text-zinc-500"
-							>Slope length ({Math.round($params.wallCutRun * 100)}%)</span
+							>{t.slopeLength} ({Math.round($params.wallCutRun * 100)}%)</span
 						>
 						<input
 							type="range"
@@ -378,21 +387,21 @@
 
 			<!-- Dividers -->
 			<div class="flex flex-col gap-3">
-				<span class={lbl}>Dividers</span>
+				<span class={lbl}>{t.dividers}</span>
 				<div class="grid grid-cols-2 gap-3">
-					{@render numField('dividersX', 'Dividers X', 'dividers X', 0, 5, 1)}
-					{@render numField('dividersY', 'Dividers Y', 'dividers Y', 0, 5, 1)}
+					{@render numField('dividersX', t.dividersX, t.dividersX, 0, 5, 1)}
+					{@render numField('dividersY', t.dividersY, t.dividersY, 0, 5, 1)}
 				</div>
 				{#if $params.dividersX > 0 || $params.dividersY > 0}
 					<p class="flex items-start gap-1.5 rounded-lg bg-sky-500/10 px-2.5 py-2 text-xs text-sky-200/90">
 						<svg class="mt-0.5 h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 							<path stroke-linecap="round" stroke-linejoin="round" d="M7 8l-4 4 4 4M17 8l4 4-4 4M3 12h18" />
 						</svg>
-						Hover a divider in the 3D view, then drag to reposition it — wall distances update live.
+						{t.dividerDragHint}
 					</p>
 					{@render toggleRow(
 						$params.lightweightDividers,
-						'Lightweight dividers',
+						t.lightweightDividers,
 						(v) => ($params.lightweightDividers = v)
 					)}
 					{#if dividerPositionsCustom}
@@ -400,7 +409,7 @@
 							onclick={resetDividerPositions}
 							class="self-start text-xs font-medium text-zinc-400 underline-offset-2 transition hover:text-zinc-200 hover:underline"
 						>
-							Reset to even spacing
+							{t.resetEvenSpacing}
 						</button>
 					{/if}
 				{/if}
@@ -410,61 +419,61 @@
 
 	<!-- Print in parts -->
 	<section class="flex flex-col gap-3">
-		<h2 class={section}>Print in parts</h2>
-		{@render toggleRow($params.splitToFit, 'Split to fit printer bed', (v) => ($params.splitToFit = v))}
+		<h2 class={section}>{t.printInParts}</h2>
+		{@render toggleRow($params.splitToFit, t.splitToFit, (v) => ($params.splitToFit = v))}
 		{#if $params.splitToFit}
 			<label class="block">
-				<span class={lbl}>Printer</span>
+				<span class={lbl}>{t.printer}</span>
 				<select onchange={(e) => applyPrinter(e.currentTarget.value)} class={selectInput} style:background-image={chevron}>
-					<option value="" selected={selectedPrinter === -1}>Custom</option>
+					<option value="" selected={selectedPrinter === -1}>{t.custom}</option>
 					{#each printerBeds as bed, i}
 						<option value={i} selected={i === selectedPrinter}>{bed.name} ({bed.w}×{bed.d})</option>
 					{/each}
 				</select>
 			</label>
 			<div class="grid grid-cols-2 gap-3">
-				{@render numField('bedWidth', 'Bed width (mm)', 'bed width', 42, 1000, 5)}
-				{@render numField('bedDepth', 'Bed depth (mm)', 'bed depth', 42, 1000, 5)}
+				{@render numField('bedWidth', t.bedWidthMm, t.bedWidth, 42, 1000, 5)}
+				{@render numField('bedDepth', t.bedDepthMm, t.bedDepth, 42, 1000, 5)}
 			</div>
 			{#if binSplit.multiTile}
 				<p class="rounded-lg bg-zinc-800/50 px-2.5 py-2 text-xs text-zinc-400">
-					Splits into <span class="font-semibold text-zinc-200">{binSplit.pieces.length}</span>
-					pieces ({binSplit.tilesX}×{binSplit.tilesY}) along grid lines · glue the flush faces.
+					{t.splitsInto} <span class="font-semibold text-zinc-200">{binSplit.pieces.length}</span>
+					{t.pieces} ({binSplit.tilesX}×{binSplit.tilesY}) {t.alongGridLines} · {t.glueFlushFaces}.
 				</p>
 				<label class="block">
-					<span class={lbl}>Piece sizing</span>
+					<span class={lbl}>{t.pieceSizing}</span>
 					<select bind:value={$params.splitAlgorithm} class={selectInput} style:background-image={chevron}>
-						<option value="ideal">Balanced (even pieces)</option>
-						<option value="incremental">Packed (max per piece)</option>
+						<option value="ideal">{t.balancedPieces}</option>
+						<option value="incremental">{t.packedPieces}</option>
 					</select>
 				</label>
 				<label class="block">
-					<span class={lbl}>STL layout</span>
+					<span class={lbl}>{t.stlLayout}</span>
 					<select bind:value={$params.splitLayout} class={selectInput} style:background-image={chevron}>
-						<option value="zip">ZIP — one file per piece</option>
-						<option value="combined">Combined — pieces spread on one plate</option>
+						<option value="zip">{t.zipPerPiece}</option>
+						<option value="combined">{t.combinedPieces}</option>
 					</select>
 				</label>
 			{:else}
-				<p class="text-xs text-zinc-500">Fits the bed in one piece — no split needed.</p>
+				<p class="text-xs text-zinc-500">{t.fitsOnePiece}</p>
 			{/if}
 		{/if}
 	</section>
 
 	<!-- Export -->
 	<section class="flex flex-col gap-2">
-		<h2 class={section}>Export</h2>
+		<h2 class={section}>{t.export}</h2>
 		<button
 			onclick={() => onexport('stl')}
 			disabled={exporting || loading}
-			aria-label="Download STL"
+			aria-label={t.downloadStl}
 			class="flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-3 py-2.5 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:bg-blue-500 active:scale-[0.99] disabled:pointer-events-none disabled:opacity-50"
 		>
 			<svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 				<path stroke-linecap="round" stroke-linejoin="round" d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M7 10l5 5 5-5M12 15V3" />
 			</svg>
-			{exporting ? 'Exporting…' : splitActive && $params.splitLayout === 'zip' ? 'Download STL (ZIP)' : 'Download STL'}
-			<span class="text-xs font-normal text-blue-200/80">for printing</span>
+			{exporting ? t.exporting : splitActive && $params.splitLayout === 'zip' ? t.downloadStlZip : t.downloadStl}
+			<span class="text-xs font-normal text-blue-200/80">{t.forPrinting}</span>
 		</button>
 		<button
 			onclick={() => onexport('step')}
@@ -472,8 +481,8 @@
 			aria-label="Download STEP"
 			class="flex items-center justify-center gap-2 rounded-lg border border-zinc-700 bg-zinc-800/60 px-3 py-2 text-sm font-medium text-zinc-200 transition hover:border-zinc-600 hover:bg-zinc-800 disabled:pointer-events-none disabled:opacity-50"
 		>
-			{exporting ? 'Exporting…' : 'STEP file'}
-			<span class="text-xs font-normal text-zinc-500">for CAD</span>
+			{exporting ? t.exporting : t.stepFile}
+			<span class="text-xs font-normal text-zinc-500">{t.forCad}</span>
 		</button>
 		<div class="flex gap-2">
 			<button
@@ -483,7 +492,7 @@
 				<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M13.828 10.172a4 4 0 010 5.656l-3 3a4 4 0 01-5.656-5.656l1.5-1.5M10.172 13.828a4 4 0 010-5.656l3-3a4 4 0 015.656 5.656l-1.5 1.5" />
 				</svg>
-				{copied ? 'Copied!' : 'Copy link'}
+				{copied ? t.copied : t.copyLink}
 			</button>
 			<button
 				onclick={reset}
@@ -492,7 +501,7 @@
 				<svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
 					<path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h5M20 20v-5h-5M5.5 9a7 7 0 0111.9-2.1L20 9M18.5 15a7 7 0 01-11.9 2.1L4 15" />
 				</svg>
-				Reset
+				{t.reset}
 			</button>
 		</div>
 	</section>

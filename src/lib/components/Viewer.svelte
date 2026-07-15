@@ -6,6 +6,7 @@
 	import DimensionOverlay from './DimensionOverlay.svelte';
 	import DividerGizmos from './DividerGizmos.svelte';
 	import { mode } from '$lib/stores/params';
+	import { language, text } from '$lib/i18n';
 
 	// Cap device pixel ratio: phones report dpr 3, which renders 9× the pixels of
 	// dpr 1 for no visible gain on this simple scene. 2 is the quality/fillrate knee.
@@ -21,6 +22,7 @@
 	}
 
 	let { vertices, triangles, normals, edges, loading, error = null }: Props = $props();
+	let t = $derived(text[$language]);
 
 	// True while a divider handle is hovered/dragged — freezes OrbitControls so
 	// grabbing a divider repositions it instead of orbiting the camera.
@@ -64,14 +66,14 @@
 		<div class="absolute inset-0 z-10 flex items-center justify-center bg-black/30">
 			<div class="flex items-center gap-3 rounded-lg bg-zinc-800 px-4 py-3">
 				<div class="h-5 w-5 animate-spin rounded-full border-2 border-zinc-500 border-t-blue-400"></div>
-				<span class="text-sm text-zinc-300">Generating...</span>
+				<span class="text-sm text-zinc-300">{t.generating}</span>
 			</div>
 		</div>
 	{:else if loading}
 		<!-- A mesh is already on screen (placeholder or prior build); don't hide it -->
 		<div class="absolute right-4 top-4 z-10 flex items-center gap-2 rounded-full bg-zinc-800/90 px-3 py-1.5 shadow-lg">
 			<div class="h-3.5 w-3.5 animate-spin rounded-full border-2 border-zinc-500 border-t-blue-400"></div>
-			<span class="text-xs text-zinc-300">Generating...</span>
+			<span class="text-xs text-zinc-300">{t.generating}</span>
 		</div>
 	{/if}
 
