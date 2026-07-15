@@ -68,7 +68,7 @@
 	<div>
 		<label class="mb-1.5 block {lbl}" for={`bp-${key}`}>{label}</label>
 		<div class="flex items-center gap-1.5">
-			<button type="button" aria-label={`- ${label}`} onclick={() => step(key, -by, min, max)} disabled={$baseplateParams[key] <= min} class={stepBtn}>&minus;</button>
+			<button type="button" aria-label={`${t.decrease} ${label}`} onclick={() => step(key, -by, min, max)} disabled={$baseplateParams[key] <= min} class={stepBtn}>&minus;</button>
 			<input
 				id={`bp-${key}`}
 				type="number"
@@ -79,7 +79,7 @@
 				oninput={(e) => setNum(key, e.currentTarget.valueAsNumber, min, max)}
 				class={numInput}
 			/>
-			<button type="button" aria-label={`+ ${label}`} onclick={() => step(key, by, min, max)} disabled={$baseplateParams[key] >= max} class={stepBtn}>+</button>
+			<button type="button" aria-label={`${t.increase} ${label}`} onclick={() => step(key, by, min, max)} disabled={$baseplateParams[key] >= max} class={stepBtn}>+</button>
 		</div>
 	</div>
 {/snippet}
@@ -91,15 +91,16 @@
 			<span class={section}>{t.startPreset}</span>
 			<div class="flex flex-wrap gap-1.5">
 				{#each baseplatePresets as preset, i}
+					{@const presetText = presetTextKeys[i]}
 					<button
 						type="button"
-						title={t.presets[presetTextKeys[i]!.description] || preset.description}
+						title={presetText ? t.presets[presetText.description] : preset.description}
 						onclick={() => applyPreset(i)}
 						class="rounded-lg border px-2.5 py-1.5 text-xs font-medium transition {selectedPreset === i
 							? 'border-blue-500/60 bg-blue-500/15 text-blue-200'
 							: 'border-zinc-800 bg-zinc-800/40 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'}"
 					>
-						{t.presets[presetTextKeys[i]!.name] || preset.name}
+						{presetText ? t.presets[presetText.name] : preset.name}
 					</button>
 				{/each}
 			</div>

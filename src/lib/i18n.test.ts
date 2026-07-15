@@ -7,14 +7,23 @@ interface MockStorage {
 	setItem: ReturnType<typeof vi.fn<(key: string, value: string) => void>>;
 }
 
-async function loadI18n(browser: boolean, stored: string | null = null) {
+interface LoadOptions {
+	getThrows?: boolean;
+	setThrows?: boolean;
+}
+
+async function loadI18n(browser: boolean, stored: string | null = null, options: LoadOptions = {}) {
 	vi.resetModules();
 	vi.doMock('$app/environment', () => ({ browser }));
 
 	const storage: MockStorage = {
 		value: stored,
-		getItem: vi.fn<(key: string) => string | null>(() => storage.value),
+		getItem: vi.fn<(key: string) => string | null>(() => {
+			if (options.getThrows) throw new DOMException('blocked', 'SecurityError');
+			return storage.value;
+		}),
 		setItem: vi.fn<(key: string, value: string) => void>((_, value) => {
+			if (options.setThrows) throw new DOMException('blocked', 'SecurityError');
 			storage.value = value;
 		})
 	};
@@ -64,11 +73,34 @@ describe('i18n language store', () => {
 		expect(documentElement.lang).toBe('en');
 	});
 
+	it('falls back to English when reading local storage throws', async () => {
+		const { mod, storage, documentElement } = await loadI18n(true, null, { getThrows: true });
+
+		expect(get(mod.language)).toBe('en');
+		expect(storage.getItem).toHaveBeenCalledWith('gridfinity-language');
+		expect(documentElement.lang).toBe('en');
+	});
+
+	it('keeps the UI language when writing local storage throws', async () => {
+		const { mod, storage, documentElement } = await loadI18n(true, 'pl', { setThrows: true });
+
+		expect(get(mod.language)).toBe('pl');
+		expect(storage.setItem).toHaveBeenCalledWith('gridfinity-language', 'pl');
+		expect(documentElement.lang).toBe('pl');
+
+		mod.language.set('en');
+
+		expect(get(mod.language)).toBe('en');
+		expect(documentElement.lang).toBe('en');
+	});
+
 	it('provides English and Polish UI copy', async () => {
 		const { mod } = await loadI18n(false);
 
 		expect(mod.text.en.language).toBe('Language');
 		expect(mod.text.pl.language).toBe('Język');
 		expect(mod.text.pl.magnetHoles).toBe('Otwory na magnesy');
+		expect(mod.text.en.increase).toBe('Increase');
+		expect(mod.text.pl.decrease).toBe('Zmniejsz');
 	});
 });

@@ -10,7 +10,12 @@ function isLanguage(value: string | null): value is Language {
 
 function initialLanguage(): Language {
 	if (!browser) return 'en';
-	const stored = localStorage.getItem('gridfinity-language');
+	let stored: string | null = null;
+	try {
+		stored = localStorage.getItem('gridfinity-language');
+	} catch {
+		return 'en';
+	}
 	if (isLanguage(stored)) return stored;
 	return 'en';
 }
@@ -19,7 +24,11 @@ export const language = writable<Language>(initialLanguage());
 
 if (browser) {
 	language.subscribe((lang) => {
-		localStorage.setItem('gridfinity-language', lang);
+		try {
+			localStorage.setItem('gridfinity-language', lang);
+		} catch {
+			// Storage may be unavailable in privacy modes or sandboxed iframes.
+		}
 		document.documentElement.lang = lang;
 	});
 }
@@ -29,6 +38,8 @@ export const text = {
 		language: 'Language',
 		english: 'English',
 		polish: 'Polish',
+		decrease: 'Decrease',
+		increase: 'Increase',
 		appTitle: 'Gridfinity Bin Generator',
 		appName: 'Gridfinity Generator',
 		tagline: 'Parametric bins · live preview',
@@ -197,6 +208,8 @@ export const text = {
 		language: 'Język',
 		english: 'Angielski',
 		polish: 'Polski',
+		decrease: 'Zmniejsz',
+		increase: 'Zwiększ',
 		appTitle: 'Generator pojemników Gridfinity',
 		appName: 'Generator Gridfinity',
 		tagline: 'Parametryczne pojemniki · podgląd na żywo',
