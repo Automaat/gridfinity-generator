@@ -45,40 +45,40 @@ afterEach(() => {
 });
 
 describe('i18n language store', () => {
-	it('defaults to English during server rendering', async () => {
+	it('defaults to Polish during server rendering', async () => {
 		const { mod } = await loadI18n(false);
 
-		expect(get(mod.language)).toBe('en');
+		expect(get(mod.language)).toBe('pl');
 	});
 
 	it('restores and persists a supported browser language', async () => {
-		const { mod, storage, documentElement } = await loadI18n(true, 'pl');
+		const { mod, storage, documentElement } = await loadI18n(true, 'en');
+
+		expect(get(mod.language)).toBe('en');
+		expect(storage.getItem).toHaveBeenCalledWith('gridfinity-language');
+		expect(storage.setItem).toHaveBeenCalledWith('gridfinity-language', 'en');
+		expect(documentElement.lang).toBe('en');
+
+		mod.language.set('pl');
+
+		expect(storage.setItem).toHaveBeenLastCalledWith('gridfinity-language', 'pl');
+		expect(documentElement.lang).toBe('pl');
+	});
+
+	it('falls back to Polish for an unsupported stored language', async () => {
+		const { mod, storage, documentElement } = await loadI18n(true, 'de');
+
+		expect(get(mod.language)).toBe('pl');
+		expect(storage.setItem).toHaveBeenCalledWith('gridfinity-language', 'pl');
+		expect(documentElement.lang).toBe('pl');
+	});
+
+	it('falls back to Polish when reading local storage throws', async () => {
+		const { mod, storage, documentElement } = await loadI18n(true, null, { getThrows: true });
 
 		expect(get(mod.language)).toBe('pl');
 		expect(storage.getItem).toHaveBeenCalledWith('gridfinity-language');
-		expect(storage.setItem).toHaveBeenCalledWith('gridfinity-language', 'pl');
 		expect(documentElement.lang).toBe('pl');
-
-		mod.language.set('en');
-
-		expect(storage.setItem).toHaveBeenLastCalledWith('gridfinity-language', 'en');
-		expect(documentElement.lang).toBe('en');
-	});
-
-	it('falls back to English for an unsupported stored language', async () => {
-		const { mod, storage, documentElement } = await loadI18n(true, 'de');
-
-		expect(get(mod.language)).toBe('en');
-		expect(storage.setItem).toHaveBeenCalledWith('gridfinity-language', 'en');
-		expect(documentElement.lang).toBe('en');
-	});
-
-	it('falls back to English when reading local storage throws', async () => {
-		const { mod, storage, documentElement } = await loadI18n(true, null, { getThrows: true });
-
-		expect(get(mod.language)).toBe('en');
-		expect(storage.getItem).toHaveBeenCalledWith('gridfinity-language');
-		expect(documentElement.lang).toBe('en');
 	});
 
 	it('keeps the UI language when writing local storage throws', async () => {
