@@ -9,15 +9,15 @@ function isLanguage(value: string | null): value is Language {
 }
 
 function initialLanguage(): Language {
-	if (!browser) return 'en';
+	if (!browser) return 'pl';
 	let stored: string | null = null;
 	try {
 		stored = localStorage.getItem('gridfinity-language');
 	} catch {
-		return 'en';
+		return 'pl';
 	}
 	if (isLanguage(stored)) return stored;
-	return 'en';
+	return 'pl';
 }
 
 export const language = writable<Language>(initialLanguage());

@@ -3,26 +3,26 @@ import { test, expect } from '@playwright/test';
 test.describe('page load', () => {
 	test('has correct title', async ({ page }) => {
 		await page.goto('/');
-		await expect(page).toHaveTitle('Gridfinity Bin Generator');
+		await expect(page).toHaveTitle('Generator pojemników Gridfinity');
 	});
 
 	test('shows app header', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByRole('heading', { name: 'Gridfinity Generator' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Generator Gridfinity' })).toBeVisible();
 	});
 
 	test('shows size heading', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByRole('heading', { name: 'Size' })).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Rozmiar' })).toBeVisible();
 	});
 
-	test('can switch language to Polish', async ({ page }) => {
+	test('can switch language to English', async ({ page }) => {
 		await page.goto('/');
 
-		await page.getByLabel('Language').selectOption('pl');
+		await page.getByLabel('Język').selectOption('en');
 
-		await expect(page.getByRole('heading', { name: 'Rozmiar' })).toBeVisible();
-		await expect(page.getByText('Otwory na magnesy')).toBeVisible();
+		await expect(page.getByRole('heading', { name: 'Size' })).toBeVisible();
+		await expect(page.getByText('Magnet holes')).toBeVisible();
 	});
 });
 
@@ -44,27 +44,27 @@ test.describe('controls panel', () => {
 
 	test('shows dimension labels with mm values', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByText('Width (84mm)')).toBeVisible();
-		await expect(page.getByText('Length (42mm)')).toBeVisible();
-		await expect(page.getByText('Height (21mm)')).toBeVisible();
+		await expect(page.getByText('Szerokość (84mm)')).toBeVisible();
+		await expect(page.getByText('Długość (42mm)')).toBeVisible();
+		await expect(page.getByText('Wysokość (21mm)')).toBeVisible();
 	});
 
 	test('updates dimension label when input changes', async ({ page }) => {
 		await page.goto('/');
 
-		const widthInput = page.getByRole('spinbutton', { name: /Width/ });
+		const widthInput = page.getByRole('spinbutton', { name: /Szerokość/ });
 		await widthInput.click({ clickCount: 3 });
 		await widthInput.pressSequentially('4');
 
-		await expect(page.getByText('Width (168mm)')).toBeVisible({ timeout: 5000 });
+		await expect(page.getByText('Szerokość (168mm)')).toBeVisible({ timeout: 5000 });
 	});
 
 	test('renders feature checkboxes unchecked by default', async ({ page }) => {
 		await page.goto('/');
 
-		const magnetCheckbox = page.getByRole('checkbox', { name: 'Magnet holes' });
-		const screwCheckbox = page.getByRole('checkbox', { name: 'Screw holes' });
-		const labelCheckbox = page.getByRole('checkbox', { name: 'Label tab' });
+		const magnetCheckbox = page.getByRole('checkbox', { name: 'Otwory na magnesy' });
+		const screwCheckbox = page.getByRole('checkbox', { name: 'Otwory na śruby' });
+		const labelCheckbox = page.getByRole('checkbox', { name: 'Miejsce na etykietę' });
 
 		await expect(magnetCheckbox).not.toBeChecked();
 		await expect(screwCheckbox).not.toBeChecked();
@@ -74,7 +74,7 @@ test.describe('controls panel', () => {
 	test('can toggle checkboxes', async ({ page }) => {
 		await page.goto('/');
 
-		const magnetCheckbox = page.getByRole('checkbox', { name: 'Magnet holes' });
+		const magnetCheckbox = page.getByRole('checkbox', { name: 'Otwory na magnesy' });
 		await magnetCheckbox.check();
 		await expect(magnetCheckbox).toBeChecked();
 	});
@@ -82,9 +82,8 @@ test.describe('controls panel', () => {
 	test('renders stacking lip dropdown with standard selected', async ({ page }) => {
 		await page.goto('/');
 
-		// Stacking lip lives in the collapsible Advanced section.
 		await page.locator('summary').click();
-		const select = page.getByLabel('Stacking lip');
+		const select = page.getByLabel('Rant do piętrowania');
 		await expect(select).toHaveValue('standard');
 	});
 
@@ -92,7 +91,7 @@ test.describe('controls panel', () => {
 		await page.goto('/');
 
 		await page.locator('summary').click();
-		const select = page.getByLabel('Stacking lip');
+		const select = page.getByLabel('Rant do piętrowania');
 		await select.selectOption('reduced');
 		await expect(select).toHaveValue('reduced');
 
@@ -104,8 +103,8 @@ test.describe('controls panel', () => {
 		await page.goto('/');
 
 		await page.locator('summary').click();
-		await expect(page.getByText('Dividers X')).toBeVisible();
-		await expect(page.getByText('Dividers Y')).toBeVisible();
+		await expect(page.getByText('Przegrody X')).toBeVisible();
+		await expect(page.getByText('Przegrody Y')).toBeVisible();
 	});
 
 	test('renders export buttons', async ({ page }) => {
@@ -135,7 +134,7 @@ test.describe('3d viewer', () => {
 test.describe('wall thickness', () => {
 	test('renders wall thickness input with default', async ({ page }) => {
 		await page.goto('/');
-		await expect(page.getByText('Wall thickness (mm)')).toBeVisible();
+		await expect(page.getByText('Grubość ścianki (mm)')).toBeVisible();
 
 		const wallInput = page.locator('input[type="number"]').nth(3);
 		await expect(wallInput).toHaveValue('1.2');
