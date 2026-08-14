@@ -41,7 +41,7 @@
 		"@types/three": "^0.185.0",
 		"fflate": "^0.8.3",
 		"manifold-3d": "^3.5.1",
-		"replicad": "^0.23.0",
+		"replicad": "^1.0.0",
 		"replicad-opencascadejs": "^0.23.0",
 		"three": "^0.185.0"
 	}
