@@ -25,7 +25,7 @@
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/vite": "^4.2.2",
 		"@types/node": "^24.13.2",
-		"@vitest/coverage-v8": "^4.1.2",
+		"@vitest/coverage-v8": "^5.0.0",
 		"oxlint": "^1.58.0",
 		"oxlint-tsgolint": "^7.0.0",
 		"svelte": "^5.54.0",
@@ -33,7 +33,7 @@
 		"tailwindcss": "^4.2.2",
 		"typescript": "6.0.3",
 		"vite": "^8.0.0",
-		"vitest": "^4.1.2"
+		"vitest": "^5.0.0"
 	},
 	"dependencies": {
 		"@threlte/core": "^8.5.5",
